@@ -1,6 +1,6 @@
-# Makefile for Shiny
-# William Edwards 20100903
-# (c) MashMobile AB 2010; all rights reserved
+# Makefile for GlestNG
+# Licenced under GPL version 3.  See LICENSE file for details
+# (c) William Edwards 2011. all rights reserved
 
 CC = gcc
 CPP = g++
@@ -11,39 +11,33 @@ DEBUG = -O0
 OPTIMISATIONS = # -O9 -fomit-frame-pointer -fno-rtti -march=native # etc -fprofile-generate/-fprofile-use
 
 # default flags
-CFLAGS = ${HYGIENE} ${DEBUG} ${OPTIMISATIONS} ${C_EXT_FLAGS}
+CFLAGS = ${HYGIENE} ${DEBUG} ${OPTIMISATIONS} ${C_EXT_FLAGS} `pkg-config --cflags sdl`
 CPPFLAGS = ${CFLAGS}
 LDFLAGS = ${HYGIENE} ${DEBUG} ${OPTIMISATIONS}
 
 #target binary names
+	
+TRG_GLEST_NG = glestng
 
-TRG_SHINY = shiny
+OBJ_GLEST_NG_CPP = \
+	glestng.opp
 
-OBJ_SHINY_CPP = \
-	shiny.opp \
-	task.opp \
-	out.opp \
-	error.opp \
-	time.opp \
-	listener.opp \
-	console.opp \
-	dr.opp \
-	monitor2.opp
-
-OBJ_SHINY_C = 
+OBJ_GLEST_NG_C = 
 		
-OBJ_CPP = ${OBJ_SHINY_CPP}
+OBJ_CPP = ${OBJ_GLEST_NG_CPP}
 
-OBJ_C = ${OBJ_SHINY_C}
+OBJ_C = ${OBJ_GLEST_NG_C}
 
 OBJ = ${OBJ_CPP}  ${OBJ_C}
 
-TARGETS = ${TRG_SHINY}
+TARGETS = ${TRG_GLEST_NG}
 
-all:	${TARGETS}
+.PHONY:	clean all check_env
 
-${TRG_SHINY}:	${OBJ_SHINY_CPP} ${OBJ_SHINY_C}
-	${LD} ${CPPFLAGS} -o $@ $^ ${LDFLAGS}
+all:	check_env ${TARGETS}
+
+${TRG_GLEST_NG}: ${OBJ_GLEST_NG_CPP} ${OBJ_GLEST_NG_C}
+	${LD} ${CPPFLAGS} -o $@ $^ ${LDFLAGS} `pkg-config --libs --static sdl`
 
 # compile c files
 	
@@ -56,12 +50,14 @@ ${TRG_SHINY}:	${OBJ_SHINY_CPP} ${OBJ_SHINY_C}
 	${CPP} ${CPPFLAGS} -c $< -MD -MF $(<:%.cpp=%.dep) -o $@
 #misc
 
-.PHONY:	clean all
 clean:
 	rm -f ${TARGETS}
 	rm -f *.[hc]pp~ Makefile~ core
 	rm -f ${OBJ}
 	rm -f $(OBJ_C:%.o=%.dep) $(OBJ_CPP:%.opp=%.dep)
 
+check_env:
+	`pkg-config --exists sdl`
+	
 -include $(OBJ_C:%.o=%.dep) $(OBJ_CPP:%.opp=%.dep)
 
