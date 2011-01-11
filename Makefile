@@ -1,6 +1,7 @@
-# Makefile for GlestNG
-# Licenced under GPL version 3.  See LICENSE file for details
-# (c) William Edwards 2011. all rights reserved
+# Makefile is part of the GlestNG RTS game engine.
+# Licensed under the GNU AFFERO GENERAL PUBLIC LICENSE version 3
+# See LICENSE for details
+# (c) William Edwards, 2011; all rights reserved
 
 CC = gcc
 CPP = g++
@@ -20,7 +21,10 @@ LDFLAGS = ${HYGIENE} ${DEBUG} ${OPTIMISATIONS}
 TRG_GLEST_NG = glestng
 
 OBJ_GLEST_NG_CPP = \
-	glestng.opp
+	glestng.opp \
+	planet.opp \
+	graphics.opp \
+	3d.opp
 
 OBJ_GLEST_NG_C = 
 		
@@ -37,7 +41,7 @@ TARGETS = ${TRG_GLEST_NG}
 all:	check_env ${TARGETS}
 
 ${TRG_GLEST_NG}: ${OBJ_GLEST_NG_CPP} ${OBJ_GLEST_NG_C}
-	${LD} ${CPPFLAGS} -o $@ $^ ${LDFLAGS} `pkg-config --libs --static sdl`
+	${LD} ${CPPFLAGS} -o $@ $^ ${LDFLAGS} `pkg-config --libs sdl gl`
 
 # compile c files
 	
@@ -57,7 +61,7 @@ clean:
 	rm -f $(OBJ_C:%.o=%.dep) $(OBJ_CPP:%.opp=%.dep)
 
 check_env:
-	`pkg-config --exists sdl`
+	`pkg-config --exists sdl gl`
 	
 -include $(OBJ_C:%.o=%.dep) $(OBJ_CPP:%.opp=%.dep)
 

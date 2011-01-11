@@ -7,6 +7,9 @@
 
 #include <math.h>
 #include <assert.h>
+#include <float.h>
+#include "memcheck.h"
+
 #include "3d.hpp"
 
 void vec_t::normalise() {
@@ -18,12 +21,22 @@ void vec_t::normalise() {
 	}
 }
 
+vec_t vec_t::normalise(const vec_t& v) {
+	vec_t ret = v;
+	ret.normalise();
+	return ret;
+}
+
 float vec_t::distance(const vec_t& v) const {
 	return sqrt(distance_sqrd(v));
 }
 
+float vec_t::magnitude() const {
+	return sqrt(magnitude_sqrd());
+}
+
 bool sphere_t::intersects(const ray_t& r) const {
-	const float a = r.d.mag_sqrd();
+	const float a = r.d.magnitude_sqrd();
 	assert(a>0);
 	const float b = 2.0f * r.d.dot(r.o) - centre.dot(r.d);
 	const float c = centre.distance_sqrd(r.o)-(radius*radius);
@@ -44,7 +57,7 @@ static bool _aabb_intersects_r(bool& found,float D,float d,float e,float& t0,flo
 		if (s < t1) t1 = s;
 		if (t0 > t1) return false;
 	}
-	return true;    
+	return true;
 }
 
 bool aabb_t::intersects(const ray_t& r) const {
@@ -76,5 +89,43 @@ bool aabb_t::intersects(const ray_t& r) const {
 		((fabs(d.z-t0*r.d.z)>b.z) || (fabs(d.z-t1*r.d.z)>b.z)))
 		return false;
 	return true;
+}
+
+static const vec_t
+	BOUNDS_MIN = vec_t(FLT_MAX,FLT_MAX,FLT_MAX),
+	BOUNDS_MAX = vec_t(-FLT_MAX,-FLT_MAX,-FLT_MAX);
+
+bounds_t::bounds_t():
+	sphere_t(vec_t(0,0,0),0),
+	aabb_t(BOUNDS_MIN,BOUNDS_MAX)
+{}
+
+bounds_t::bounds_t(const vec_t& a,const vec_t& b):
+	sphere_t(vec_t(0,0,0),0),
+	aabb_t(a,b)
+{
+	fix();
+}
+
+void bounds_t::reset() {
+	a = BOUNDS_MIN;
+	b = BOUNDS_MAX;
+	VALGRIND_MAKE_MEM_UNDEFINED(&centre,sizeof(centre));
+	VALGRIND_MAKE_MEM_UNDEFINED(&radius,sizeof(radius));
+}
+
+void bounds_t::include(const vec_t& v) {
+	if(v.x < a.x) a.x = v.x;
+	if(v.y < a.y) a.y = v.y;
+	if(v.z < a.z) a.z = v.z;
+	if(v.x > b.x) b.x = v.x;
+	if(v.y > b.y) b.y = v.y;
+	if(v.z > b.z) b.z = v.z;
+}
+
+void bounds_t::fix() {
+	const vec_t sz = b-a;
+	centre = vec_t(sz.x/2.0f,sz.y/2.0f,sz.z/2.0f);
+	radius = sz.magnitude()/2.0f;
 }
 
