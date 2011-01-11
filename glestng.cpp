@@ -38,8 +38,7 @@ int main(int argc,char** args) {
 		return EXIT_FAILURE;
 	}
 	
-	printf("terraforming...\n");
-	terrain = gen_planet(2);
+	terrain = gen_planet(5,500,3);
 	
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
 	screen = SDL_SetVideoMode(1024,768,32,SDL_OPENGL/*|SDL_FULLSCREEN*/);
@@ -98,7 +97,7 @@ int main(int argc,char** args) {
 			}
 		}
 		tick();
-       }
+        }
         
         delete terrain;
 	

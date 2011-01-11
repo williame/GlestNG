@@ -16,7 +16,7 @@ struct terrain_t {
 	virtual bool intersection(int x,int y,vec_t& pt) = 0;
 };
 
-terrain_t* gen_planet(size_t recursionLevel);
+terrain_t* gen_planet(size_t recursionLevel,size_t iterations,size_t smoothing_passes);
 
 #endif //__TERRAIN_HPP__
 

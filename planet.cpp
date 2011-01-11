@@ -12,6 +12,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <limits.h>
+#include <time.h>
 
 #include "memcheck.h"
 #include "terrain.hpp"
@@ -67,7 +69,7 @@ template<typename T> void fixed_array_t<T>::fill(const T& t) {
 }
 
 enum {
-	DIVIDE_THRESHOLD = 3,
+	DIVIDE_THRESHOLD = 4,
 	FACE_IDX = 18, // how much to shift to get the ID of the mesh the face belongs to?
 	FACE_MASK = (1<<FACE_IDX)-1,
 };
@@ -76,6 +78,12 @@ struct face_t {
 	face_t() {}
 	face_t(GLuint a_,GLuint b_,GLuint c_): a(a_), b(b_), c(c_) {}
 	GLuint a,b,c;
+};
+
+struct rgb_t {
+	rgb_t() {}
+	rgb_t(GLubyte r_,GLubyte g_,GLubyte b_): r(r_), g(g_), b(b_) {}
+	GLubyte r,g,b;
 };
 
 struct planet_t;
@@ -91,13 +99,14 @@ struct mesh_t {
 };
 
 struct planet_t: public terrain_t {
-	planet_t	(size_t recursionLevel);
+	planet_t	(size_t recursionLevel,size_t iterations,size_t smoothing_passes);
 	~planet_t();
 	static size_t num_points(size_t recursionLevel);
 	GLuint midpoint(GLuint a,GLuint b);
 	GLuint find_face(GLuint a,GLuint b,GLuint c);
 	void draw();
 	void divide(const face_t& tri,size_t recursionLevel,size_t depth);
+	void gen(size_t iterations,size_t smoothing_passes);
 	bool intersection(int x,int y,vec_t& pt);
 	typedef std::map<uint64_t,GLuint> midpoints_t;
 	midpoints_t midpoints;
@@ -105,7 +114,7 @@ struct planet_t: public terrain_t {
 	meshes_t meshes;
 	fixed_array_t<vec_t> points;
 	fixed_array_t<vec_t> normals;
-	fixed_array_t<float> heights;
+	fixed_array_t<rgb_t> colours;
 	struct adjacent_t {
 		adjacent_t();
 		void dump(FILE* out=stdout) const;
@@ -117,10 +126,20 @@ struct planet_t: public terrain_t {
 	};
 	fixed_array_t<adjacent_t> adjacent_faces;
 	fixed_array_t<adjacent_t> adjacent_points;
+	static const float
+		WATER_LEVEL = 0.9f,
+		MOUNTAIN_LEVEL = 0.97f;
+	enum type_t {
+		WATER,
+		ICE,
+		LAND,
+		MOUNTAIN,
+	};
+	fixed_array_t<type_t> types;
 };
 
 size_t mesh_t::num_faces(size_t recursionLevel) {
-	static const size_t Nf[] = {0,65,64,153,561,2145,8385};
+	static const size_t Nf[] = {0,0,64,256,0,0,0};
 	assert(recursionLevel <= DIVIDE_THRESHOLD);
 	assert(recursionLevel<(sizeof(Nf)/sizeof(*Nf)));
 	const size_t nf = Nf[recursionLevel];
@@ -165,7 +184,8 @@ mesh_t::mesh_t(planet_t& p,face_t tri,size_t recursionLevel):
 	}
 }
 
-static void _vertex(const vec_t& n,const vec_t& v) {
+static void _vertex(const rgb_t& c,const vec_t& n,const vec_t& v) {
+	glColor3ub(c.r,c.g,c.b);
 	glNormal3f(n.x,n.y,n.z);
 	glVertex3f(v.x,v.y,v.z);
 }
@@ -175,9 +195,9 @@ void mesh_t::draw() {
 	glBegin(GL_TRIANGLES);
 	for(size_t i=0; i<faces.size(); i++) {
 		const face_t& f = faces[i];
-		_vertex(planet.normals[f.a],planet.points[f.a]);
-		_vertex(planet.normals[f.b],planet.points[f.b]);
-		_vertex(planet.normals[f.c],planet.points[f.c]);
+		_vertex(planet.colours[f.a],planet.normals[f.a],planet.points[f.a]);
+		_vertex(planet.colours[f.b],planet.normals[f.b],planet.points[f.b]);
+		_vertex(planet.colours[f.c],planet.normals[f.c],planet.points[f.c]);
 	}
 	glEnd();
 }
@@ -262,13 +282,15 @@ size_t planet_t::num_points(size_t recursionLevel) {
 	return (5*pow(2,2*recursionLevel+3)+2);
 }
 
-planet_t::planet_t(size_t recursionLevel):
+planet_t::planet_t(size_t recursionLevel,size_t iterations,size_t smoothing_passes):
 	points(num_points(recursionLevel)),
 	normals(num_points(recursionLevel)),
-	heights(num_points(recursionLevel)),
+	colours(num_points(recursionLevel)),
 	adjacent_faces(num_points(recursionLevel),true),
-	adjacent_points(num_points(recursionLevel),true)
+	adjacent_points(num_points(recursionLevel),true),
+	types(num_points(recursionLevel))
 {
+	printf("terraforming...\n: recursionLevel = %zu\n",recursionLevel);
 	static const float t = (1.0f + sqrt(5.0f)) / 2.0f;
 	static const vec_t Ts[12] = {
 		vec_t(-1, t, 0),vec_t( 1, t, 0),vec_t(-1,-t, 0),vec_t( 1,-t, 0),
@@ -286,8 +308,9 @@ planet_t::planet_t(size_t recursionLevel):
         	size_t face_count = 0;
         	for(meshes_t::const_iterator i=meshes.begin(); i!=meshes.end(); i++)
         		face_count += (*i)->faces.size();
-        	printf("%zu points, %zu meshes, %zu faces\n",points.size(),meshes.size(),face_count);
+        	printf(": %zu points, %zu meshes, %zu faces\n",points.size(),meshes.size(),face_count);
 	assert(points.full());
+	gen(iterations,smoothing_passes);
 	normals.fill(vec_t(0,0,0));
 	for(meshes_t::const_iterator i=meshes.begin(); i!=meshes.end(); i++) {
 		const mesh_t* mesh = *i;
@@ -329,6 +352,108 @@ void planet_t::divide(const face_t& tri,size_t recursionLevel,size_t depth) {
 	}
 }
 
+static float randf() {
+	return (float)random()/RAND_MAX;
+}
+
+void planet_t::gen(size_t iterations,size_t smoothing_passes) {
+        // http://freespace.virgin.net/hugo.elias/models/m_landsp.htm
+        printf(": generating landscape with %zu iterations\n",iterations); 
+        srandom(time(NULL));
+        vec_t n, v;
+        fixed_array_t<float> adj(points.size());
+        adj.fill(0);
+        for(size_t i=0; i<iterations; i++) {
+        		do {
+			n.x = (randf()-0.5f)*2.0f;
+			n.y = (randf()-0.5f)*2.0f;
+			n.z = (randf()-0.5f)*2.0f;
+		} while(n.magnitude_sqrd() <= 0.0f);
+		const int m = (randf() > 0.7)? -1: 1;
+		for(size_t p=0; p<points.size(); p++) {
+			v = points[p];
+			v -= n;
+			if(v.dot(n) > 0)
+				adj[p] += m;
+			else
+				adj[p] -= m;
+		}
+	}
+	// rescale all
+	float mn = INT_MAX, mx = -INT_MAX;
+	for(size_t p=0; p<adj.size(); p++) {
+		mn = std::min(mn,adj[p]);
+		mx = std::max(mx,adj[p]);
+	}
+	const float s = mx-mn, t = (1.0f-WATER_LEVEL)*1.5f;
+	const rgb_t WATER_COLOUR(0,0,0xff),
+		ICE_COLOUR(0xff,0xff,0xff),
+		LAND_COLOUR(0,0xff,0),
+		MOUNTAIN_COLOUR(0xa0,0xa0,0xa0);
+	const float POLAR = 0.7f;
+	for(size_t p=0; p<points.size(); p++) {
+		const float a = 1.0f - (((adj[p]-mn)/s)*t);
+		adj[p] = a;
+	}
+	// classify it
+	for(size_t p=0; p<points.size(); p++) {
+		const float y = points[p].y;
+		const bool polar = (y < -POLAR || y > POLAR);
+		if(adj[p] > WATER_LEVEL) {
+			if((adj[p] > MOUNTAIN_LEVEL) || polar)
+				types.append(MOUNTAIN);
+			else
+				types.append(LAND);	
+		} else {
+			if(polar)
+				types.append(ICE);
+			else
+				types.append(WATER);
+		}	
+	}
+	// smooth land that isn't mountains
+	printf(": smoothing land with %zu passes\n",smoothing_passes);
+	for(size_t i=0; i<smoothing_passes; i++) {
+		for(size_t p=0; p<points.size(); p++) {
+			if(types[p] == LAND) {
+				float a = adj[p];
+				for(int n=0; n<6; n++)
+					if(adjacent_points[p].adj[n] == adjacent_t::EMPTY)
+						break;
+					else
+						a += adj[adjacent_points[p].adj[n]];
+				a /= adjacent_points[p].size()+1;
+				adj[p] = a;
+			}
+		}
+	}
+	// set heights
+	for(size_t p=0; p<points.size(); p++)
+		if(types[p] == WATER || types[p] == ICE)
+			points[p] *= WATER_LEVEL;
+		else
+			points[p] *= adj[p];
+	// colour it
+	for(size_t p=0; p<points.size(); p++) {
+		switch(types[p]) {
+		case WATER:
+			colours.append(WATER_COLOUR);
+			break;
+		case ICE:
+			colours.append(ICE_COLOUR);
+			break;
+		case LAND:
+			colours.append(LAND_COLOUR);
+			break;
+		case MOUNTAIN:
+			colours.append(MOUNTAIN_COLOUR);
+			break;
+		default:
+			assert(false);
+		}
+	}
+}
+
 GLuint planet_t::midpoint(GLuint a,GLuint b) {
 	const uint64_t key = (std::min<uint64_t>(a,b) << 32) + std::max(a,b);
 	midpoints_t::iterator i = midpoints.find(key);
@@ -360,6 +485,6 @@ bool planet_t::intersection(int x,int y,vec_t& pt) {
 	return false;
 }
 
-terrain_t* gen_planet(size_t recursionLevel) {
-	return new planet_t(recursionLevel);
+terrain_t* gen_planet(size_t recursionLevel,size_t iterations,size_t smoothing_passes) {
+	return new planet_t(recursionLevel,iterations,smoothing_passes);
 }
