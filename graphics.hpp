@@ -8,6 +8,7 @@
 #ifndef __GRAPHICS_HPP__
 #define __GRAPHICS_HPP__
 
+#include <SDL.h>
 #define GL_GLEXT_PROTOTYPES
 #include <SDL_opengl.h>
 
@@ -15,6 +16,7 @@ class graphics_mgr_t {
 public:
 	static graphics_mgr_t* mgr();
 	GLuint alloc_vbo(GLenum target,GLsizeiptr size,const GLvoid* data,GLenum usage);
+	GLuint alloc_2D(SDL_Surface* image);
 private:
 	graphics_mgr_t();
 };

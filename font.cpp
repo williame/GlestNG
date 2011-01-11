@@ -12,7 +12,9 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "graphics.hpp"
 #include "font.hpp"
+#include "3d.hpp"
 
 #include "font.dat"
 
@@ -89,12 +91,14 @@ struct font_glyph_t {
 	{251,52,136,14,19,2,-1,14},{252,50,174,14,18,2,-1,14},{253,206,18,16,23,0,-5,13},
 	{254,0,83,15,22,0,-5,14},{255,199,42,16,22,0,-5,13}};
 	
+static const size_t num_glyths = (sizeof(font_glyth)/sizeof(font_glyph_t));
+	
 class font_mgr_t::impl_t: public font_mgr_t {
 public:
 	impl_t();
 private:
 	const font_glyph_t* get_glyth(int code) const;
-	SDL_Surface* bmp;
+	GLuint texture;
 };
 
 font_mgr_t::impl_t::impl_t() {
@@ -103,9 +107,15 @@ font_mgr_t::impl_t::impl_t() {
 		fprintf(stderr,"IMG_Init: %s\n", IMG_GetError());
 		exit(EXIT_FAILURE);
 	}
-	bmp = IMG_Load_RW(SDL_RWFromConstMem(font_data,sizeof(font_data)),1);
+	SDL_Surface* bmp = IMG_Load_RW(SDL_RWFromConstMem(font_data,sizeof(font_data)),1);
 	if(!bmp) {
 		fprintf(stderr,"IMG_Load_RW: %s\n", IMG_GetError());
+		exit(EXIT_FAILURE);
+	}
+	texture = graphics_mgr()->alloc_2D(bmp);
+	SDL_FreeSurface(bmp);
+	if(!texture) {
+		fprintf(stderr,"Could not load embedded bitmap font\n");
 		exit(EXIT_FAILURE);
 	}
 	printf("loaded embedded bitmap font: %dx%d\n",bmp->w,bmp->h);
@@ -114,7 +124,7 @@ font_mgr_t::impl_t::impl_t() {
 const font_glyph_t* font_mgr_t::impl_t::get_glyth(int code) const {
 	code -= font_glyth[0].code;
 	if(code < 0) return NULL;
-	if(code >= (sizeof(font_glyth)/sizeof(font_glyph_t))) return NULL;
+	if((size_t)code >= num_glyths) return NULL;
 	assert(font_glyth[code].code == code);
 	return font_glyth+code;
 }
