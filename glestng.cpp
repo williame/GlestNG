@@ -12,6 +12,7 @@
 #include <inttypes.h>
 
 #include "terrain.hpp"
+#include "font.hpp"
 
 SDL_Surface* screen;
 terrain_t* terrain;
@@ -39,6 +40,7 @@ int main(int argc,char** args) {
 	}
 	
 	terrain = gen_planet(5,500,3);
+	font_mgr();
 	
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
 	screen = SDL_SetVideoMode(1024,768,32,SDL_OPENGL/*|SDL_FULLSCREEN*/);
