@@ -12,19 +12,19 @@
 
 #include "3d.hpp"
 
-void vec_t::normalise() {
+vec_t& vec_t::normalise() {
 	const float d  = sqrt(x*x + y*y + z*z);
 	if(d > 0) {
 		x /= d;
 		y /= d;
 		z /= d;
 	}
+	return *this;
 }
 
 vec_t vec_t::normalise(const vec_t& v) {
 	vec_t ret = v;
-	ret.normalise();
-	return ret;
+	return ret.normalise();
 }
 
 float vec_t::distance(const vec_t& v) const {

@@ -20,13 +20,17 @@ struct vec_t {
 	inline vec_t operator-(const vec_t& v) const;
 	inline vec_t& operator*=(const matrix_t& m);
 	inline vec_t operator*(const matrix_t& m) const;
+	inline vec_t& operator+=(const vec_t& v);
+	inline vec_t operator+(const vec_t& v) const;
+	inline vec_t& operator/=(float d);
+	inline vec_t operator/(float d) const;
 	inline vec_t cross(const vec_t& v) const;
 	inline float dot(const vec_t& v) const;
 	inline float magnitude_sqrd() const;
 	float magnitude() const;
 	inline float distance_sqrd(const vec_t& v) const;
 	float distance(const vec_t& v) const;
-	void normalise();
+	vec_t& normalise();
 	static vec_t normalise(const vec_t& v);
 };
 
@@ -81,6 +85,32 @@ inline vec_t& vec_t::operator*=(const matrix_t& m) {
 inline vec_t vec_t::operator*(const matrix_t& m) const {
 	vec_t ret = *this;
 	ret *= m;
+	return ret;
+}
+
+inline vec_t& vec_t::operator+=(const vec_t& v) {
+	x += v.x;
+	y += v.y;
+	z += v.z;
+	return *this;
+}
+
+inline vec_t vec_t::operator+(const vec_t& v) const {
+	vec_t ret = *this;
+	ret += v;
+	return ret;
+}
+
+inline vec_t& vec_t::operator/=(float d) {
+	x /= d;
+	y /= d;
+	z /= d;
+	return *this;
+}
+
+inline vec_t vec_t::operator/(float d) const {
+	vec_t ret = *this;
+	ret /= d;
 	return ret;
 }
 

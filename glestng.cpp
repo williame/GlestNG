@@ -24,10 +24,12 @@ void tick() {
 	SDL_Flip(screen);
 }
 
-float* v4(float a,float b,float c,float d) {
-	static float r[4] = {a,b,c,d};
-	return r;
-}
+struct v4_t {
+	v4_t(float a,float b,float c,float d) {
+		v[0] = a; v[1] = b; v[2] = c; v[3] = d;
+	}
+	float v[4];
+};
 
 int main(int argc,char** args) {
 	
@@ -45,19 +47,28 @@ int main(int argc,char** args) {
 		fprintf(stderr,"Unable to create SDL screen: %s\n",SDL_GetError());
 		return EXIT_FAILURE;
 	}
-	glLightfv(GL_LIGHT0,GL_AMBIENT,v4(0,0,0,1));
-        glLightfv(GL_LIGHT0,GL_DIFFUSE,v4(1.,1.,1.,1.));
-        glLightfv(GL_LIGHT0,GL_SPECULAR,v4(1.,1.,1.,1.));
-        glLightfv(GL_LIGHT0,GL_POSITION,v4(1.,1.,1.,0.));
-        glMaterialfv(GL_FRONT,GL_AMBIENT,v4(.7,.7,.7,1.));
-        glMaterialfv(GL_FRONT,GL_DIFFUSE,v4(.8,.8,.8,1.));
-        glMaterialfv(GL_FRONT,GL_SPECULAR,v4(1.,1.,1.,1.));
+	v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,1.,0.),
+		mat_amb(.7,.7,.7,1.), mat_dif(.8,.8,.8,1.), mat_spec(1.,1.,1.,1.);
+	glLightfv(GL_LIGHT0,GL_AMBIENT,light_amb.v);
+        glLightfv(GL_LIGHT0,GL_DIFFUSE,light_dif.v);
+        glLightfv(GL_LIGHT0,GL_SPECULAR,light_spec.v);
+        glLightfv(GL_LIGHT0,GL_POSITION,light_pos.v);
+        glMaterialfv(GL_FRONT,GL_AMBIENT,mat_amb.v);
+        glMaterialfv(GL_FRONT,GL_DIFFUSE,mat_dif.v);
+        glMaterialfv(GL_FRONT,GL_SPECULAR,mat_spec.v);
         glMaterialf(GL_FRONT,GL_SHININESS,100.0);
         glEnable(GL_LIGHTING);
         glEnable(GL_LIGHT0);
         glDepthFunc(GL_LEQUAL);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_COLOR_MATERIAL);
+        glEnable(GL_RESCALE_NORMAL);
+	glViewport(0,0,screen->w,screen->h);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	const float left = -(float)screen->w/(float)screen->h;
+	glOrtho(left,-left,-1,1,10,-10);
+	glMatrixMode(GL_MODELVIEW);
 	
 	bool quit = false;
 	SDL_Event event;
@@ -65,9 +76,9 @@ int main(int argc,char** args) {
 		while(!quit && SDL_PollEvent(&event)) {
 			switch (event.type) {
 			case SDL_MOUSEMOTION:
-				printf("Mouse moved by %d,%d to (%d,%d)\n", 
+				/*printf("Mouse moved by %d,%d to (%d,%d)\n", 
 				event.motion.xrel, event.motion.yrel,
-				event.motion.x, event.motion.y);
+				event.motion.x, event.motion.y);*/
 				break;
 			case SDL_MOUSEBUTTONDOWN:
 				printf("Mouse button %d pressed at (%d,%d)\n",
