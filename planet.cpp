@@ -127,13 +127,14 @@ struct planet_t: public terrain_t {
 	fixed_array_t<adjacent_t> adjacent_faces;
 	fixed_array_t<adjacent_t> adjacent_points;
 	static const float
-		WATER_LEVEL = 0.9f,
-		MOUNTAIN_LEVEL = 0.97f;
+		WATER_LEVEL = 0.85f,
+		MOUNTAIN_LEVEL = 0.95f;
 	enum type_t {
 		WATER,
 		ICE,
 		LAND,
 		MOUNTAIN,
+		ICE_FLOW,
 	};
 	fixed_array_t<type_t> types;
 };
@@ -386,22 +387,20 @@ void planet_t::gen(size_t iterations,size_t smoothing_passes) {
 		mx = std::max(mx,adj[p]);
 	}
 	const float s = mx-mn, t = (1.0f-WATER_LEVEL)*1.5f;
-	const rgb_t WATER_COLOUR(0,0,0xff),
-		ICE_COLOUR(0xff,0xff,0xff),
-		LAND_COLOUR(0,0xff,0),
-		MOUNTAIN_COLOUR(0xa0,0xa0,0xa0);
-	const float POLAR = 0.7f;
 	for(size_t p=0; p<points.size(); p++) {
 		const float a = 1.0f - (((adj[p]-mn)/s)*t);
 		adj[p] = a;
 	}
 	// classify it
+	const float POLAR = 0.7f;
 	for(size_t p=0; p<points.size(); p++) {
 		const float y = points[p].y;
 		const bool polar = (y < -POLAR || y > POLAR);
 		if(adj[p] > WATER_LEVEL) {
-			if((adj[p] > MOUNTAIN_LEVEL) || polar)
+			if((adj[p] > MOUNTAIN_LEVEL))
 				types.append(MOUNTAIN);
+			else if(polar)
+				types.append(ICE_FLOW);
 			else
 				types.append(LAND);	
 		} else {
@@ -415,7 +414,7 @@ void planet_t::gen(size_t iterations,size_t smoothing_passes) {
 	printf(": smoothing land with %zu passes\n",smoothing_passes);
 	for(size_t i=0; i<smoothing_passes; i++) {
 		for(size_t p=0; p<points.size(); p++) {
-			if(types[p] == LAND) {
+			if(types[p] == LAND || types[p] == ICE_FLOW) {
 				float a = adj[p];
 				for(int n=0; n<6; n++)
 					if(adjacent_points[p].adj[n] == adjacent_t::EMPTY)
@@ -434,6 +433,11 @@ void planet_t::gen(size_t iterations,size_t smoothing_passes) {
 		else
 			points[p] *= adj[p];
 	// colour it
+	const rgb_t WATER_COLOUR(0,0,0xff),
+		ICE_COLOUR(0xff,0xff,0xff),
+		LAND_COLOUR(0,0xff,0),
+		ICE_FLOW_COLOUR(0xc0,0xc0,0xc0),
+		MOUNTAIN_COLOUR(0xa0,0xa0,0xa0);
 	for(size_t p=0; p<points.size(); p++) {
 		switch(types[p]) {
 		case WATER:
@@ -444,6 +448,9 @@ void planet_t::gen(size_t iterations,size_t smoothing_passes) {
 			break;
 		case LAND:
 			colours.append(LAND_COLOUR);
+			break;
+		case ICE_FLOW:
+			colours.append(ICE_FLOW_COLOUR);
 			break;
 		case MOUNTAIN:
 			colours.append(MOUNTAIN_COLOUR);
