@@ -5,10 +5,13 @@
  (c) William Edwards, 2011; all rights reserved
 */
 
-#include <SDL.h>
-#include <SDL_opengl.h>
 #include <stdio.h>
 #include <inttypes.h>
+
+#include <SDL.h>
+#define GL_GLEXT_PROTOTYPES
+#include <SDL_opengl.h>
+#include <GL/glu.h>
 
 #include "terrain.hpp"
 #include "font.hpp"
@@ -16,10 +19,32 @@
 SDL_Surface* screen;
 terrain_t* terrain;
 
+void ui() {
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	glLoadIdentity();
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glViewport(0,0,screen->w,screen->h);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluOrtho2D(0,screen->w,0,screen->h);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glDisable(GL_DEPTH_TEST);
+	font_mgr()->draw(10,10,"GlestNG");
+	glEnable(GL_DEPTH_TEST);
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
+	glPopMatrix();
+}
+
 void tick() {
-	glClearColor(1,1,1,1);
+	glClearColor(.2,.1,.2,1);
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 	terrain->draw();
+	ui();
 	SDL_GL_SwapBuffers();
 	SDL_Flip(screen);
 }
@@ -37,16 +62,15 @@ int main(int argc,char** args) {
 		fprintf(stderr,"Unable to initialize SDL: %s\n",SDL_GetError());
 		return EXIT_FAILURE;
 	}
-	
-	terrain = gen_planet(5,500,3);
-	font_mgr();
-	
+		
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
 	screen = SDL_SetVideoMode(1024,768,32,SDL_OPENGL/*|SDL_FULLSCREEN*/);
 	if(!screen) {
 		fprintf(stderr,"Unable to create SDL screen: %s\n",SDL_GetError());
 		return EXIT_FAILURE;
 	}
+	terrain = gen_planet(5,500,3);
+
 	v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,1.,0.),
 		mat_amb(.7,.7,.7,1.), mat_dif(.8,.8,.8,1.), mat_spec(1.,1.,1.,1.);
 	glLightfv(GL_LIGHT0,GL_AMBIENT,light_amb.v);
@@ -61,8 +85,13 @@ int main(int argc,char** args) {
         glEnable(GL_LIGHT0);
         glDepthFunc(GL_LEQUAL);
         glEnable(GL_DEPTH_TEST);
+        glAlphaFunc(GL_GREATER,0.4);
         glEnable(GL_COLOR_MATERIAL);
         glEnable(GL_RESCALE_NORMAL);
+	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_NORMALIZE);
+	glEnable(GL_BLEND);
+	glEnable(GL_TEXTURE_2D);
 	glViewport(0,0,screen->w,screen->h);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();

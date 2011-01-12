@@ -12,7 +12,7 @@ DEBUG = -O0
 OPTIMISATIONS = # -O9 -fomit-frame-pointer -fno-rtti -march=native # etc -fprofile-generate/-fprofile-use
 
 # default flags
-CFLAGS = ${HYGIENE} ${DEBUG} ${OPTIMISATIONS} ${C_EXT_FLAGS} `pkg-config --cflags sdl SDL_image`
+CFLAGS = ${HYGIENE} ${DEBUG} ${OPTIMISATIONS} ${C_EXT_FLAGS} `pkg-config --cflags sdl SDL_image glu`
 CPPFLAGS = ${CFLAGS}
 LDFLAGS = ${HYGIENE} ${DEBUG} ${OPTIMISATIONS}
 
@@ -25,6 +25,7 @@ OBJ_GLEST_NG_CPP = \
 	planet.opp \
 	graphics.opp \
 	font.opp \
+	ui.opp \
 	3d.opp
 
 OBJ_GLEST_NG_C = 
@@ -42,7 +43,7 @@ TARGETS = ${TRG_GLEST_NG}
 all:	check_env ${TARGETS}
 
 ${TRG_GLEST_NG}: ${OBJ_GLEST_NG_CPP} ${OBJ_GLEST_NG_C}
-	${LD} ${CPPFLAGS} -o $@ $^ ${LDFLAGS} `pkg-config --libs sdl gl SDL_image`
+	${LD} ${CPPFLAGS} -o $@ $^ ${LDFLAGS} `pkg-config --libs sdl gl SDL_image glu`
 
 # compile c files
 	

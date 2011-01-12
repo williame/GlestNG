@@ -19,7 +19,7 @@
 #include "font.dat"
 
 struct {
-	int img_w, img_h, size, ascent, descent;
+	int w, h, size, ascent, descent;
 } const font_meta = {256,256,23,23,-7};
 
 struct font_glyph_t {
@@ -96,6 +96,8 @@ static const size_t num_glyths = (sizeof(font_glyth)/sizeof(font_glyph_t));
 class font_mgr_t::impl_t: public font_mgr_t {
 public:
 	impl_t();
+	vec2_t measure(const char* msg);
+	void draw(int x,int y,const char* msg);
 private:
 	const font_glyph_t* get_glyth(int code) const;
 	GLuint texture;
@@ -113,19 +115,55 @@ font_mgr_t::impl_t::impl_t() {
 		exit(EXIT_FAILURE);
 	}
 	texture = graphics_mgr()->alloc_2D(bmp);
-	SDL_FreeSurface(bmp);
 	if(!texture) {
 		fprintf(stderr,"Could not load embedded bitmap font\n");
 		exit(EXIT_FAILURE);
 	}
 	printf("loaded embedded bitmap font: %dx%d\n",bmp->w,bmp->h);
+	SDL_FreeSurface(bmp);
+}
+
+vec2_t font_mgr_t::impl_t::measure(const char* msg) {
+	vec2_t sz(0,font_meta.size);
+	for(; *msg; msg++) {
+		const font_glyph_t* g = get_glyth(*msg);
+		if(!g) continue;
+		sz.x += g->advance;
+	}
+	return sz;
+}
+
+void font_mgr_t::impl_t::draw(int x,int y,const char* msg) {
+	glBindTexture(GL_TEXTURE_2D,texture);
+	glColor4f(0,0,.5,1);
+	glBegin(GL_QUADS);
+	for(; *msg; msg++) {
+		const font_glyph_t* g = get_glyth(*msg);
+		if(!g) continue;
+		const float
+			tx0 = (float)g->x/(float)font_meta.w,
+			ty1 = (float)g->y/(float)font_meta.h,
+			tx1 = (float)(g->x+g->w)/(float)font_meta.w,
+			ty0 = (float)(g->y+g->h)/(float)font_meta.h;
+		glTexCoord2f(tx0,ty0);
+		glVertex2f(x+g->ofs_x,y+g->ofs_y);
+		glTexCoord2f(tx1,ty0);
+		glVertex2f(x+g->ofs_x+g->w,y+g->ofs_y);
+		glTexCoord2f(tx1,ty1);
+		glVertex2f(x+g->ofs_x+g->w,y+g->ofs_y+g->h);
+		glTexCoord2f(tx0,ty1);
+		glVertex2f(x+g->ofs_x,y+g->ofs_y+g->h);
+		x += g->advance;
+	}
+	glEnd();
+	glBindTexture(GL_TEXTURE_2D,0);
 }
 
 const font_glyph_t* font_mgr_t::impl_t::get_glyth(int code) const {
 	code -= font_glyth[0].code;
 	if(code < 0) return NULL;
 	if((size_t)code >= num_glyths) return NULL;
-	assert(font_glyth[code].code == code);
+	assert(font_glyth[code].code == code+font_glyth[0].code);
 	return font_glyth+code;
 }
 	
