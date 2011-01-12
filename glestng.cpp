@@ -5,8 +5,8 @@
  (c) William Edwards, 2011; all rights reserved
 */
 
-#include <SDL.h>
-#include <SDL_opengl.h>
+#include "graphics.hpp"
+
 #include <stdio.h>
 #include <inttypes.h>
 
@@ -37,6 +37,14 @@ int main(int argc,char** args) {
 		fprintf(stderr,"Unable to initialize SDL: %s\n",SDL_GetError());
 		return EXIT_FAILURE;
 	}
+	
+	glewInit();
+	GLenum err = glewInit();
+	if(GLEW_OK != err) {
+		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+		return EXIT_FAILURE;
+	}
+	fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
 	
 	terrain = gen_planet(5,500,3);
 	font_mgr();

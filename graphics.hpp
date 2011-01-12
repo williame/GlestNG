@@ -8,9 +8,9 @@
 #ifndef __GRAPHICS_HPP__
 #define __GRAPHICS_HPP__
 
+#define GLEW_STATIC
+#include <GL/glew.h>
 #include <SDL.h>
-#define GL_GLEXT_PROTOTYPES
-#include <SDL_opengl.h>
 
 class graphics_mgr_t {
 public:
