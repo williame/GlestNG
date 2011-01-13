@@ -42,18 +42,18 @@ struct planet_t;
 
 struct mesh_t {
 	mesh_t(planet_t& planet,face_t tri,size_t recursionLevel);
-	static size_t num_faces(size_t recursionLevel);
 	void draw();
 	planet_t& planet;
 	const GLuint ID;
 	bounds_t bounds;
-	fixed_array_t<face_t> faces;
+	size_t start, stop;
 };
 
 struct planet_t: public terrain_t {
 	planet_t	(size_t recursionLevel,size_t iterations,size_t smoothing_passes);
 	~planet_t();
 	static size_t num_points(size_t recursionLevel);
+	static size_t num_faces(size_t recursionLevel);
 	GLuint midpoint(GLuint a,GLuint b);
 	GLuint find_face(GLuint a,GLuint b,GLuint c);
 	void draw();
@@ -67,6 +67,7 @@ struct planet_t: public terrain_t {
 	fixed_array_t<vec_t> points;
 	fixed_array_t<vec_t> normals;
 	fixed_array_t<rgb_t> colours;
+	fixed_array_t<face_t> faces;
 	struct adjacent_t {
 		adjacent_t();
 		size_t size() const;
@@ -90,38 +91,28 @@ struct planet_t: public terrain_t {
 	fixed_array_t<type_t> types;
 };
 
-size_t mesh_t::num_faces(size_t recursionLevel) {
-	static const size_t Nf[] = {0,0,64,256,0,0,0};
-	assert(recursionLevel <= DIVIDE_THRESHOLD);
-	assert(recursionLevel<(sizeof(Nf)/sizeof(*Nf)));
-	const size_t nf = Nf[recursionLevel];
-	assert(nf);
-	return nf;
-}
 
 mesh_t::mesh_t(planet_t& p,face_t tri,size_t recursionLevel):
 	planet(p),
-	ID(p.meshes.size()<<FACE_IDX),
-	faces(num_faces(recursionLevel))
+	ID(p.meshes.size()<<FACE_IDX)
 {
-	faces.append(tri);
+	start = stop = planet.faces.append(tri);
 	for(size_t i=0; i<=recursionLevel; i++) {
-		const size_t prev = faces.size();
-		for(size_t j=0; j<prev; j++) {
-			const face_t& f = faces[j];
+		const size_t prev = stop;
+		for(size_t j=start; j<=prev; j++) {
+			const face_t& f = planet.faces[j];
 			const GLuint
 				a = planet.midpoint(f.a,f.b),
 				b = planet.midpoint(f.b,f.c),
 				c = planet.midpoint(f.c,f.a);
-			faces.append(face_t(f.a,a,c));
-			faces.append(face_t(f.b,b,a));
-			faces.append(face_t(f.c,c,b));
-			faces[j] = face_t(a,b,c);
+			planet.faces.append(face_t(f.a,a,c));
+			planet.faces.append(face_t(f.b,b,a));
+			stop = planet.faces.append(face_t(f.c,c,b));
+			planet.faces[j] = face_t(a,b,c);
 		}
 	}
-	assert(faces.full());
-	for(int i=faces.size()-1; i>=0; i--) {
-		const face_t& f = faces[i];
+	for(size_t i=start; i<=stop; i++) {
+		const face_t& f = planet.faces[i];
 		const GLuint a = f.a, b = f.b, c = f.c;
 		planet.adjacent_faces[a].add(ID|i);
 		planet.adjacent_faces[b].add(ID|i);
@@ -145,8 +136,8 @@ static void _vertex(const rgb_t& c,const vec_t& n,const vec_t& v) {
 void mesh_t::draw() {
 	glColor3f(1.,0,0);
 	glBegin(GL_TRIANGLES);
-	for(size_t i=0; i<faces.size(); i++) {
-		const face_t& f = faces[i];
+	for(size_t i=start; i<=stop; i++) {
+		const face_t& f = planet.faces[i];
 		_vertex(planet.colours[f.a],planet.normals[f.a],planet.points[f.a]);
 		_vertex(planet.colours[f.b],planet.normals[f.b],planet.points[f.b]);
 		_vertex(planet.colours[f.c],planet.normals[f.c],planet.points[f.c]);
@@ -236,10 +227,15 @@ size_t planet_t::num_points(size_t recursionLevel) {
 	return (5*pow(2,2*recursionLevel+3)+2);
 }
 
+size_t planet_t::num_faces(size_t recursionLevel) {
+	return (20*pow(4,recursionLevel+1));
+}
+
 planet_t::planet_t(size_t recursionLevel,size_t iterations,size_t smoothing_passes):
 	points(num_points(recursionLevel)),
 	normals(num_points(recursionLevel)),
 	colours(num_points(recursionLevel)),
+	faces(num_faces(recursionLevel)),
 	adjacent_faces(num_points(recursionLevel),true),
 	adjacent_points(num_points(recursionLevel),true),
 	types(num_points(recursionLevel))
@@ -259,26 +255,21 @@ planet_t::planet_t(size_t recursionLevel,size_t iterations,size_t smoothing_pass
             face_t(4,9,5),face_t(2,4,11),face_t(6,2,10),face_t(8,6,7),face_t(9,8,1)};
         for(int f=0; f<20; f++)
         		divide(Fs[f],recursionLevel,0);
-	size_t face_count = 0;
-	for(meshes_t::const_iterator i=meshes.begin(); i!=meshes.end(); i++)
-		face_count += (*i)->faces.size();
 	std::cout << ": " << points.size() << " points, "
 		<< meshes.size() << " meshes, "
-		<< face_count << "faces" << std::endl;
+		<< faces.size() << " faces"<< std::endl;
 	assert(points.full());
+        	assert(faces.full());
 	gen(iterations,smoothing_passes);
 	normals.fill(vec_t(0,0,0));
-	for(meshes_t::const_iterator i=meshes.begin(); i!=meshes.end(); i++) {
-		const mesh_t* mesh = *i;
-		for(size_t j=0; j<mesh->faces.size(); j++) {
-			const face_t& f = mesh->faces[j];
-			const vec_t a = points[f.c]-points[f.b];
-			const vec_t b = points[f.a]-points[f.b];
-			const vec_t pn = a.cross(b).normalise();
-			normals[f.a] += pn;
-			normals[f.b] += pn;
-			normals[f.c] += pn;
-		}
+	for(size_t i=0; i<faces.size(); i++) {
+		const face_t& f = faces[i];
+		const vec_t a = points[f.c]-points[f.b];
+		const vec_t b = points[f.a]-points[f.b];
+		const vec_t pn = a.cross(b).normalise();
+		normals[f.a] += pn;
+		normals[f.b] += pn;
+		normals[f.c] += pn;
 	}
 	for(size_t i=0; i<normals.size(); i++) {
 		assert(adjacent_faces[i].size() >= 5);
