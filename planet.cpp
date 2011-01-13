@@ -14,6 +14,7 @@
 #include <inttypes.h>
 #include <limits.h>
 #include <time.h>
+#include <iostream>
 
 #include "memcheck.h"
 #include "terrain.hpp"
@@ -68,7 +69,6 @@ struct planet_t: public terrain_t {
 	fixed_array_t<rgb_t> colours;
 	struct adjacent_t {
 		adjacent_t();
-		void dump(FILE* out=stdout) const;
 		size_t size() const;
 		GLuint adj[6];
 		void add(GLuint neighbour);
@@ -154,6 +154,18 @@ void mesh_t::draw() {
 	glEnd();
 }
 
+std::ostream& operator<<(std::ostream& out,const planet_t::adjacent_t& adj) {
+	out << "[";
+	for(int i=0; i<6; i++) {
+		if(adj.adj[i]!=planet_t::adjacent_t::EMPTY)
+			out << (unsigned)adj.adj[i];
+		if(i<5)
+			out << ",";
+	}
+	out << "]";
+	return out;
+}
+
 planet_t::adjacent_t::adjacent_t() {
 	for(int i=0; i<6; i++)
 		adj[i] = EMPTY;
@@ -168,18 +180,8 @@ void planet_t::adjacent_t::add(GLuint neighbour) {
 			return;
 		}
 	}
-	printf("cannot add %u to ",(unsigned)neighbour); dump(); putchar('\n');
+	std::cout << "cannot add " << neighbour << " to " << *this << std::endl;
 	assert(false);
-}
-
-void planet_t::adjacent_t::dump(FILE* out) const {
-	fputc('[',out);
-	for(int i=0; i<6; i++)
-		if(adj[i]==EMPTY)
-			fputc(',',out);
-		else
-			fprintf(out,"%u,",(unsigned)adj[i]);
-	fputc(']',out);
 }
 
 size_t planet_t::adjacent_t::size() const {
@@ -189,7 +191,7 @@ size_t planet_t::adjacent_t::size() const {
 	return 0;
 }
 
-planet_t::adjacent_t::adjacent_t& planet_t::adjacent_t::operator-=(adjacent_t a) {
+planet_t::adjacent_t& planet_t::adjacent_t::operator-=(adjacent_t a) {
 	unsigned intersection = 0, used = 0;
 	for(int i=0; i<6; i++) {
 		if(adj[i] == EMPTY)
@@ -242,7 +244,7 @@ planet_t::planet_t(size_t recursionLevel,size_t iterations,size_t smoothing_pass
 	adjacent_points(num_points(recursionLevel),true),
 	types(num_points(recursionLevel))
 {
-	printf("terraforming...\n: recursionLevel = %zu\n",recursionLevel);
+	std::cout << "terraforming...\n: recursionLevel = " << recursionLevel << std::endl;
 	static const float t = (1.0f + sqrt(5.0f)) / 2.0f;
 	static const vec_t Ts[12] = {
 		vec_t(-1, t, 0),vec_t( 1, t, 0),vec_t(-1,-t, 0),vec_t( 1,-t, 0),
@@ -257,10 +259,12 @@ planet_t::planet_t(size_t recursionLevel,size_t iterations,size_t smoothing_pass
             face_t(4,9,5),face_t(2,4,11),face_t(6,2,10),face_t(8,6,7),face_t(9,8,1)};
         for(int f=0; f<20; f++)
         		divide(Fs[f],recursionLevel,0);
-        	size_t face_count = 0;
-        	for(meshes_t::const_iterator i=meshes.begin(); i!=meshes.end(); i++)
-        		face_count += (*i)->faces.size();
-        	printf(": %zu points, %zu meshes, %zu faces\n",points.size(),meshes.size(),face_count);
+	size_t face_count = 0;
+	for(meshes_t::const_iterator i=meshes.begin(); i!=meshes.end(); i++)
+		face_count += (*i)->faces.size();
+	std::cout << ": " << points.size() << " points, "
+		<< meshes.size() << " meshes, "
+		<< face_count << "faces" << std::endl;
 	assert(points.full());
 	gen(iterations,smoothing_passes);
 	normals.fill(vec_t(0,0,0));
@@ -305,18 +309,18 @@ void planet_t::divide(const face_t& tri,size_t recursionLevel,size_t depth) {
 }
 
 static float randf() {
-	return (float)random()/RAND_MAX;
+	return (float)rand()/RAND_MAX;
 }
 
 void planet_t::gen(size_t iterations,size_t smoothing_passes) {
         // http://freespace.virgin.net/hugo.elias/models/m_landsp.htm
-        printf(": generating landscape with %zu iterations\n",iterations); 
-        srandom(time(NULL));
+        std::cout << ": generating landscape with " << iterations << " iterations" << std::endl;
+        srand(time(NULL));
         vec_t n, v;
         fixed_array_t<float> adj(points.size());
         adj.fill(0);
         for(size_t i=0; i<iterations; i++) {
-        		do {
+        	do {
 			n.x = (randf()-0.5f)*2.0f;
 			n.y = (randf()-0.5f)*2.0f;
 			n.z = (randf()-0.5f)*2.0f;
@@ -362,7 +366,7 @@ void planet_t::gen(size_t iterations,size_t smoothing_passes) {
 		}	
 	}
 	// smooth land that isn't mountains
-	printf(": smoothing land with %zu passes\n",smoothing_passes);
+	std::cout << ": smoothing land with " << smoothing_passes << " passes" << std::endl;
 	for(size_t i=0; i<smoothing_passes; i++) {
 		for(size_t p=0; p<points.size(); p++) {
 			if(types[p] == LAND || types[p] == ICE_FLOW) {

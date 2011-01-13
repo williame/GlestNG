@@ -5,13 +5,12 @@
  (c) William Edwards, 2011; all rights reserved
 */
 
+#include "graphics.hpp"
+//#include <GL/glu.h>
+
 #include <stdio.h>
 #include <inttypes.h>
 
-#include <SDL.h>
-#define GL_GLEXT_PROTOTYPES
-#include <SDL_opengl.h>
-#include <GL/glu.h>
 
 #include "terrain.hpp"
 #include "font.hpp"
@@ -62,7 +61,22 @@ int main(int argc,char** args) {
 		fprintf(stderr,"Unable to initialize SDL: %s\n",SDL_GetError());
 		return EXIT_FAILURE;
 	}
+<<<<<<< HEAD
 		
+=======
+	
+	glewInit();
+	GLenum err = glewInit();
+	if(GLEW_OK != err) {
+		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+		return EXIT_FAILURE;
+	}
+	fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
+	
+	terrain = gen_planet(5,500,3);
+	font_mgr();
+	
+>>>>>>> eabfd6712c8ce9a7c842cef89d76aa585a72a9f1
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
 	screen = SDL_SetVideoMode(1024,768,32,SDL_OPENGL/*|SDL_FULLSCREEN*/);
 	if(!screen) {

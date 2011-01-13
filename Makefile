@@ -11,15 +11,25 @@ HYGIENE = -g3 -Wall #-pedantic-errors -std=c++98 -Wno-long-long -fdiagnostics-sh
 DEBUG = -O0
 OPTIMISATIONS = # -O9 -fomit-frame-pointer -fno-rtti -march=native # etc -fprofile-generate/-fprofile-use
 
+ifeq ($(shell uname),windows32)
+	LIB_CFLAGS = `sdl-config --cflags`
+	LIB_LDFLAGS = -static -lglew32s `sdl-config --libs` -dynamic -lopengl32 -lglu32 
+	EXE_EXT = .exe
+else
+	LIB_CFLAGS = `pkg-config --cflags sdl gl glew`
+	LIB_LDFLAGS = `pkg-config --lib sdl gl glew`
+	EXE_EXT =
+endif
+
 # default flags
-CFLAGS = ${HYGIENE} ${DEBUG} ${OPTIMISATIONS} ${C_EXT_FLAGS} `pkg-config --cflags sdl SDL_image glu`
+CFLAGS = ${HYGIENE} ${DEBUG} ${OPTIMISATIONS} ${C_EXT_FLAGS} ${LIB_CFLAGS}
 CPPFLAGS = ${CFLAGS}
-LDFLAGS = ${HYGIENE} ${DEBUG} ${OPTIMISATIONS}
+LDFLAGS = ${HYGIENE} ${DEBUG} ${OPTIMISATIONS} ${LIB_LDFLAGS}
 
 #target binary names
 	
-TRG_GLEST_NG = glestng
-
+TRG_GLEST_NG = glestng${EXE_EXT}
+	
 OBJ_GLEST_NG_CPP = \
 	glestng.opp \
 	planet.opp \
@@ -43,7 +53,7 @@ TARGETS = ${TRG_GLEST_NG}
 all:	check_env ${TARGETS}
 
 ${TRG_GLEST_NG}: ${OBJ_GLEST_NG_CPP} ${OBJ_GLEST_NG_C}
-	${LD} ${CPPFLAGS} -o $@ $^ ${LDFLAGS} `pkg-config --libs sdl gl SDL_image glu`
+	${LD} ${CPPFLAGS} -o $@ $^ ${LDFLAGS}
 
 # compile c files
 	
@@ -58,12 +68,16 @@ ${TRG_GLEST_NG}: ${OBJ_GLEST_NG_CPP} ${OBJ_GLEST_NG_C}
 
 clean:
 	rm -f ${TARGETS}
-	rm -f *.[hc]pp~ Makefile~ core
+	rm -f \*.?pp\~ Makefile\~ core
 	rm -f ${OBJ}
 	rm -f $(OBJ_C:%.o=%.dep) $(OBJ_CPP:%.opp=%.dep)
 
 check_env:
-	`pkg-config --exists sdl gl`
-	
+ifeq ($(shell uname),windows32)
+	@echo "You are using windows; good luck!"
+else
+	`pkg-config --exists sdl gl glew`
+endif
+
 -include $(OBJ_C:%.o=%.dep) $(OBJ_CPP:%.opp=%.dep)
 
