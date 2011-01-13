@@ -17,7 +17,7 @@ ifeq ($(shell uname),windows32)
 	EXE_EXT = .exe
 else
 	LIB_CFLAGS = `pkg-config --cflags sdl gl glew`
-	LIB_LDFLAGS = `pkg-config --lib sdl gl glew`
+	LIB_LDFLAGS = `pkg-config --libs sdl gl glew`
 	EXE_EXT =
 endif
 

@@ -22,9 +22,10 @@ struct {
 } const font_meta = {32,24};
 
 struct font_glyph_t {
-	uint8_t code;
+	int code;
 	short x,y,w,h,ofs_x,ofs_y,advance;
-} const font_glyth[] = {
+} const font_glyph[] = {
+// convention is that [0] is -1 for unknown glyphs, others are in order
 {-1,235,154,20,23,1,5,21},{32,127,223,5,5,-2,24,10},{33,243,97,12,26,-1,1,10},
 {34,145,205,12,15,-2,3,10},{35,212,154,22,23,-2,5,18},{36,0,39,19,33,-1,-1,17},
 {37,76,187,20,22,-2,5,25},{38,184,154,27,23,-1,6,24},{39,175,204,11,13,-2,4,5},
@@ -90,7 +91,7 @@ struct font_glyph_t {
 {250,84,242,5,5,-2,24,16},{251,90,242,5,5,-2,24,16},{253,102,242,5,5,-2,24,14},
 {254,108,239,5,5,-2,24,16},{255,114,239,5,5,-2,24,14}};
 
-static const size_t num_glyths = (sizeof(font_glyth)/sizeof(font_glyph_t));
+static const size_t num_glyphs = (sizeof(font_glyph)/sizeof(font_glyph_t));
 	
 class font_mgr_t::impl_t: public font_mgr_t {
 public:
@@ -98,8 +99,9 @@ public:
 	vec2_t measure(const char* msg);
 	void draw(int x,int y,const char* msg);
 private:
-	const font_glyph_t* get_glyth(int code) const;
+	const font_glyph_t* get_glyph(int code) const;
 	GLuint texture;
+	vec2_t bmp_sz;
 };
 
 font_mgr_t::impl_t::impl_t() {
@@ -113,14 +115,15 @@ font_mgr_t::impl_t::impl_t() {
 		fprintf(stderr,"Could not load embedded bitmap font\n");
 		exit(EXIT_FAILURE);
 	}
+	bmp_sz = vec2_t(bmp->w,bmp->h);
 	printf("loaded embedded bitmap font: %dx%d\n",bmp->w,bmp->h);
 	SDL_FreeSurface(bmp);
 }
 
 vec2_t font_mgr_t::impl_t::measure(const char* msg) {
-	vec2_t sz(0,font_meta.size);
+	vec2_t sz(0,font_meta.height);
 	for(; *msg; msg++) {
-		const font_glyph_t* g = get_glyth(*msg);
+		const font_glyph_t* g = get_glyph(*msg);
 		if(!g) continue;
 		sz.x += g->advance;
 	}
@@ -132,13 +135,13 @@ void font_mgr_t::impl_t::draw(int x,int y,const char* msg) {
 	glColor4f(0,0,.5,1);
 	glBegin(GL_QUADS);
 	for(; *msg; msg++) {
-		const font_glyph_t* g = get_glyth(*msg);
+		const font_glyph_t* g = get_glyph(*msg);
 		if(!g) continue;
 		const float
-			tx0 = (float)g->x/(float)font_meta.w,
-			ty1 = (float)g->y/(float)font_meta.h,
-			tx1 = (float)(g->x+g->w)/(float)font_meta.w,
-			ty0 = (float)(g->y+g->h)/(float)font_meta.h;
+			tx0 = (float)g->x/bmp_sz.x,
+			ty1 = (float)g->y/bmp_sz.y,
+			tx1 = (float)(g->x+g->w)/bmp_sz.x,
+			ty0 = (float)(g->y+g->h)/bmp_sz.y;
 		glTexCoord2f(tx0,ty0);
 		glVertex2f(x+g->ofs_x,y+g->ofs_y);
 		glTexCoord2f(tx1,ty0);
@@ -153,12 +156,18 @@ void font_mgr_t::impl_t::draw(int x,int y,const char* msg) {
 	glBindTexture(GL_TEXTURE_2D,0);
 }
 
-const font_glyph_t* font_mgr_t::impl_t::get_glyth(int code) const {
-	code -= font_glyth[0].code;
-	if(code < 0) return NULL;
-	if((size_t)code >= num_glyths) return NULL;
-	assert(font_glyth[code].code == code+font_glyth[0].code);
-	return font_glyth+code;
+static int _cmp_int(const void *a, const void *b) {
+	return *(int*)a - *(int*)b;
+}
+
+const font_glyph_t* font_mgr_t::impl_t::get_glyph(int code) const {
+	const font_glyph_t* ret = (font_glyph_t*)
+		bsearch(&code,
+		font_glyph,num_glyphs,sizeof(font_glyph_t),
+		_cmp_int);
+	if(!ret)
+		return font_glyph; //[0] is reserved for unknown glyths
+	return ret;
 }
 	
 font_mgr_t* font_mgr_t::get_font_mgr() {

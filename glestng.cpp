@@ -61,28 +61,21 @@ int main(int argc,char** args) {
 		fprintf(stderr,"Unable to initialize SDL: %s\n",SDL_GetError());
 		return EXIT_FAILURE;
 	}
-<<<<<<< HEAD
-		
-=======
 	
-	glewInit();
-	GLenum err = glewInit();
-	if(GLEW_OK != err) {
-		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
-		return EXIT_FAILURE;
-	}
-	fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
-	
-	terrain = gen_planet(5,500,3);
-	font_mgr();
-	
->>>>>>> eabfd6712c8ce9a7c842cef89d76aa585a72a9f1
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
 	screen = SDL_SetVideoMode(1024,768,32,SDL_OPENGL/*|SDL_FULLSCREEN*/);
 	if(!screen) {
 		fprintf(stderr,"Unable to create SDL screen: %s\n",SDL_GetError());
 		return EXIT_FAILURE;
 	}
+
+	GLenum err = glewInit();
+	if(GLEW_OK != err) {
+		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+		return EXIT_FAILURE;
+	}
+	fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
+
 	terrain = gen_planet(5,500,3);
 
 	v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,1.,0.),

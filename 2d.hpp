@@ -9,6 +9,7 @@
 #define __2D_HPP__
 
 struct vec2_t {
+	vec2_t() {}
 	vec2_t(short x_,short y_): x(x_), y(y_) {}
 	short x, y;
 	inline static void normalise(vec2_t& tl,vec2_t& br);
