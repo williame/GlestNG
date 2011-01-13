@@ -68,7 +68,7 @@ ${TRG_GLEST_NG}: ${OBJ_GLEST_NG_CPP} ${OBJ_GLEST_NG_C}
 
 clean:
 	rm -f ${TARGETS}
-	rm -f \*.?pp\~ Makefile\~ core
+	rm -f *.?pp~ Makefile~ core
 	rm -f ${OBJ}
 	rm -f $(OBJ_C:%.o=%.dep) $(OBJ_CPP:%.opp=%.dep)
 

@@ -31,7 +31,8 @@ void ui() {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	glDisable(GL_DEPTH_TEST);
-	font_mgr()->draw(10,10,"GlestNG");
+	glColor3f(1,1,1);
+	font_mgr()->draw(10,10,"http://github.com/williame/GlestNG");
 	glEnable(GL_DEPTH_TEST);
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
