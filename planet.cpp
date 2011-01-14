@@ -43,6 +43,7 @@ struct planet_t;
 
 struct mesh_t {
 	mesh_t(planet_t& planet,face_t tri,size_t recursionLevel);
+	void calc_bounds();
 	void draw();
 	planet_t& planet;
 	const GLuint ID;
@@ -131,6 +132,17 @@ mesh_t::mesh_t(planet_t& p,face_t tri,size_t recursionLevel):
 		planet.adjacent_points[b].add(c);
 		planet.adjacent_points[c].add(b);
 	}
+}
+
+void mesh_t::calc_bounds() {
+	bounds.reset();
+	for(size_t i=start; i<=stop; i++) {
+		const face_t& f = planet.faces[i];
+		bounds.include(planet.points[f.a]);
+		bounds.include(planet.points[f.b]);
+		bounds.include(planet.points[f.c]);
+	}
+	bounds.fix();
 }
 
 static void _vertex(const rgb_t& c,const vec_t& n,const vec_t& v) {
@@ -283,6 +295,8 @@ planet_t::planet_t(size_t recursionLevel,size_t iterations,size_t smoothing_pass
 		normals[i] /= adjacent_faces[i].size();
 		normals[i].normalise();
 	}
+	for(meshes_t::iterator i=meshes.begin(); i!=meshes.end(); i++)
+		(*i)->calc_bounds();
 }
 
 planet_t::~planet_t() {
