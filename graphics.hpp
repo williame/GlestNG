@@ -8,6 +8,8 @@
 #ifndef __GRAPHICS_HPP__
 #define __GRAPHICS_HPP__
 
+#define USE_GL
+
 #define GLEW_STATIC
 #include <GL/glew.h>
 #include <SDL.h>
@@ -15,8 +17,10 @@
 class graphics_mgr_t {
 public:
 	static graphics_mgr_t* mgr();
+#ifdef USE_GL
 	GLuint alloc_vbo(GLenum target,GLsizeiptr size,const GLvoid* data,GLenum usage);
 	GLuint alloc_2D(SDL_Surface* image);
+#endif
 private:
 	graphics_mgr_t();
 };

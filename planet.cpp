@@ -93,6 +93,12 @@ struct planet_t: public terrain_t {
 	};
 	fixed_array_t<type_t> types;
 	vec_t sun;
+#ifdef USE_GL
+	struct {
+		GLuint points, normals, colours, faces; 
+	} vbo;
+	void init_gl();
+#endif
 };
 
 
@@ -297,6 +303,9 @@ planet_t::planet_t(size_t recursionLevel,size_t iterations,size_t smoothing_pass
 	}
 	for(meshes_t::iterator i=meshes.begin(); i!=meshes.end(); i++)
 		(*i)->calc_bounds();
+#ifdef USE_GL
+	init_gl();
+#endif
 }
 
 planet_t::~planet_t() {
@@ -450,6 +459,31 @@ GLuint planet_t::find_face(GLuint a,GLuint b,GLuint c) {
 	return set.adj[0];
 }
 
+#ifdef USE_GL
+void planet_t::init_gl() {
+	vbo.points = graphics_mgr()->alloc_vbo(
+		GL_ARRAY_BUFFER,
+		points.size()*sizeof(vec_t),
+		points.ptr(),
+		GL_STATIC_DRAW);
+	vbo.normals = graphics_mgr()->alloc_vbo(
+		GL_ARRAY_BUFFER,
+		normals.size()*sizeof(vec_t),
+		normals.ptr(),
+		GL_STATIC_DRAW);
+	vbo.colours = graphics_mgr()->alloc_vbo(
+		GL_ARRAY_BUFFER,
+		colours.size()*sizeof(rgb_t),
+		colours.ptr(),
+		GL_STATIC_DRAW);
+	vbo.faces = graphics_mgr()->alloc_vbo(
+		GL_ELEMENT_ARRAY_BUFFER,
+		faces.size()*sizeof(face_t),
+		faces.ptr(),
+		GL_STATIC_DRAW);
+}
+#endif
+
 void planet_t::draw() {
 	static const double PI = 3.14159265;
 	const double r = fmod(now()/20.0,360)*(PI/180.0);
@@ -460,7 +494,24 @@ void planet_t::draw() {
 	light[2] = sun.z;
 	light[3] = 0;
 	glLightfv(GL_LIGHT1,GL_POSITION,light);
-#if 0 // vertex arrays
+#if 1 // VBOs
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glBindBuffer(GL_ARRAY_BUFFER,vbo.points);
+        glVertexPointer(3,GL_FLOAT,0,NULL);
+        glEnableClientState(GL_NORMAL_ARRAY);
+        glBindBuffer(GL_ARRAY_BUFFER,vbo.normals);
+        glNormalPointer(GL_FLOAT,0,NULL);
+        glEnableClientState(GL_COLOR_ARRAY);
+        glBindBuffer(GL_ARRAY_BUFFER,vbo.colours);
+        glColorPointer(3,GL_UNSIGNED_BYTE,0,NULL);
+        glBindBuffer(GL_ARRAY_BUFFER,0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,vbo.faces);
+        glDrawElements(GL_TRIANGLES,faces.size()*3,GL_UNSIGNED_INT,NULL);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
+        glDisableClientState(GL_COLOR_ARRAY);
+        glDisableClientState(GL_VERTEX_ARRAY);
+        glDisableClientState(GL_NORMAL_ARRAY);
+#elif 0 // vertex arrays
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glVertexPointer(3,GL_FLOAT,0,points.ptr());
 	glEnableClientState(GL_COLOR_ARRAY);
