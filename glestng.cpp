@@ -6,17 +6,20 @@
 */
 
 #include "graphics.hpp"
-//#include <GL/glu.h>
 
 #include <stdio.h>
 #include <inttypes.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-
+#include "world.hpp"
 #include "terrain.hpp"
 #include "font.hpp"
 
 SDL_Surface* screen;
 terrain_t* terrain;
+
+perf_t framerate;
 
 void ui() {
 	glMatrixMode(GL_PROJECTION);
@@ -24,29 +27,37 @@ void ui() {
 	glLoadIdentity();
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
+	glLoadIdentity();
 	glViewport(0,0,screen->w,screen->h);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
 	gluOrtho2D(0,screen->w,0,screen->h);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
 	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_LIGHTING);
 	glColor3f(1,1,1);
-	font_mgr()->draw(10,10,"http://github.com/williame/GlestNG");
-	glEnable(GL_DEPTH_TEST);
+	char fps[12];
+	snprintf(fps,sizeof(fps),"%d fps",framerate.per_second(now()));
+	font_mgr()->draw(10,10,fps);
+	glPopMatrix();
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
 	glMatrixMode(GL_MODELVIEW);
-	glPopMatrix();
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_LIGHTING);
 }
 
 void tick() {
-	glClearColor(.2,.1,.2,1);
-	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+#if 0
+	usleep(100000);
+	char fps[12];
+	snprintf(fps,sizeof(fps),"%d fps",framerate.per_second(now()));
+	printf("%s\n",fps);
+	return;
+#endif
 	terrain->draw();
 	ui();
 	SDL_GL_SwapBuffers();
 	SDL_Flip(screen);
+	glClearColor(.2,.1,.2,1);
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 }
 
 struct v4_t {
@@ -64,7 +75,7 @@ int main(int argc,char** args) {
 	}
 	
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
-	screen = SDL_SetVideoMode(1024,768,32,SDL_OPENGL/*|SDL_FULLSCREEN*/);
+	screen = SDL_SetVideoMode(1024,768,32,SDL_OPENGL|SDL_HWSURFACE|SDL_DOUBLEBUF/*|SDL_FULLSCREEN*/);
 	if(!screen) {
 		fprintf(stderr,"Unable to create SDL screen: %s\n",SDL_GetError());
 		return EXIT_FAILURE;
@@ -79,18 +90,22 @@ int main(int argc,char** args) {
 
 	terrain = gen_planet(5,500,3);
 
-	v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,1.,0.),
+	v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),
 		mat_amb(.7,.7,.7,1.), mat_dif(.8,.8,.8,1.), mat_spec(1.,1.,1.,1.);
 	glLightfv(GL_LIGHT0,GL_AMBIENT,light_amb.v);
         glLightfv(GL_LIGHT0,GL_DIFFUSE,light_dif.v);
         glLightfv(GL_LIGHT0,GL_SPECULAR,light_spec.v);
         glLightfv(GL_LIGHT0,GL_POSITION,light_pos.v);
+ 	glLightfv(GL_LIGHT1,GL_AMBIENT,light_amb.v);
+        glLightfv(GL_LIGHT1,GL_DIFFUSE,light_dif.v);
+        glLightfv(GL_LIGHT1,GL_SPECULAR,light_spec.v);
         glMaterialfv(GL_FRONT,GL_AMBIENT,mat_amb.v);
         glMaterialfv(GL_FRONT,GL_DIFFUSE,mat_dif.v);
         glMaterialfv(GL_FRONT,GL_SPECULAR,mat_spec.v);
         glMaterialf(GL_FRONT,GL_SHININESS,100.0);
         glEnable(GL_LIGHTING);
         glEnable(GL_LIGHT0);
+        glEnable(GL_LIGHT1);
         glDepthFunc(GL_LEQUAL);
         glEnable(GL_DEPTH_TEST);
         glAlphaFunc(GL_GREATER,0.4);
@@ -109,34 +124,42 @@ int main(int argc,char** args) {
 	
 	bool quit = false;
 	SDL_Event event;
+	const unsigned start = SDL_GetTicks();
+	unsigned last_event = start;
+	framerate.reset();
 	while(!quit) {
-		while(!quit && SDL_PollEvent(&event)) {
-			switch (event.type) {
-			case SDL_MOUSEMOTION:
-				/*printf("Mouse moved by %d,%d to (%d,%d)\n", 
-				event.motion.xrel, event.motion.yrel,
-				event.motion.x, event.motion.y);*/
-				break;
-			case SDL_MOUSEBUTTONDOWN:
-				printf("Mouse button %d pressed at (%d,%d)\n",
-				event.button.button, event.button.x, event.button.y);
-				break;
-			case SDL_KEYDOWN:
-				switch(event.key.keysym.sym) {
-				case SDLK_ESCAPE:
+		set_now(SDL_GetTicks()-start);
+		// only eat events 10 times a second
+		if((now()-last_event) > 1000) {
+			while(!quit && SDL_PollEvent(&event)) {
+				switch (event.type) {
+				case SDL_MOUSEMOTION:
+					/*printf("Mouse moved by %d,%d to (%d,%d)\n", 
+					event.motion.xrel, event.motion.yrel,
+					event.motion.x, event.motion.y);*/
+					break;
+				case SDL_MOUSEBUTTONDOWN:
+					printf("Mouse button %d pressed at (%d,%d)\n",
+					event.button.button, event.button.x, event.button.y);
+					break;
+				case SDL_KEYDOWN:
+					switch(event.key.keysym.sym) {
+					case SDLK_ESCAPE:
+						quit = true;
+						break;
+					default:;
+					}
+					break;
+				case SDL_QUIT:
 					quit = true;
 					break;
-				default:;
 				}
-				break;
-			case SDL_QUIT:
-				quit = true;
-				break;
 			}
+			last_event = now();
 		}
+		framerate.tick(now());
 		tick();
         }
-        
         delete terrain;
 	
 	SDL_Quit();

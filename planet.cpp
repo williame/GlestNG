@@ -19,6 +19,7 @@
 #include "memcheck.h"
 #include "terrain.hpp"
 #include "graphics.hpp"
+#include "world.hpp"
 
 enum {
 	DIVIDE_THRESHOLD = 4,
@@ -46,6 +47,7 @@ struct mesh_t {
 	planet_t& planet;
 	const GLuint ID;
 	bounds_t bounds;
+	GLuint mn_point, mx_point;
 	size_t start, stop;
 };
 
@@ -89,12 +91,14 @@ struct planet_t: public terrain_t {
 		ICE_FLOW,
 	};
 	fixed_array_t<type_t> types;
+	vec_t sun;
 };
 
 
 mesh_t::mesh_t(planet_t& p,face_t tri,size_t recursionLevel):
 	planet(p),
-	ID(p.meshes.size()<<FACE_IDX)
+	ID(p.meshes.size()<<FACE_IDX),
+	mn_point(~0), mx_point(0)
 {
 	start = stop = planet.faces.append(tri);
 	for(size_t i=0; i<=recursionLevel; i++) {
@@ -114,6 +118,8 @@ mesh_t::mesh_t(planet_t& p,face_t tri,size_t recursionLevel):
 	for(size_t i=start; i<=stop; i++) {
 		const face_t& f = planet.faces[i];
 		const GLuint a = f.a, b = f.b, c = f.c;
+		mn_point = std::min<GLuint>(mn_point,std::min<GLuint>(a,std::min<GLuint>(b,c)));
+		mx_point = std::max<GLuint>(mx_point,std::max<GLuint>(a,std::max<GLuint>(b,c)));
 		planet.adjacent_faces[a].add(ID|i);
 		planet.adjacent_faces[b].add(ID|i);
 		planet.adjacent_faces[c].add(ID|i);
@@ -238,7 +244,8 @@ planet_t::planet_t(size_t recursionLevel,size_t iterations,size_t smoothing_pass
 	faces(num_faces(recursionLevel)),
 	adjacent_faces(num_points(recursionLevel),true),
 	adjacent_points(num_points(recursionLevel),true),
-	types(num_points(recursionLevel))
+	types(num_points(recursionLevel)),
+	sun(0,0,100)
 {
 	std::cout << "terraforming...\n: recursionLevel = " << recursionLevel << std::endl;
 	static const float t = (1.0f + sqrt(5.0f)) / 2.0f;
@@ -430,8 +437,32 @@ GLuint planet_t::find_face(GLuint a,GLuint b,GLuint c) {
 }
 
 void planet_t::draw() {
+	static const double PI = 3.14159265;
+	const double r = fmod(now()/20.0,360)*(PI/180.0);
+	const vec_t sun = this->sun.rotate(r,vec_t(0,1,0),vec_t(0,-1,0));
+	static float light[4];
+	light[0] = sun.x;
+	light[1] = sun.y;
+	light[2] = sun.z;
+	light[3] = 0;
+	glLightfv(GL_LIGHT1,GL_POSITION,light);
+#if 1 // vertex arrays
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glVertexPointer(3,GL_FLOAT,0,points.ptr());
+	glEnableClientState(GL_COLOR_ARRAY);
+	glColorPointer(3,GL_UNSIGNED_BYTE,0,colours.ptr());
+	glEnableClientState(GL_NORMAL_ARRAY);
+	glNormalPointer(GL_FLOAT,0,normals.ptr());
+	for(meshes_t::iterator i=meshes.begin(); i!=meshes.end(); i++)
+		glDrawRangeElements(GL_TRIANGLES,
+			(*i)->mn_point,(*i)->mx_point,
+			((*i)->stop-(*i)->start+1)*3,
+			GL_UNSIGNED_INT,
+			faces.ptr()+(*i)->start);
+#else // vertices
 	for(meshes_t::iterator i=meshes.begin(); i!=meshes.end(); i++)
 		(*i)->draw();
+#endif
 }
 
 bool planet_t::intersection(int x,int y,vec_t& pt) {

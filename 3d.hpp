@@ -37,6 +37,7 @@ struct vec_t {
 	float distance(const vec_t& v) const;
 	vec_t& normalise();
 	static vec_t normalise(const vec_t& v);
+	vec_t rotate(float rad,const vec_t& axis1,const vec_t& axis2) const;
 };
 
 struct ray_t {

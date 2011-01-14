@@ -35,6 +35,40 @@ float vec_t::magnitude() const {
 	return sqrt(magnitude_sqrd());
 }
 
+vec_t vec_t::rotate(float rad,const vec_t& axis1,const vec_t& axis2) const {
+	// http://local.wasp.uwa.edu.au/~pbourke/geometry/rotate/example.c
+	vec_t q1 = *this - axis1, q2;
+	vec_t u = axis2 - axis1;
+	u.normalise();
+	const double
+		d = sqrt(u.y*u.y + u.z*u.z),
+		cosrad = cos(rad),
+		sinrad = sin(rad);
+	if(d != 0) {
+		q2.x = q1.x;
+		q2.y = q1.y * u.z / d - q1.z * u.y / d;
+		q2.z = q1.y * u.y / d + q1.z * u.z / d;
+	} else
+		q2 = q1;
+	q1.x = q2.x * d - q2.z * u.x;
+	q1.y = q2.y;
+	q1.z = q2.x * u.x + q2.z * d;
+	q2.x = q1.x * cosrad - q1.y * sinrad;
+	q2.y = q1.x * sinrad + q1.y * cosrad;
+	q2.z = q1.z;
+	q1.x =   q2.x * d + q2.z * u.x;
+	q1.y =   q2.y;
+	q1.z = - q2.x * u.x + q2.z * d;
+	if (d != 0) {
+		q2.x =   q1.x;
+		q2.y =   q1.y * u.z / d + q1.z * u.y / d;
+		q2.z = - q1.y * u.y / d + q1.z * u.z / d;
+	} else
+		q2 = q1;
+	q1 = q2 + axis1;
+	return q1;
+}
+
 bool sphere_t::intersects(const ray_t& r) const {
 	const float a = r.d.magnitude_sqrd();
 	assert(a>0);
