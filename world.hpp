@@ -8,6 +8,8 @@
 #ifndef __WORLD_HPP__
 #define __WORLD_HPP__
 
+#include <inttypes.h>
+
 /*** GAME TIME
  Game time is in milliseconds since game-start */
 
@@ -16,11 +18,10 @@ public:
 	perf_t();
 	void reset();
 	void tick(unsigned now);
-	int per_second(unsigned now) const;
+	double per_second(unsigned now) const;
 private:
 	enum { MAX_SECONDS = 3, NUM_SLOTS = 64 };
 	unsigned slot[NUM_SLOTS];
-	unsigned first;
 	int idx;
 };
 

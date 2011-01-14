@@ -20,26 +20,25 @@ perf_t::perf_t() {
 void perf_t::reset() {
 	for(int i=0; i<NUM_SLOTS; i++)
 		slot[i] = 0;
-	first = 0;
 	idx = 0;
 }
 
 void perf_t::tick(unsigned now) {
 	if(++idx == NUM_SLOTS)
 		idx = 0;
-	if(!first)
-		first = now;
 	slot[idx] = now;
 }
 	
-int perf_t::per_second(unsigned now) const {
-	const unsigned start = now - ((unsigned)MAX_SECONDS * 1000);
+double perf_t::per_second(unsigned now) const {
+	enum { WINDOW = MAX_SECONDS*1000 };
+	const unsigned first = slot[idx<(NUM_SLOTS-1)?idx+1:0];
+	const unsigned len = (now-first);
 	int count = 0;
 	for(int i=0; i<NUM_SLOTS; i++)
-		if(slot[i] >= start)
+		if(slot[i])
 			count++;
-	const double multi = (start < first)? ((double)(now-first)/1000.0): MAX_SECONDS;
-	return (count/multi);
+	const double multi = len/1000.0;
+	return count/multi;
 }
 
 static unsigned _now;

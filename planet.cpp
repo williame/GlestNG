@@ -446,7 +446,7 @@ void planet_t::draw() {
 	light[2] = sun.z;
 	light[3] = 0;
 	glLightfv(GL_LIGHT1,GL_POSITION,light);
-#if 1 // vertex arrays
+#if 0 // vertex arrays
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glVertexPointer(3,GL_FLOAT,0,points.ptr());
 	glEnableClientState(GL_COLOR_ARRAY);

@@ -34,7 +34,7 @@ void ui() {
 	glDisable(GL_LIGHTING);
 	glColor3f(1,1,1);
 	char fps[12];
-	snprintf(fps,sizeof(fps),"%d fps",framerate.per_second(now()));
+	snprintf(fps,sizeof(fps),"%u fps",(unsigned)framerate.per_second(now()));
 	font_mgr()->draw(10,10,fps);
 	glPopMatrix();
 	glMatrixMode(GL_PROJECTION);
@@ -45,13 +45,6 @@ void ui() {
 }
 
 void tick() {
-#if 0
-	usleep(100000);
-	char fps[12];
-	snprintf(fps,sizeof(fps),"%d fps",framerate.per_second(now()));
-	printf("%s\n",fps);
-	return;
-#endif
 	terrain->draw();
 	ui();
 	SDL_GL_SwapBuffers();
