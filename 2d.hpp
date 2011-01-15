@@ -12,6 +12,8 @@ struct vec2_t {
 	vec2_t() {}
 	vec2_t(short x_,short y_): x(x_), y(y_) {}
 	short x, y;
+	inline vec2_t& operator+=(const vec2_t& a);
+	inline vec2_t operator+(const vec2_t& a) const;
 	inline static void normalise(vec2_t& tl,vec2_t& br);
 };
 
@@ -23,6 +25,18 @@ struct rect_t {
 	inline bool empty() const { return (br.x<=tl.x) || (br.y<=tl.y); }
 	inline void normalise() { vec2_t::normalise(tl,br); }
 };
+
+inline vec2_t& vec2_t::operator+=(const vec2_t& a) {
+	x += a.x;
+	y += a.y;
+	return *this;
+}
+
+inline vec2_t vec2_t::operator+(const vec2_t& a) const {
+	vec2_t ret = *this;
+	ret += a;
+	return ret;
+}
 
 inline void vec2_t::normalise(vec2_t& tl,vec2_t& br) {
 	if(br.x < tl.x) {

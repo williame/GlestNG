@@ -66,5 +66,23 @@ private:
 	int idx;
 };
 
+// pretty printers for logs and panics and things
+
+inline std::ostream& operator<<(std::ostream& out,const world_t::category_t& category) {
+	out << "category<";
+	switch(category) {
+	case world_t::TERRAIN: out << "TERRAIN"; break;
+	case world_t::BUILDING: out << "BUILDING"; break;
+	default: out << (int)category << "!";
+	}
+	out << ">";
+	return out;
+}
+
+inline std::ostream& operator<<(std::ostream& out,const world_t::hit_t& hit) {
+	out << "hit<" << hit.d << "," << hit.category << "," << *hit.obj << ">";
+	return out;
+}
+
 #endif //__WORLD_HPP__
 

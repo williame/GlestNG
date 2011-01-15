@@ -17,6 +17,7 @@
 #include "world.hpp"
 #include "terrain.hpp"
 #include "font.hpp"
+#include "2d.hpp"
 
 SDL_Surface* screen;
 terrain_t* terrain;
@@ -53,6 +54,24 @@ void tick() {
 	SDL_Flip(screen);
 	glClearColor(.2,.1,.2,1);
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+}
+
+void click(int x,int y) {
+        double mv[16], p[16], a, b, c;
+        glGetDoublev(GL_MODELVIEW_MATRIX,mv);
+        glGetDoublev(GL_PROJECTION_MATRIX,p);
+        GLint viewport[4];
+        glGetIntegerv(GL_VIEWPORT,viewport);
+        gluUnProject(x,y,1,mv,p,viewport,&a,&b,&c);
+        const vec_t origin(a,b,c);
+        gluUnProject(x,y,-1,mv,p,viewport,&a,&b,&c);
+        const vec_t dest(a,b+0.1,c);
+        ray_t ray(origin,dest-origin);
+        std::cout << "click(" << x << "," << y << ") " << ray << std::endl;
+        world_t::hits_t hits;
+        world()->intersection(ray,world_t::TERRAIN,hits);
+        for(world_t::hits_t::iterator i=hits.begin(); i!=hits.end(); i++)
+        		std::cout << *i << std::endl; 
 }
 
 struct v4_t {
@@ -140,6 +159,7 @@ int main(int argc,char** args) {
 					case SDL_MOUSEBUTTONDOWN:
 						printf("Mouse button %d pressed at (%d,%d)\n",
 						event.button.button, event.button.x, event.button.y);
+						click(event.button.x,event.button.y);
 						break;
 					case SDL_KEYDOWN:
 						switch(event.key.keysym.sym) {

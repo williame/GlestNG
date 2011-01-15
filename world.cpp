@@ -130,12 +130,16 @@ void octree_t::remove(items_t& items,world_t::category_t category,object_t* obj)
 }
 
 void octree_t::intersection(const ray_t& r,unsigned category,world_t::hits_t& hits) {
-	for(int i=0; i<8; i++) {
-		if(sub[i].sub)
-			sub[i].sub->intersection(r,category,hits);
-		else
-			intersection(sub[i].items,r,category,hits);
-	}
+	if(!intersects(r))
+		panic(*this << " does not intersect " << r <<
+			" (" << sphere_t::intersects(r) << "," << aabb_t::intersects(r) << ")");
+	for(int i=0; i<8; i++)
+		if((sub[i].sub || sub[i].items.size()) && sub[i].bounds.intersects(r)) {
+			if(sub[i].sub)
+				sub[i].sub->intersection(r,category,hits);
+			else
+				intersection(sub[i].items,r,category,hits);
+		}
 	intersection(items,r,category,hits);
 }
 
