@@ -78,6 +78,12 @@ struct bounds_t: public sphere_t, public aabb_t {
 	void bounds_fix();
 };
 
+struct triangle_t {
+	triangle_t(const vec_t a_,const vec_t b_,const vec_t c_): a(a_), b(b_), c(c_) {}
+	vec_t a, b, c;
+	bool intersection(const ray_t& r,vec_t& I) const;
+};
+
 template<typename T> class fixed_array_t {
 public:
 	fixed_array_t(size_t capacity,bool filled=false);

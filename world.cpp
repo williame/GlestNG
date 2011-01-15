@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <sys/time.h>
 
 #include "world.hpp"
 #include "error.hpp"
@@ -221,4 +222,14 @@ unsigned now() { return _now; }
 
 void set_now(unsigned now) {
 	_now = now;
+}
+
+
+uint64_t high_precision_time() {
+	static uint64_t high_precision_base = 0;
+	timespec ts;
+	clock_gettime(CLOCK_REALTIME,&ts);
+	if(!high_precision_base)
+		high_precision_base = ts.tv_sec;
+	return (ts.tv_sec-high_precision_base)*1000000000+ts.tv_nsec;
 }

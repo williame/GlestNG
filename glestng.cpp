@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <iostream>
+#include <sys/time.h>
 
 #include "error.hpp"
 #include "world.hpp"
@@ -57,21 +58,30 @@ void tick() {
 }
 
 void click(int x,int y) {
-        double mv[16], p[16], a, b, c;
-        glGetDoublev(GL_MODELVIEW_MATRIX,mv);
-        glGetDoublev(GL_PROJECTION_MATRIX,p);
-        GLint viewport[4];
-        glGetIntegerv(GL_VIEWPORT,viewport);
-        gluUnProject(x,y,1,mv,p,viewport,&a,&b,&c);
-        const vec_t origin(a,b,c);
-        gluUnProject(x,y,-1,mv,p,viewport,&a,&b,&c);
-        const vec_t dest(a,b+0.1,c);
-        ray_t ray(origin,dest-origin);
-        std::cout << "click(" << x << "," << y << ") " << ray << std::endl;
-        world_t::hits_t hits;
-        world()->intersection(ray,world_t::TERRAIN,hits);
-        for(world_t::hits_t::iterator i=hits.begin(); i!=hits.end(); i++)
-        		std::cout << *i << std::endl; 
+	uint64_t start = high_precision_time();
+	double mv[16], p[16], a, b, c;
+	glGetDoublev(GL_MODELVIEW_MATRIX,mv);
+	glGetDoublev(GL_PROJECTION_MATRIX,p);
+	GLint viewport[4];
+	glGetIntegerv(GL_VIEWPORT,viewport);
+	gluUnProject(x,y,1,mv,p,viewport,&a,&b,&c);
+	const vec_t origin(a,b,c);
+	gluUnProject(x,y,-1,mv,p,viewport,&a,&b,&c);
+	const vec_t dest(a,b+0.1,c);
+	ray_t ray(origin,dest-origin);
+	world_t::hits_t hits;
+	world()->intersection(ray,world_t::TERRAIN,hits);
+	uint64_t ns = high_precision_time()-start;
+	std::cout << "click(" << x << "," << y << ") " << ray << " (" << ns << " ns)"<< std::endl;
+	for(world_t::hits_t::iterator i=hits.begin(); i!=hits.end(); i++) {
+			vec_t pt;
+			start = high_precision_time();
+			const bool hit = i->obj->refine_intersection(ray,pt);
+			ns = high_precision_time()-start;
+			if(hit)
+				std::cout << "HIT " << pt << ": ";
+			std::cout << *i << " (" << ns << " ns)" << std::endl;
+	}
 }
 
 struct v4_t {
@@ -157,8 +167,6 @@ int main(int argc,char** args) {
 						event.motion.x, event.motion.y);*/
 						break;
 					case SDL_MOUSEBUTTONDOWN:
-						printf("Mouse button %d pressed at (%d,%d)\n",
-						event.button.button, event.button.x, event.button.y);
 						click(event.button.x,event.button.y);
 						break;
 					case SDL_KEYDOWN:

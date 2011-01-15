@@ -18,6 +18,7 @@ class object_t: public bounds_t {
 public:
 	virtual ~object_t() {}
 	virtual void draw() = 0;
+	virtual bool refine_intersection(const ray_t& r,vec_t& I) = 0;
 protected:
 	object_t() {}
 };
@@ -65,6 +66,8 @@ private:
 	unsigned slot[NUM_SLOTS];
 	int idx;
 };
+
+uint64_t high_precision_time();
 
 // pretty printers for logs and panics and things
 

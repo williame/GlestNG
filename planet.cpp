@@ -45,6 +45,7 @@ struct mesh_t: public object_t {
 	mesh_t(planet_t& planet,face_t tri,size_t recursionLevel);
 	void calc_bounds();
 	void draw();
+	bool refine_intersection(const ray_t& r,vec_t& I);
 	planet_t& planet;
 	const GLuint ID;
 	GLuint mn_point, mx_point;
@@ -154,6 +155,25 @@ void mesh_t::calc_bounds() {
 	bounds_fix();
 	// must not be called only once ever:
 	world()->add(world_t::TERRAIN,this);
+}
+
+bool mesh_t::refine_intersection(const ray_t& r,vec_t& I) {
+	bool hit = false;
+	float nearest;
+	for(size_t i=start; i<=stop; i++) {
+		const face_t& f = planet.faces[i];
+		triangle_t tri(planet.points[f.a],planet.points[f.b],planet.points[f.c]);
+		vec_t I2;
+		if(tri.intersection(r,I2)) {
+			const float d = I2.distance_sqrd(r.o);
+			if(!hit || (d < nearest)) {
+				nearest = d;
+				I = I2;
+				hit = true;
+			}
+		}
+	}
+	return hit;
 }
 
 void mesh_t::init_gl() {

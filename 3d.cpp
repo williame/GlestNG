@@ -77,51 +77,79 @@ bool sphere_t::intersects(const ray_t& r) const {
 	return (b*b-4*a*c) >= 0.0f;
 }
 
-static bool _aabb_intersects_r(bool& found,float D,float d,float e,float& t0,float& t1) {
-	const float es = D>0? e: -e;
-	const float invDi = 1. / D;
-	if(!found) {
-		t0 = (d - es) * invDi;
-		t1 = (d + es) * invDi;
-		found = true;
-	} else {
-		float s = (d - es) * invDi;
-		if (s > t0) t0 = s;
-		s = (d + es) * invDi;
-		if (s < t1) t1 = s;
-		if (t0 > t1) return false;
-	}
-	return true;
-}
-
 bool aabb_t::intersects(const ray_t& r) const {
-	unsigned parallel = 0;
-	bool found = false;
-	const vec_t d = a - r.o;
-	float t0, t1;
-	if(fabs(a.x) < 0.000001f)
-		parallel |= 1 << 0;
-	else if(!_aabb_intersects_r(found,r.d.x,d.x,b.x,t0,t1))
-		return false;
-	if(fabs(a.y) < 0.000001f)
-		parallel |= 1 << 1;
-	else if(!_aabb_intersects_r(found,r.d.y,d.y,b.y,t0,t1))
-		return false;
-	if(fabs(a.z) < 0.000001f)
-		parallel |= 1 << 2;
-	else if(!_aabb_intersects_r(found,r.d.z,d.z,b.z,t0,t1))
-		return false;
-	if(!parallel)
+	// Adapted from code based on "Fast Ray-Box Intersection," by Woo in Graphics Gems I, p395.
+	bool inside = true;
+	float xt, yt, zt, x, y, z, t;
+	if (r.o.x < a.x) {
+		xt = a.x - r.o.x;
+		if (xt > r.d.x) return false;
+		xt /= r.d.x;
+		inside = false;
+	} else if (r.o.x > b.x) {
+		xt = b.x - r.o.x;
+		if (xt < r.d.x) return false;
+		xt /= r.d.x;
+		inside = false;
+	} else
+		xt = -1.0f;
+	if (r.o.y < a.y) {
+		yt = a.y - r.o.y;
+		if (yt > r.d.y) return false;
+		yt /= r.d.y;
+		inside = false;
+	} else if (r.o.y > b.y) {
+		yt = b.y - r.o.y;
+		if (yt < r.d.y) return false;
+		yt /= r.d.y;
+		inside = false;
+	} else
+		yt = -1.0f;
+	if (r.o.z < a.z) {
+		zt = a.z - r.o.z;
+		if (zt > r.d.z) return false;
+		zt /= r.d.z;
+		inside = false;
+	} else if (r.o.z > b.z) {
+		zt = b.z - r.o.z;
+		if (zt < r.d.z) return false;
+		zt /= r.d.z;
+		inside = false;
+	} else
+		zt = -1.0f;
+	if (inside)
 		return true;
-	else if((parallel & (1<<0)) &&
-		((fabs(d.x-t0*r.d.x)>b.x) || (fabs(d.x-t1*r.d.x)>b.x)))
-		return false;
-	else if((parallel & (1<<1)) &&
-		((fabs(d.y-t0*r.d.y)>b.y) || (fabs(d.y-t1*r.d.y)>b.y)))
-		return false;
-	else if((parallel & (1<<2)) &&
-		((fabs(d.z-t0*r.d.z)>b.z) || (fabs(d.z-t1*r.d.z)>b.z)))
-		return false;
+	enum {X,Y,Z} which = X;
+	t = xt;
+	if (yt > t) {
+		which = Y;
+		t = yt;
+	}
+	if (zt > t) {
+		which = Z;
+		t = zt;
+	}
+	switch (which) {
+	case X:
+		y = r.o.y + r.d.y*t;
+		if (y < a.y || y > b.y) return false;
+		z = r.o.z + r.d.z*t;
+		if (z < a.z || z > b.z) return false;
+		break;
+	case Y:
+		x = r.o.x + r.d.x*t;
+		if (x < a.x || x > b.x) return false;
+		z = r.o.z + r.d.z*t;
+		if (z < a.z || z > b.z) return false;
+		break;
+
+	case Z:
+		x = r.o.x + r.d.x*t;
+		if (x < a.x || x > b.x) return false;
+		y = r.o.y + r.d.y*t;
+		if (y < a.y || y > b.y) return false;
+		break;
+	}
 	return true;
 }
 
@@ -185,5 +213,36 @@ void bounds_t::bounds_fix() {
 	const vec_t sz = (b-a)/2.0f;
 	centre = a+sz;
 	radius = sz.magnitude();
+}
+
+bool triangle_t::intersection(const ray_t& r,vec_t& I) const {
+    // http://softsurfer.com/Archive/algorithm_0105/algorithm_0105.htm#intersect_RayTriangle%28%29
+    // get triangle edge vectors and plane normal
+    const vec_t u = b-a;
+    const vec_t v = c-a;
+    const vec_t n = u.cross(v);
+    if(n.x==0 && n.y==0 && n.z==0) return false; // triangle is degenerate
+    const vec_t w0 = r.o-a;
+    const float j = n.dot(r.d);
+    if(fabs(j) < 0.00000001) return false; // parallel, disjoint or on plane
+    const float i = -n.dot(w0);
+    // get intersect point of ray with triangle plane
+    const float k = i / j;
+    if(k < 0.0) return false; // ray goes away from triangle
+    // for a segment, also test if (r > 1.0) => no intersect
+    I = r.o + r.d * k; // intersect point of ray and plane
+    // is I inside T?
+    const float uu = u.dot(u);
+    const float uv = u.dot(v);
+    const float vv = v.dot(v);
+    const vec_t w = I - a;
+    const float wu = w.dot(u);
+    const float wv = w.dot(v);
+    const float D = uv * uv - uu * vv;
+    const float s = (uv * wv - vv * wu) / D;
+    if(s<0.0 || s>1.0) return false; // I is outside T
+    const float t = (uv * wu - uu * wv) / D;
+    if(t<0.0 || (s+t)>1.0) return false; // I is outside T
+    return true; // I is in T
 }
 
