@@ -41,15 +41,18 @@ struct rgb_t {
 
 struct planet_t;
 
-struct mesh_t {
+struct mesh_t: public object_t {
 	mesh_t(planet_t& planet,face_t tri,size_t recursionLevel);
 	void calc_bounds();
 	void draw();
 	planet_t& planet;
 	const GLuint ID;
-	bounds_t bounds;
 	GLuint mn_point, mx_point;
 	size_t start, stop;
+#ifdef USE_GL
+	GLuint faces;
+	void init_gl();
+#endif
 };
 
 struct planet_t: public terrain_t {
@@ -95,7 +98,7 @@ struct planet_t: public terrain_t {
 	vec_t sun;
 #ifdef USE_GL
 	struct {
-		GLuint points, normals, colours, faces; 
+		GLuint points, normals, colours; 
 	} vbo;
 	void init_gl();
 #endif
@@ -141,32 +144,28 @@ mesh_t::mesh_t(planet_t& p,face_t tri,size_t recursionLevel):
 }
 
 void mesh_t::calc_bounds() {
-	bounds.reset();
+	bounds_reset();
 	for(size_t i=start; i<=stop; i++) {
 		const face_t& f = planet.faces[i];
-		bounds.include(planet.points[f.a]);
-		bounds.include(planet.points[f.b]);
-		bounds.include(planet.points[f.c]);
+		bounds_include(planet.points[f.a]);
+		bounds_include(planet.points[f.b]);
+		bounds_include(planet.points[f.c]);
 	}
-	bounds.fix();
+	bounds_fix();
 }
 
-static void _vertex(const rgb_t& c,const vec_t& n,const vec_t& v) {
-	glColor3ub(c.r,c.g,c.b);
-	glNormal3f(n.x,n.y,n.z);
-	glVertex3f(v.x,v.y,v.z);
+void mesh_t::init_gl() {
+	faces = graphics_mgr()->alloc_vbo(
+		GL_ELEMENT_ARRAY_BUFFER,
+		((stop-start)+1)*sizeof(face_t),
+		planet.faces.ptr()+start,
+		GL_STATIC_DRAW);
 }
 
 void mesh_t::draw() {
-	glColor3f(1.,0,0);
-	glBegin(GL_TRIANGLES);
-	for(size_t i=start; i<=stop; i++) {
-		const face_t& f = planet.faces[i];
-		_vertex(planet.colours[f.a],planet.normals[f.a],planet.points[f.a]);
-		_vertex(planet.colours[f.b],planet.normals[f.b],planet.points[f.b]);
-		_vertex(planet.colours[f.c],planet.normals[f.c],planet.points[f.c]);
-	}
-	glEnd();
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,faces);
+        glDrawRangeElements(GL_TRIANGLES,mn_point,mx_point,((stop-start)+1)*3,GL_UNSIGNED_INT,NULL);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
 }
 
 std::ostream& operator<<(std::ostream& out,const planet_t::adjacent_t& adj) {
@@ -476,11 +475,8 @@ void planet_t::init_gl() {
 		colours.size()*sizeof(rgb_t),
 		colours.ptr(),
 		GL_STATIC_DRAW);
-	vbo.faces = graphics_mgr()->alloc_vbo(
-		GL_ELEMENT_ARRAY_BUFFER,
-		faces.size()*sizeof(face_t),
-		faces.ptr(),
-		GL_STATIC_DRAW);
+	for(meshes_t::iterator i=meshes.begin(); i!=meshes.end(); i++)
+		(*i)->init_gl();
 }
 #endif
 
@@ -494,7 +490,6 @@ void planet_t::draw() {
 	light[2] = sun.z;
 	light[3] = 0;
 	glLightfv(GL_LIGHT1,GL_POSITION,light);
-#if 1 // VBOs
         glEnableClientState(GL_VERTEX_ARRAY);
         glBindBuffer(GL_ARRAY_BUFFER,vbo.points);
         glVertexPointer(3,GL_FLOAT,0,NULL);
@@ -505,29 +500,11 @@ void planet_t::draw() {
         glBindBuffer(GL_ARRAY_BUFFER,vbo.colours);
         glColorPointer(3,GL_UNSIGNED_BYTE,0,NULL);
         glBindBuffer(GL_ARRAY_BUFFER,0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,vbo.faces);
-        glDrawElements(GL_TRIANGLES,faces.size()*3,GL_UNSIGNED_INT,NULL);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
+	for(meshes_t::iterator i=meshes.begin(); i!=meshes.end(); i++)
+		(*i)->draw();
         glDisableClientState(GL_COLOR_ARRAY);
         glDisableClientState(GL_VERTEX_ARRAY);
         glDisableClientState(GL_NORMAL_ARRAY);
-#elif 0 // vertex arrays
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glVertexPointer(3,GL_FLOAT,0,points.ptr());
-	glEnableClientState(GL_COLOR_ARRAY);
-	glColorPointer(3,GL_UNSIGNED_BYTE,0,colours.ptr());
-	glEnableClientState(GL_NORMAL_ARRAY);
-	glNormalPointer(GL_FLOAT,0,normals.ptr());
-	for(meshes_t::iterator i=meshes.begin(); i!=meshes.end(); i++)
-		glDrawRangeElements(GL_TRIANGLES,
-			(*i)->mn_point,(*i)->mx_point,
-			((*i)->stop-(*i)->start+1)*3,
-			GL_UNSIGNED_INT,
-			faces.ptr()+(*i)->start);
-#else // vertices
-	for(meshes_t::iterator i=meshes.begin(); i!=meshes.end(); i++)
-		(*i)->draw();
-#endif
 }
 
 bool planet_t::intersection(int x,int y,vec_t& pt) {

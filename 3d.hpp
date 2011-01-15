@@ -37,6 +37,7 @@ struct vec_t {
 	float distance(const vec_t& v) const;
 	vec_t& normalise();
 	static vec_t normalise(const vec_t& v);
+	inline static vec_t midpoint(const vec_t& a,const vec_t& b);
 	vec_t rotate(float rad,const vec_t& axis1,const vec_t& axis2) const;
 };
 
@@ -45,11 +46,17 @@ struct ray_t {
 	vec_t o, d;
 };
 
+enum intersection_t {
+	SOME,
+	ALL,
+	MISS,
+};
+
 struct sphere_t {
 	sphere_t(const vec_t& c,float r): centre(c), radius(r) {}
 	vec_t centre;
 	float radius;
-	inline bool intersects(const sphere_t& s) const;
+	inline intersection_t intersects(const sphere_t& s) const;
 	bool intersects(const ray_t& r) const;
 };
 
@@ -57,14 +64,17 @@ struct aabb_t { //axis-aligned bounding box
 	aabb_t(const vec_t& a_,const vec_t& b_): a(a_), b(b_) {}
 	vec_t a, b;
 	bool intersects(const ray_t& r) const;
+	intersection_t intersects(const aabb_t& a) const;
 };
 
 struct bounds_t: public sphere_t, public aabb_t {
 	bounds_t();
 	bounds_t(const vec_t& a,const vec_t& b);
-	void reset();
-	void include(const vec_t& v);
-	void fix();
+	void bounds_reset();
+	void bounds_include(const vec_t& v);
+	bool intersects(const ray_t& r) const;
+	intersection_t intersects(const bounds_t& a) const;
+	void bounds_fix();
 };
 
 template<typename T> class fixed_array_t {
@@ -83,6 +93,8 @@ private:
 	size_t len;
 	T* data;
 };
+
+inline float sqrd(float x) { return x*x; }
 
 inline vec_t& vec_t::operator-=(const vec_t& v) {
 	x -= v.x;
@@ -159,17 +171,26 @@ inline float vec_t::dot(const vec_t& v) const {
 }
 
 inline float vec_t::magnitude_sqrd() const {
-	return x*x + y*y + z*z;
+	return sqrd(x) + sqrd(y) + sqrd(z);
 }
 
 inline float vec_t::distance_sqrd(const vec_t& v) const {
 	const float xx = (x-v.x), yy = (y-v.y), zz = (z-v.z);
-	return xx*xx + yy*yy + zz*zz;
+	return sqrd(xx) + sqrd(yy) + sqrd(zz);
 }
 
-inline bool sphere_t::intersects(const sphere_t& s) const {
-	const float d = (radius+s.radius)*(radius+s.radius);
-	return d < centre.distance_sqrd(s.centre);
+inline vec_t vec_t::midpoint(const vec_t& a,const vec_t& b) {
+	return vec_t((a.x+b.x)/2.0,(a.y+b.y)/2.0,(a.z+b.z)/2.0);
+}
+
+inline intersection_t sphere_t::intersects(const sphere_t& s) const {
+	const float b = sqrd(radius+s.radius);
+	const float d = centre.distance_sqrd(s.centre);
+	if((radius<=s.radius) && (d<sqrd(s.radius-radius)))
+		return ALL;
+	if(d<b)
+		return SOME;
+	return MISS;
 }
 
 template<typename T> fixed_array_t<T>::fixed_array_t(size_t cap,bool filled):

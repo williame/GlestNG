@@ -9,11 +9,50 @@
 #define __WORLD_HPP__
 
 #include <inttypes.h>
+#include <vector>
+
+#include "3d.hpp"
+
+class object_t: public bounds_t {
+public:
+	virtual ~object_t() {}
+	virtual void draw() = 0;
+protected:
+	object_t() {}
+};
+
+class world_t { // *the* spartial index of what is where in the world
+public:
+	static world_t* get_world();
+	enum category_t {
+		TERRAIN = 0x01,
+		BUILDING = 0x02,
+	};
+	void add(category_t category,object_t* obj);
+	void remove(category_t category,object_t* obj);
+	struct hit_t {
+		hit_t(float d_,category_t c,object_t* o): d(d_),category(c),obj(o) {}
+		float d;
+		category_t category;
+		object_t* obj;
+	};
+	typedef std::vector<hit_t> hits_t;
+	void intersection(const ray_t& r,unsigned category,hits_t& hits);
+private:
+	world_t();
+	struct pimpl_t;
+	pimpl_t* pimpl;
+};
+
+inline world_t* world() { return world_t::get_world(); }
 
 /*** GAME TIME
  Game time is in milliseconds since game-start */
 
-class perf_t {
+unsigned now();
+void set_now(unsigned now);
+
+class perf_t { // for fps etc
 public:
 	perf_t();
 	void reset();
@@ -24,9 +63,6 @@ private:
 	unsigned slot[NUM_SLOTS];
 	int idx;
 };
-
-unsigned now();
-void set_now(unsigned now);
 
 #endif //__WORLD_HPP__
 

@@ -125,6 +125,22 @@ bool aabb_t::intersects(const ray_t& r) const {
 	return true;
 }
 
+intersection_t aabb_t::intersects(const aabb_t& o) const {
+	const bool a_after = (a.x>=o.a.x && a.y>=o.a.y && a.z>=o.a.z),
+		b_before = (b.x<=o.b.x && b.y<=o.b.y && b.z<=o.b.z);
+	if(a_after && b_before)
+		return ALL;
+	const bool a_before = (a.x<=o.b.x && a.y<=o.b.y && a.z<=o.b.z);
+	if(a_after&&a_before)
+		return SOME;
+	const bool b_after = (b.x>=o.a.x && b.y>=o.a.y && b.z>=o.a.z);
+	if(b_before&&b_after)
+		return SOME;
+	if(!a_after&&!b_before)
+		return SOME;
+	return MISS;
+}
+
 static const vec_t
 	BOUNDS_MIN = vec_t(FLT_MAX,FLT_MAX,FLT_MAX),
 	BOUNDS_MAX = vec_t(-FLT_MAX,-FLT_MAX,-FLT_MAX);
@@ -138,17 +154,17 @@ bounds_t::bounds_t(const vec_t& a,const vec_t& b):
 	sphere_t(vec_t(0,0,0),0),
 	aabb_t(a,b)
 {
-	fix();
+	bounds_fix();
 }
 
-void bounds_t::reset() {
+void bounds_t::bounds_reset() {
 	a = BOUNDS_MIN;
 	b = BOUNDS_MAX;
 	VALGRIND_MAKE_MEM_UNDEFINED(&centre,sizeof(centre));
 	VALGRIND_MAKE_MEM_UNDEFINED(&radius,sizeof(radius));
 }
 
-void bounds_t::include(const vec_t& v) {
+void bounds_t::bounds_include(const vec_t& v) {
 	if(v.x < a.x) a.x = v.x;
 	if(v.y < a.y) a.y = v.y;
 	if(v.z < a.z) a.z = v.z;
@@ -157,7 +173,15 @@ void bounds_t::include(const vec_t& v) {
 	if(v.z > b.z) b.z = v.z;
 }
 
-void bounds_t::fix() {
+intersection_t bounds_t::intersects(const bounds_t& a) const {
+	return aabb_t::intersects(a);
+}
+
+bool bounds_t::intersects(const ray_t& r) const {
+	return sphere_t::intersects(r) && aabb_t::intersects(r);
+}
+
+void bounds_t::bounds_fix() {
 	const vec_t sz = b-a;
 	centre = vec_t(sz.x/2.0f,sz.y/2.0f,sz.z/2.0f);
 	radius = sz.magnitude()/2.0f;
