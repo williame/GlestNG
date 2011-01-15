@@ -10,6 +10,7 @@
 
 #include <inttypes.h>
 #include <vector>
+#include <iostream>
 
 #include "3d.hpp"
 
@@ -38,6 +39,7 @@ public:
 	};
 	typedef std::vector<hit_t> hits_t;
 	void intersection(const ray_t& r,unsigned category,hits_t& hits);
+	void dump(std::ostream& out) const;
 private:
 	world_t();
 	struct pimpl_t;

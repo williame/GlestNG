@@ -11,7 +11,9 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <iostream>
 
+#include "error.hpp"
 #include "world.hpp"
 #include "terrain.hpp"
 #include "font.hpp"
@@ -62,99 +64,105 @@ struct v4_t {
 
 int main(int argc,char** args) {
 	
-	if (SDL_Init(SDL_INIT_VIDEO)) {
-		fprintf(stderr,"Unable to initialize SDL: %s\n",SDL_GetError());
-		return EXIT_FAILURE;
-	}
+	try {
 	
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
-	screen = SDL_SetVideoMode(1024,768,32,SDL_OPENGL|SDL_HWSURFACE|SDL_DOUBLEBUF/*|SDL_FULLSCREEN*/);
-	if(!screen) {
-		fprintf(stderr,"Unable to create SDL screen: %s\n",SDL_GetError());
-		return EXIT_FAILURE;
-	}
-
-	GLenum err = glewInit();
-	if(GLEW_OK != err) {
-		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
-		return EXIT_FAILURE;
-	}
-	fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
-
-	terrain = gen_planet(5,500,3);
-
-	v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),
-		mat_amb(.7,.7,.7,1.), mat_dif(.8,.8,.8,1.), mat_spec(1.,1.,1.,1.);
-	glLightfv(GL_LIGHT0,GL_AMBIENT,light_amb.v);
-        glLightfv(GL_LIGHT0,GL_DIFFUSE,light_dif.v);
-        glLightfv(GL_LIGHT0,GL_SPECULAR,light_spec.v);
-        glLightfv(GL_LIGHT0,GL_POSITION,light_pos.v);
- 	glLightfv(GL_LIGHT1,GL_AMBIENT,light_amb.v);
-        glLightfv(GL_LIGHT1,GL_DIFFUSE,light_dif.v);
-        glLightfv(GL_LIGHT1,GL_SPECULAR,light_spec.v);
-        glMaterialfv(GL_FRONT,GL_AMBIENT,mat_amb.v);
-        glMaterialfv(GL_FRONT,GL_DIFFUSE,mat_dif.v);
-        glMaterialfv(GL_FRONT,GL_SPECULAR,mat_spec.v);
-        glMaterialf(GL_FRONT,GL_SHININESS,100.0);
-        glEnable(GL_LIGHTING);
-        glEnable(GL_LIGHT0);
-        glEnable(GL_LIGHT1);
-        glDepthFunc(GL_LEQUAL);
-        glEnable(GL_DEPTH_TEST);
-        glAlphaFunc(GL_GREATER,0.4);
-        glEnable(GL_COLOR_MATERIAL);
-        glEnable(GL_RESCALE_NORMAL);
-	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-	glEnable(GL_NORMALIZE);
-	glEnable(GL_BLEND);
-	glEnable(GL_TEXTURE_2D);
-	glViewport(0,0,screen->w,screen->h);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	const float left = -(float)screen->w/(float)screen->h;
-	glOrtho(left,-left,-1,1,10,-10);
-	glMatrixMode(GL_MODELVIEW);
+		if (SDL_Init(SDL_INIT_VIDEO)) {
+			fprintf(stderr,"Unable to initialize SDL: %s\n",SDL_GetError());
+			return EXIT_FAILURE;
+		}
+		atexit(SDL_Quit);
+		
+		SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
+		screen = SDL_SetVideoMode(1024,768,32,SDL_OPENGL|SDL_HWSURFACE|SDL_DOUBLEBUF/*|SDL_FULLSCREEN*/);
+		if(!screen) {
+			fprintf(stderr,"Unable to create SDL screen: %s\n",SDL_GetError());
+			return EXIT_FAILURE;
+		}
 	
-	bool quit = false;
-	SDL_Event event;
-	const unsigned start = SDL_GetTicks();
-	unsigned last_event = start;
-	framerate.reset();
-	while(!quit) {
-		set_now(SDL_GetTicks()-start);
-		// only eat events 10 times a second
-		if((now()-last_event) > 1000) {
-			while(!quit && SDL_PollEvent(&event)) {
-				switch (event.type) {
-				case SDL_MOUSEMOTION:
-					/*printf("Mouse moved by %d,%d to (%d,%d)\n", 
-					event.motion.xrel, event.motion.yrel,
-					event.motion.x, event.motion.y);*/
-					break;
-				case SDL_MOUSEBUTTONDOWN:
-					printf("Mouse button %d pressed at (%d,%d)\n",
-					event.button.button, event.button.x, event.button.y);
-					break;
-				case SDL_KEYDOWN:
-					switch(event.key.keysym.sym) {
-					case SDLK_ESCAPE:
+		GLenum err = glewInit();
+		if(GLEW_OK != err) {
+			fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+			return EXIT_FAILURE;
+		}
+		fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
+	
+		terrain = gen_planet(5,500,3);
+		world()->dump(std::cout);
+	
+		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),
+			mat_amb(.7,.7,.7,1.), mat_dif(.8,.8,.8,1.), mat_spec(1.,1.,1.,1.);
+		glLightfv(GL_LIGHT0,GL_AMBIENT,light_amb.v);
+		glLightfv(GL_LIGHT0,GL_DIFFUSE,light_dif.v);
+		glLightfv(GL_LIGHT0,GL_SPECULAR,light_spec.v);
+		glLightfv(GL_LIGHT0,GL_POSITION,light_pos.v);
+		glLightfv(GL_LIGHT1,GL_AMBIENT,light_amb.v);
+		glLightfv(GL_LIGHT1,GL_DIFFUSE,light_dif.v);
+		glLightfv(GL_LIGHT1,GL_SPECULAR,light_spec.v);
+		glMaterialfv(GL_FRONT,GL_AMBIENT,mat_amb.v);
+		glMaterialfv(GL_FRONT,GL_DIFFUSE,mat_dif.v);
+		glMaterialfv(GL_FRONT,GL_SPECULAR,mat_spec.v);
+		glMaterialf(GL_FRONT,GL_SHININESS,100.0);
+		glEnable(GL_LIGHTING);
+		glEnable(GL_LIGHT0);
+		glEnable(GL_LIGHT1);
+		glDepthFunc(GL_LEQUAL);
+		glEnable(GL_DEPTH_TEST);
+		glAlphaFunc(GL_GREATER,0.4);
+		glEnable(GL_COLOR_MATERIAL);
+		glEnable(GL_RESCALE_NORMAL);
+		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+		glEnable(GL_NORMALIZE);
+		glEnable(GL_BLEND);
+		glEnable(GL_TEXTURE_2D);
+		glViewport(0,0,screen->w,screen->h);
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		const float left = -(float)screen->w/(float)screen->h;
+		glOrtho(left,-left,-1,1,10,-10);
+		glMatrixMode(GL_MODELVIEW);
+		
+		bool quit = false;
+		SDL_Event event;
+		const unsigned start = SDL_GetTicks();
+		unsigned last_event = start;
+		framerate.reset();
+		while(!quit) {
+			set_now(SDL_GetTicks()-start);
+			// only eat events 10 times a second
+			if((now()-last_event) > 1000) {
+				while(!quit && SDL_PollEvent(&event)) {
+					switch (event.type) {
+					case SDL_MOUSEMOTION:
+						/*printf("Mouse moved by %d,%d to (%d,%d)\n", 
+						event.motion.xrel, event.motion.yrel,
+						event.motion.x, event.motion.y);*/
+						break;
+					case SDL_MOUSEBUTTONDOWN:
+						printf("Mouse button %d pressed at (%d,%d)\n",
+						event.button.button, event.button.x, event.button.y);
+						break;
+					case SDL_KEYDOWN:
+						switch(event.key.keysym.sym) {
+						case SDLK_ESCAPE:
+							quit = true;
+							break;
+						default:;
+						}
+						break;
+					case SDL_QUIT:
 						quit = true;
 						break;
-					default:;
 					}
-					break;
-				case SDL_QUIT:
-					quit = true;
-					break;
 				}
+				last_event = now();
 			}
-			last_event = now();
+			framerate.tick(now());
+			tick();
 		}
-		framerate.tick(now());
-		tick();
-        }
-        delete terrain;
-	
-	SDL_Quit();
-	return EXIT_SUCCESS;
+		delete terrain;
+		return EXIT_SUCCESS;
+	} catch(panic_t* panic) {
+		std::cerr << panic << std::endl;
+		return EXIT_FAILURE;
+	}
 }

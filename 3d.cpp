@@ -182,8 +182,8 @@ bool bounds_t::intersects(const ray_t& r) const {
 }
 
 void bounds_t::bounds_fix() {
-	const vec_t sz = b-a;
-	centre = vec_t(sz.x/2.0f,sz.y/2.0f,sz.z/2.0f);
-	radius = sz.magnitude()/2.0f;
+	const vec_t sz = (b-a)/2.0f;
+	centre = a+sz;
+	radius = sz.magnitude();
 }
 

@@ -5,6 +5,18 @@
  (c) William Edwards, 2011; all rights reserved
 */
 
+// ensure that NDEBUG is set when including <algorithm>, else sorts will test
+// symmetry of comparators for every single swap 
+#ifndef NDEBUG
+//##	#define _GLESTNG_NDEBUG
+//##	#define NDEBUG
+#endif
+#include <algorithm>
+#ifdef _GLESTNG_NDEBUG
+	#undef _GLESTNG_NDEBUG
+	#undef NDEBUG
+#endif
+
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -12,6 +24,7 @@
 #include <assert.h>
 
 #include "world.hpp"
+#include "error.hpp"
 
 class octree_t: public bounds_t {
 public:
@@ -19,12 +32,14 @@ public:
 	void add(world_t::category_t category,object_t* obj);
 	void remove(world_t::category_t category,object_t* obj);
 	void intersection(const ray_t& r,unsigned category,world_t::hits_t& hits);
+	void dump(std::ostream& out,int depth=0) const;
 private:
 	struct item_t {
 		item_t(world_t::category_t c,object_t* o): category(c), obj(o) {}
 		world_t::category_t category;
 		object_t* obj;
 	};
+	enum { SPLIT = 8 }; // number of children to split
 	typedef std::vector<item_t> items_t;
 	struct sub_t {
 		sub_t(): sub(NULL) {}
@@ -34,6 +49,7 @@ private:
 	} sub[8];
 	items_t items;
 	static void intersection(items_t& items,const ray_t& r,unsigned category,world_t::hits_t& hits);
+	static void remove(items_t& items,world_t::category_t category,object_t* obj);
 };
 
 octree_t::octree_t(const bounds_t& bounds): bounds_t(bounds) {
@@ -47,21 +63,70 @@ octree_t::octree_t(const bounds_t& bounds): bounds_t(bounds) {
 	sub[7].bounds = bounds_t(centre,b);
 }
 
+static std::ostream& indent(std::ostream& out,int depth) {
+	while(depth-- > 0)
+		out << "  ";
+	return out;
+}
+
+void octree_t::dump(std::ostream& out,int depth) const {
+	indent(out,depth) << "octree_t<" << *this << ">" << std::endl;
+	for(items_t::const_iterator i=items.begin(); i!=items.end(); i++)
+		indent(out,depth+1) << i->category << "," << *i->obj << std::endl;
+	for(int i=0; i<8; i++)
+		if(sub[i].sub || sub[i].items.size()) {
+			indent(out,depth+1) << "sub[" << i << "] " << sub[i].bounds << std::endl;
+			for(items_t::const_iterator j=sub[i].items.begin(); j!=sub[i].items.end(); j++)
+				indent(out,depth+2) << j->category << "," << *j->obj << std::endl;
+			if(sub[i].sub)
+				sub[i].sub->dump(out,depth+2);
+		}
+}
+
 void octree_t::add(world_t::category_t category,object_t* obj) {
-	assert(ALL == intersects(*obj));
+	if(ALL != obj->intersects(*this))
+		panic(*obj << " intersects " << *this << " = " << obj->intersects(*this))
 	// would fit entirely inside a child?  delegate
-	for(int i=0; i<8; i++) {
+	for(int i=0; i<8; i++)
 		if(ALL == obj->intersects(sub[i].bounds)) {
-			// TODO: threshold to break into a sub-octree
-			sub[i].items.push_back(item_t(category,obj));
+			if(sub[i].sub)
+				sub[i].sub->add(category,obj);
+			else  if(sub[i].items.size() == SPLIT) {
+				sub[i].sub = new octree_t(sub[i].bounds);
+				sub[i].sub->items.insert(
+					sub[i].sub->items.begin(),
+					sub[i].items.begin(),
+					sub[i].items.end());
+				sub[i].items.clear();
+			} else
+				sub[i].items.push_back(item_t(category,obj));
 			return;
 		}
-	}
 	items.push_back(item_t(category,obj));
 }
 
 void octree_t::remove(world_t::category_t category,object_t* obj) {
-	assert(ALL == intersects(*obj));
+	if(ALL != obj->intersects(*this))
+		panic(*obj << " intersects " << *this << " = " << obj->intersects(*this))
+	for(int i=0; i<8; i++)
+		if(ALL == obj->intersects(sub[i].bounds)) {
+			if(sub[i].sub)
+				sub[i].sub->remove(category,obj);
+			else
+				remove(sub[i].items,category,obj);
+			return;
+		}
+	remove(items,category,obj);
+}
+
+void octree_t::remove(items_t& items,world_t::category_t category,object_t* obj) {
+	for(items_t::iterator i=items.begin(); i!=items.end(); i++)
+		if(i->obj == obj) {
+			assert(i->category == category);
+			items.erase(i);
+			return;
+		}
+	panic("object could not be found in the octree");
 }
 
 void octree_t::intersection(const ray_t& r,unsigned category,world_t::hits_t& hits) {
@@ -97,11 +162,26 @@ world_t* world_t::get_world() {
 
 world_t::world_t(): pimpl(new pimpl_t()) {}
 
-void world_t::add(category_t category,object_t* obj) {}
+void world_t::add(category_t category,object_t* obj) {
+	pimpl->idx.add(category,obj);
+}
 
-void world_t::remove(category_t category,object_t* obj) {}
+void world_t::remove(category_t category,object_t* obj) {
+	pimpl->idx.remove(category,obj);
+}
 
-void world_t::intersection(const ray_t& r,unsigned category,hits_t& hits) {}
+static bool cmp_hits(const world_t::hit_t& a,const world_t::hit_t& b) {
+	return (a.d < b.d);
+}
+
+void world_t::intersection(const ray_t& r,unsigned category,hits_t& hits) {
+	pimpl->idx.intersection(r,category,hits);
+	std::sort(hits.begin(),hits.end(),cmp_hits);
+}
+
+void world_t::dump(std::ostream& out) const {
+	pimpl->idx.dump(out);
+}
 
 perf_t::perf_t() {
 	reset();

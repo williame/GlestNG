@@ -152,6 +152,8 @@ void mesh_t::calc_bounds() {
 		bounds_include(planet.points[f.c]);
 	}
 	bounds_fix();
+	// must not be called only once ever:
+	world()->add(world_t::TERRAIN,this);
 }
 
 void mesh_t::init_gl() {

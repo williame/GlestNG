@@ -10,6 +10,7 @@
 
 #include <stddef.h>
 #include <assert.h>
+#include <iostream>
 
 struct matrix_t {
 	float f[16];
@@ -223,6 +224,45 @@ template<typename T> void fixed_array_t<T>::fill(const T& t) {
 	for(size_t i=0; i<capacity; i++)
 		data[i] = t;
 	len = capacity;
+}
+
+// pretty printers for logs and panics and things
+
+inline std::ostream& operator<<(std::ostream& out,const vec_t& v) {
+	out << "vec_t<" << v.x << "," << v.y << "," << v.z << ">";
+	return out;
+}
+
+inline std::ostream& operator<<(std::ostream& out,const ray_t& r) {
+	out << "ray_t<" << r.o << "," << r.d << ">";
+	return out;
+}
+
+inline std::ostream& operator<<(std::ostream& out,const sphere_t& s) {
+	out << "sphere_t<" << s.centre << "," << s.radius << ">";
+	return out;
+}
+
+inline std::ostream& operator<<(std::ostream& out,const aabb_t& a) {
+	out << "aabb_t<" << a.a << "," << a.b << ">";
+	return out;
+}
+
+inline std::ostream& operator<<(std::ostream& out,const bounds_t& a) {
+	out << "bounds_t<" << static_cast<const aabb_t&>(a) << "," << static_cast<const sphere_t&>(a) << ">";
+	return out;
+}
+
+inline std::ostream& operator<<(std::ostream& out,intersection_t i) {
+	out << "intersection<";
+	switch(i) {
+	case ALL: out << "ALL"; break;
+	case SOME: out << "SOME"; break;
+	case MISS: out << "MISS"; break;
+	default: out << (int)i << "!";
+	}
+	out << ">";
+	return out;
 }
 
 #endif //__3D_HPP__
