@@ -12,8 +12,8 @@ DEBUG = -O0
 OPTIMISATIONS = # -O9 -fomit-frame-pointer -fno-rtti -march=native # etc -fprofile-generate/-fprofile-use
 
 ifeq ($(shell uname),windows32)
-	LIB_CFLAGS = `sdl-config --cflags`
-	LIB_LDFLAGS = -static -lglew32s `sdl-config --libs` -dynamic -lopengl32 -lglu32 
+	LIB_CFLAGS =  -I/usr/include/SDL `sdl-config --cflags`
+	LIB_LDFLAGS =  -L/usr/lib -static -lglew32s `sdl-config --libs` -dynamic -lopengl32 -lglu32 
 	EXE_EXT = .exe
 else
 	LIB_CFLAGS = `pkg-config --cflags sdl gl glew`
@@ -55,6 +55,9 @@ all:	check_env ${TARGETS}
 
 ${TRG_GLEST_NG}: ${OBJ_GLEST_NG_CPP} ${OBJ_GLEST_NG_C}
 	${LD} ${CPPFLAGS} -o $@ $^ ${LDFLAGS}
+	
+zip:
+	zip "glestng-`date \"+%y%m%d-%H%M%S\"`.zip" ${TRG_GLEST_NG} font.bmp
 
 # compile c files
 	
@@ -77,6 +80,7 @@ check_env:
 ifeq ($(shell uname),windows32)
 	@echo "You are using windows; good luck!"
 else
+	@echo $(shell uname)
 	`pkg-config --exists sdl gl glew`
 endif
 
