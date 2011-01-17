@@ -70,7 +70,7 @@ void click(int x,int y) {
 	const vec_t dest(a,b+0.1,c);
 	ray_t ray(origin,dest-origin);
 	world_t::hits_t hits;
-	world()->intersection(ray,world_t::TERRAIN,hits);
+	world()->intersection(ray,TERRAIN,hits);
 	uint64_t ns = high_precision_time()-start;
 	std::cout << "click(" << x << "," << y << ") " << ray << " (" << ns << " ns)"<< std::endl;
 	for(world_t::hits_t::iterator i=hits.begin(); i!=hits.end(); i++) {

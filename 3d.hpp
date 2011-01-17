@@ -65,7 +65,7 @@ struct aabb_t { //axis-aligned bounding box
 	aabb_t(const vec_t& a_,const vec_t& b_): a(a_), b(b_) {}
 	vec_t a, b;
 	bool intersects(const ray_t& r) const;
-	intersection_t intersects(const aabb_t& a) const;
+	intersection_t intersects(const aabb_t& o) const;
 };
 
 struct bounds_t: public sphere_t, public aabb_t {

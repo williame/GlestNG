@@ -107,6 +107,7 @@ struct planet_t: public terrain_t {
 
 
 mesh_t::mesh_t(planet_t& p,face_t tri,size_t recursionLevel):
+	object_t(TERRAIN),
 	planet(p),
 	ID(p.meshes.size()<<FACE_IDX),
 	mn_point(~0), mx_point(0)
@@ -154,7 +155,7 @@ void mesh_t::calc_bounds() {
 	}
 	bounds_fix();
 	// must not be called only once ever:
-	world()->add(world_t::TERRAIN,this);
+	world()->add(this);
 }
 
 bool mesh_t::refine_intersection(const ray_t& r,vec_t& I) {

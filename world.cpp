@@ -27,17 +27,21 @@
 #include "world.hpp"
 #include "error.hpp"
 
-class octree_t: public bounds_t {
+class spartial_index_t: public bounds_t {
 public:
-	octree_t(const bounds_t& bounds);
-	void add(world_t::category_t category,object_t* obj);
-	void remove(world_t::category_t category,object_t* obj);
-	void intersection(const ray_t& r,unsigned category,world_t::hits_t& hits);
+	spartial_index_t();
+	spartial_index_t(const bounds_t& bounds,spartial_index_t* parent);
+	void add(object_t* obj);
+	void remove(object_t* obj);
+	void intersection(const ray_t& r,unsigned type,world_t::hits_t& hits);
 	void dump(std::ostream& out,int depth=0) const;
 private:
+	spartial_index_t* const parent;
 	struct item_t {
-		item_t(world_t::category_t c,object_t* o): category(c), obj(o) {}
-		world_t::category_t category;
+		item_t(type_t t,object_t* o): straddles(0), type(t), obj(o) {}
+		item_t(unsigned s,type_t t,object_t* o): straddles(s), type(t), obj(o) {}
+		uint8_t straddles;
+		type_t type;
 		object_t* obj;
 	};
 	enum { SPLIT = 8 }; // number of children to split
@@ -46,14 +50,24 @@ private:
 		sub_t(): sub(NULL) {}
 		bounds_t bounds;
 		items_t items;
-		octree_t* sub;
+		spartial_index_t* sub;
 	} sub[8];
+	uint8_t straddles;
 	items_t items;
-	static void intersection(items_t& items,const ray_t& r,unsigned category,world_t::hits_t& hits);
-	static void remove(items_t& items,world_t::category_t category,object_t* obj);
+	void init_sub();
+	static void intersection(items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits);
 };
 
-octree_t::octree_t(const bounds_t& bounds): bounds_t(bounds) {
+spartial_index_t::spartial_index_t(): bounds_t(vec_t(-1,-1,-1),vec_t(1,1,1)), parent(NULL) {
+	init_sub();
+}
+
+spartial_index_t::spartial_index_t(const bounds_t& bounds,spartial_index_t* p): bounds_t(bounds), parent(p) {
+	assert(p);
+	init_sub();
+}
+
+void spartial_index_t::init_sub() {
 	sub[0].bounds = bounds_t(a,centre);
 	sub[1].bounds = bounds_t(vec_t(a.x,a.y,centre.z),vec_t(centre.x,centre.y,b.z));
 	sub[2].bounds = bounds_t(vec_t(a.x,centre.y,a.z),vec_t(centre.x,b.y,centre.z));
@@ -62,6 +76,15 @@ octree_t::octree_t(const bounds_t& bounds): bounds_t(bounds) {
 	sub[5].bounds = bounds_t(vec_t(centre.x,a.y,centre.z),vec_t(b.x,centre.y,b.z));
 	sub[6].bounds = bounds_t(vec_t(centre.x,centre.y,a.z),vec_t(b.x,b.y,centre.z));
 	sub[7].bounds = bounds_t(centre,b);
+#ifndef NDEBUG
+	for(int i=0; i<8; i++)
+		for(int j=0; j<8; j++) {
+			if(j==i) continue;
+			intersection_t bang = sub[i].bounds.intersects(sub[j].bounds);
+			if(bang != MISS)
+				panic(i<<":"<<sub[i].bounds<<" intersects "<<j<<":"<<sub[j].bounds<<" "<<bang);
+		}
+#endif
 }
 
 static std::ostream& indent(std::ostream& out,int depth) {
@@ -70,92 +93,101 @@ static std::ostream& indent(std::ostream& out,int depth) {
 	return out;
 }
 
-void octree_t::dump(std::ostream& out,int depth) const {
-	indent(out,depth) << "octree_t<" << *this << ">" << std::endl;
+static const char* fmtbin(unsigned val,int digits) {
+	static char out[33];
+	char *o = out;
+	for(int i=0; i<digits; i++,val>>=1)
+		*o++ = (val&1?'1':'0');
+	*o = 0;
+	return out;
+}
+
+void spartial_index_t::dump(std::ostream& out,int depth) const {
+	indent(out,depth) << "spartial_index_t<" << *this << ">" << std::endl;
 	for(items_t::const_iterator i=items.begin(); i!=items.end(); i++)
-		indent(out,depth+1) << i->category << "," << *i->obj << std::endl;
+		indent(out,depth+1) << i->type << "," << fmtbin(i->straddles,8) << "," << *i->obj << std::endl;
 	for(int i=0; i<8; i++)
 		if(sub[i].sub || sub[i].items.size()) {
 			indent(out,depth+1) << "sub[" << i << "] " << sub[i].bounds << std::endl;
 			for(items_t::const_iterator j=sub[i].items.begin(); j!=sub[i].items.end(); j++)
-				indent(out,depth+2) << j->category << "," << *j->obj << std::endl;
+				indent(out,depth+2) << j->type << "," << *j->obj << std::endl;
 			if(sub[i].sub)
 				sub[i].sub->dump(out,depth+2);
 		}
 }
 
-void octree_t::add(world_t::category_t category,object_t* obj) {
+void spartial_index_t::add(object_t* obj) {
 	if(ALL != obj->intersects(*this))
 		panic(*obj << " intersects " << *this << " = " << obj->intersects(*this))
 	// would fit entirely inside a child?  delegate
+	unsigned s = 0;
 	for(int i=0; i<8; i++)
-		if(ALL == obj->intersects(sub[i].bounds)) {
+		switch(obj->intersects(sub[i].bounds)) {
+		case ALL:
+			assert(!s);
 			if(sub[i].sub)
-				sub[i].sub->add(category,obj);
+				sub[i].sub->add(obj);
 			else  if(sub[i].items.size() == SPLIT) {
-				sub[i].sub = new octree_t(sub[i].bounds);
-				sub[i].sub->items.insert(
-					sub[i].sub->items.begin(),
-					sub[i].items.begin(),
-					sub[i].items.end());
+				sub[i].sub = new spartial_index_t(sub[i].bounds,this);
+				// move the items into the sub-node
+				for(items_t::iterator j=sub[i].items.begin(); j!=sub[i].items.end(); j++)
+					sub[i].sub->add(j->obj);
 				sub[i].items.clear();
+				// add the new object
+				sub[i].sub->add(obj);
 			} else
-				sub[i].items.push_back(item_t(category,obj));
+				// skip straddles
+				sub[i].items.push_back(item_t(obj->type,obj));
 			return;
+		case SOME:
+			s |= (1 << i);
+			break;
+		default:;
 		}
-	items.push_back(item_t(category,obj));
+	assert(__builtin_popcount(s) > 1);
+	items.push_back(item_t(s,obj->type,obj));
+	straddles |= s;
 }
 
-void octree_t::remove(world_t::category_t category,object_t* obj) {
+void spartial_index_t::remove(object_t* obj) {
+	assert(obj->spartial_index == this);
 	if(ALL != obj->intersects(*this))
 		panic(*obj << " intersects " << *this << " = " << obj->intersects(*this))
-	for(int i=0; i<8; i++)
-		if(ALL == obj->intersects(sub[i].bounds)) {
-			if(sub[i].sub)
-				sub[i].sub->remove(category,obj);
-			else
-				remove(sub[i].items,category,obj);
-			return;
-		}
-	remove(items,category,obj);
-}
-
-void octree_t::remove(items_t& items,world_t::category_t category,object_t* obj) {
 	for(items_t::iterator i=items.begin(); i!=items.end(); i++)
 		if(i->obj == obj) {
-			assert(i->category == category);
+			assert(i->type == obj->type);
 			items.erase(i);
+			obj->spartial_index = NULL;
 			return;
 		}
 	panic("object could not be found in the octree");
 }
 
-void octree_t::intersection(const ray_t& r,unsigned category,world_t::hits_t& hits) {
+void spartial_index_t::intersection(const ray_t& r,unsigned type,world_t::hits_t& hits) {
 	if(!intersects(r))
 		panic(*this << " does not intersect " << r <<
 			" (" << sphere_t::intersects(r) << "," << aabb_t::intersects(r) << ")");
 	for(int i=0; i<8; i++)
 		if((sub[i].sub || sub[i].items.size()) && sub[i].bounds.intersects(r)) {
 			if(sub[i].sub)
-				sub[i].sub->intersection(r,category,hits);
+				sub[i].sub->intersection(r,type,hits);
 			else
-				intersection(sub[i].items,r,category,hits);
+				intersection(sub[i].items,r,type,hits);
 		}
-	intersection(items,r,category,hits);
+	intersection(items,r,type,hits);
 }
 
-void octree_t::intersection(items_t& items,const ray_t& r,unsigned category,world_t::hits_t& hits) {
+void spartial_index_t::intersection(items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits) {
 	for(items_t::iterator i=items.begin(); i!=items.end(); i++)
-		if((i->category&category)&&i->obj->intersects(r))
+		if((i->type&type)&&i->obj->intersects(r))
 			hits.push_back(world_t::hit_t(
 				i->obj->centre.distance_sqrd(r.o),
-				i->category,
+				i->type,
 				i->obj));
 }
 
 struct world_t::pimpl_t {
-	pimpl_t(): idx(bounds_t(vec_t(-1,-1,-1),vec_t(1,1,1))) {}
-	octree_t idx;
+	spartial_index_t idx;
 };
 
 world_t* world_t::get_world() {
@@ -167,25 +199,59 @@ world_t* world_t::get_world() {
 
 world_t::world_t(): pimpl(new pimpl_t()) {}
 
-void world_t::add(category_t category,object_t* obj) {
-	pimpl->idx.add(category,obj);
+void world_t::add(object_t* obj) {
+	assert(!obj->spartial_index);
+	pimpl->idx.add(obj);
 }
 
-void world_t::remove(category_t category,object_t* obj) {
-	pimpl->idx.remove(category,obj);
+void world_t::remove(object_t* obj) {
+	if(obj->spartial_index)
+		obj->spartial_index->remove(obj);
 }
 
-static bool cmp_hits(const world_t::hit_t& a,const world_t::hit_t& b) {
+static bool cmp_hits_distance(const world_t::hit_t& a,const world_t::hit_t& b) {
 	return (a.d < b.d);
 }
 
-void world_t::intersection(const ray_t& r,unsigned category,hits_t& hits) {
-	pimpl->idx.intersection(r,category,hits);
-	std::sort(hits.begin(),hits.end(),cmp_hits);
+static bool cmp_hits_type(const world_t::hit_t& a,const world_t::hit_t& b) {
+	return (a.type < b.type);
+}
+
+static bool cmp_hits_type_then_distance(const world_t::hit_t& a,const world_t::hit_t& b) {
+	if(a.type == b.type)
+		return (a.d < b.d);
+	return (a.type < b.type);
+}
+
+void world_t::intersection(const ray_t& r,unsigned type,hits_t& hits,sort_by_t sort_by) {
+	pimpl->idx.intersection(r,type,hits);
+	bool (*func)(const world_t::hit_t& a,const world_t::hit_t& b);
+	switch(sort_by) {
+	case SORT_BY_DISTANCE:
+		func = cmp_hits_distance;
+		break;
+	case SORT_BY_TYPE:
+		func = cmp_hits_type;
+		break;
+	case SORT_BY_TYPE_THEN_DISTANCE:
+		func = cmp_hits_type_then_distance;
+		break;
+	default:
+		assert(sort_by == DONT_SORT);
+		return;
+	};
+	std::sort(hits.begin(),hits.end(),func);
 }
 
 void world_t::dump(std::ostream& out) const {
 	pimpl->idx.dump(out);
+}
+
+object_t::object_t(type_t t): type(t), spartial_index(NULL) {}
+
+object_t::~object_t() {
+	if(spartial_index)
+		spartial_index->remove(this);
 }
 
 perf_t::perf_t() {
