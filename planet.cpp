@@ -59,6 +59,7 @@ struct mesh_t: public object_t {
 struct planet_t: public terrain_t {
 	planet_t	(size_t recursionLevel,size_t iterations,size_t smoothing_passes);
 	~planet_t();
+	void intersection(const ray_t& r,test_hits_t& hits);
 	static size_t num_points(size_t recursionLevel);
 	static size_t num_faces(size_t recursionLevel);
 	GLuint midpoint(GLuint a,GLuint b);
@@ -154,7 +155,7 @@ void mesh_t::calc_bounds() {
 		bounds_include(planet.points[f.c]);
 	}
 	bounds_fix();
-	// must not be called only once ever:
+	// must be called only once ever:
 	world()->add(this);
 }
 
@@ -333,6 +334,14 @@ planet_t::planet_t(size_t recursionLevel,size_t iterations,size_t smoothing_pass
 planet_t::~planet_t() {
 	for(int i=meshes.size()-1; i>=0; i--)
 		delete meshes[i];
+}
+
+void planet_t::intersection(const ray_t& r,test_hits_t& hits) {
+	hits.clear();
+	vec_t pt;
+	for(meshes_t::const_iterator i=meshes.begin(); i!=meshes.end(); i++)
+		if((*i)->refine_intersection(r,pt))
+			hits.push_back(test_t(*i,pt));
 }
 
 void planet_t::divide(const face_t& tri,size_t recursionLevel,size_t depth) {

@@ -19,7 +19,16 @@ public:
 	*panic << __FILE__ << '#' << __LINE__<<" "<<X; \
 	throw panic; }
 	
-inline std::ostream& operator<<(std::ostream& out,panic_t* p) {
+class data_error_t: public std::stringstream {
+public:
+	data_error_t(): std::stringstream("An error occurred: ",ios_base::out|ios_base::ate) {}
+};
+
+#define data_error(X) { data_error_t* data_error = new data_error_t(); \
+	*data_error << '(' << __FILE__ << '#' << __LINE__<<") "<<X; \
+	throw data_error; }
+	
+inline std::ostream& operator<<(std::ostream& out,std::stringstream* p) {
 	out << p->str();
 	return out;
 }

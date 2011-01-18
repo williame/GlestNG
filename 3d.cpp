@@ -70,87 +70,34 @@ vec_t vec_t::rotate(float rad,const vec_t& axis1,const vec_t& axis2) const {
 }
 
 bool sphere_t::intersects(const ray_t& r) const {
-	const float a = r.d.magnitude_sqrd();
-	assert(a>0);
-	const float b = 2.0f * r.d.dot(r.o) - centre.dot(r.d);
-	const float c = centre.distance_sqrd(r.o)-(radius*radius);
-	return (b*b-4*a*c) >= 0.0f;
+	const vec_t dst = r.o - centre;
+	const float B = sqrd(dst.dot(r.d));
+	const float C = dst.dot(dst) - sqrd(radius);
+	return (B-C)>0;
 }
 
 bool aabb_t::intersects(const ray_t& r) const {
-	// Adapted from code based on "Fast Ray-Box Intersection," by Woo in Graphics Gems I, p395.
-	bool inside = true;
-	float xt, yt, zt, x, y, z, t;
-	if (r.o.x < a.x) {
-		xt = a.x - r.o.x;
-		if (xt > r.d.x) return false;
-		xt /= r.d.x;
-		inside = false;
-	} else if (r.o.x > b.x) {
-		xt = b.x - r.o.x;
-		if (xt < r.d.x) return false;
-		xt /= r.d.x;
-		inside = false;
-	} else
-		xt = -1.0f;
-	if (r.o.y < a.y) {
-		yt = a.y - r.o.y;
-		if (yt > r.d.y) return false;
-		yt /= r.d.y;
-		inside = false;
-	} else if (r.o.y > b.y) {
-		yt = b.y - r.o.y;
-		if (yt < r.d.y) return false;
-		yt /= r.d.y;
-		inside = false;
-	} else
-		yt = -1.0f;
-	if (r.o.z < a.z) {
-		zt = a.z - r.o.z;
-		if (zt > r.d.z) return false;
-		zt /= r.d.z;
-		inside = false;
-	} else if (r.o.z > b.z) {
-		zt = b.z - r.o.z;
-		if (zt < r.d.z) return false;
-		zt /= r.d.z;
-		inside = false;
-	} else
-		zt = -1.0f;
-	if (inside)
-		return true;
-	enum {X,Y,Z} which = X;
-	t = xt;
-	if (yt > t) {
-		which = Y;
-		t = yt;
-	}
-	if (zt > t) {
-		which = Z;
-		t = zt;
-	}
-	switch (which) {
-	case X:
-		y = r.o.y + r.d.y*t;
-		if (y < a.y || y > b.y) return false;
-		z = r.o.z + r.d.z*t;
-		if (z < a.z || z > b.z) return false;
-		break;
-	case Y:
-		x = r.o.x + r.d.x*t;
-		if (x < a.x || x > b.x) return false;
-		z = r.o.z + r.d.z*t;
-		if (z < a.z || z > b.z) return false;
-		break;
-
-	case Z:
-		x = r.o.x + r.d.x*t;
-		if (x < a.x || x > b.x) return false;
-		y = r.o.y + r.d.y*t;
-		if (y < a.y || y > b.y) return false;
-		break;
-	}
-	return true;
+        const bool xsign = (r.d.x < 0.0);
+        const float invx = 1.0 / r.d.x;
+        float tmin = ((xsign?b.x:a.x) - r.o.x) * invx;
+        float tmax = ((xsign?a.x:b.x) - r.o.x) * invx;
+        const bool ysign = (r.d.y < 0.0);
+        const float invy = 1.0 / r.d.y;
+        const float tymin = ((ysign?b.y:a.y) - r.o.y) * invy;
+        const float tymax = ((ysign?a.y:b.y) - r.o.y) * invy;
+        if((tmin > tymax) || (tymin > tmax))
+                return false;
+        if(tymin > tmin) tmin = tymin;
+        if(tymax < tmax) tmax = tymax;
+        const bool zsign = (r.d.z < 0.0);
+        const float invz = 1.0 / r.d.z;
+        const float tzmin = ((zsign?b.z:a.z) - r.o.z) * invz;
+        const float tzmax = ((zsign?a.z:b.z) - r.o.z) * invz;
+        if((tmin > tzmax) || (tzmin > tmax))
+                return false;
+        if(tzmin > tmin) tmin = tzmin;
+        if(tzmax < tmax) tmax = tzmax;
+        return (tmin < 1.0) && (tmax > 0.0);
 }
 
 intersection_t aabb_t::intersects(const aabb_t& o) const {

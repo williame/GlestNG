@@ -25,7 +25,35 @@ terrain_t* terrain;
 
 perf_t framerate;
 
+bool selection = false;
+vec_t selected_point;
+
 void ui() {
+	glDisable(GL_LIGHTING);
+	glDisable(GL_DEPTH_TEST);
+	if(selection) {
+		glPushMatrix();
+		const float x=selected_point.x, y=selected_point.y, z=selected_point.z;
+		glTranslatef(x,-y,-z);
+		glScalef(0.03,0.03,0.03);
+		glColor3f(1,0,0);
+		glBegin(GL_TRIANGLES);		
+			//NeHe lesson 5 pyramid		
+			glVertex3f( 0.0f, 1.0f, 0.0f);		
+			glVertex3f(-1.0f,-1.0f, 1.0f);		
+			glVertex3f( 1.0f,-1.0f, 1.0f);		
+			glVertex3f( 0.0f, 1.0f, 0.0f);		
+			glVertex3f( 1.0f,-1.0f, 1.0f);		
+			glVertex3f( 1.0f,-1.0f, -1.0f);		
+			glVertex3f( 0.0f, 1.0f, 0.0f);		
+			glVertex3f( 1.0f,-1.0f, -1.0f);		
+			glVertex3f(-1.0f,-1.0f, -1.0f);		
+			glVertex3f( 0.0f, 1.0f, 0.0f);		
+			glVertex3f(-1.0f,-1.0f,-1.0f);		
+			glVertex3f(-1.0f,-1.0f, 1.0f);		
+		glEnd();					
+		glPopMatrix();
+	}
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 	glLoadIdentity();
@@ -34,8 +62,6 @@ void ui() {
 	glLoadIdentity();
 	glViewport(0,0,screen->w,screen->h);
 	gluOrtho2D(0,screen->w,0,screen->h);
-	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_LIGHTING);
 	glColor3f(1,1,1);
 	char fps[12];
 	snprintf(fps,sizeof(fps),"%u fps",(unsigned)framerate.per_second(now()));
@@ -64,24 +90,38 @@ void click(int x,int y) {
 	glGetDoublev(GL_PROJECTION_MATRIX,p);
 	GLint viewport[4];
 	glGetIntegerv(GL_VIEWPORT,viewport);
-	gluUnProject(x,y,1,mv,p,viewport,&a,&b,&c);
+	gluUnProject(x,y,10,mv,p,viewport,&a,&b,&c);
 	const vec_t origin(a,b,c);
-	gluUnProject(x,y,-1,mv,p,viewport,&a,&b,&c);
-	const vec_t dest(a,b+0.1,c);
+	gluUnProject(x,y,-10,mv,p,viewport,&a,&b,&c);
+	const vec_t dest(a,b,c);
 	ray_t ray(origin,dest-origin);
 	world_t::hits_t hits;
 	world()->intersection(ray,TERRAIN,hits);
 	uint64_t ns = high_precision_time()-start;
-	std::cout << "click(" << x << "," << y << ") " << ray << " (" << ns << " ns)"<< std::endl;
+	std::cout << std::endl << "click(" << x << "," << y << ") " << ray << " (" << ns << " ns)"<< std::endl;
+	selection = false;
+	bool hit = false;
 	for(world_t::hits_t::iterator i=hits.begin(); i!=hits.end(); i++) {
-			vec_t pt;
-			start = high_precision_time();
-			const bool hit = i->obj->refine_intersection(ray,pt);
-			ns = high_precision_time()-start;
-			if(hit)
-				std::cout << "HIT " << pt << ": ";
-			std::cout << *i << " (" << ns << " ns)" << std::endl;
+		vec_t pt;
+		start = high_precision_time();
+		hit = i->obj->refine_intersection(ray,pt);
+		ns = high_precision_time()-start;
+		if(hit) {
+			selection = true;
+			selected_point = pt;
+			std::cout << "HIT " << selected_point << ": ";
+		} else
+			std::cout << "miss ";
+		std::cout << *i << " (" << ns << " ns)" << std::endl;
 	}
+	// the slow way
+	terrain_t::test_hits_t test;
+	terrain->intersection(ray,test);
+	for(terrain_t::test_hits_t::iterator i=test.begin(); i!=test.end(); i++)
+		std::cout << "TEST " <<
+			(i->obj->sphere_t::intersects(ray)?"+":"-") << 
+			(i->obj->aabb_t::intersects(ray)?"+":"-") <<
+			*i->obj << i->hit << std::endl;
 }
 
 struct v4_t {
@@ -158,7 +198,7 @@ int main(int argc,char** args) {
 		while(!quit) {
 			set_now(SDL_GetTicks()-start);
 			// only eat events 10 times a second
-			if((now()-last_event) > 1000) {
+			if((now()-last_event) > 100) {
 				while(!quit && SDL_PollEvent(&event)) {
 					switch (event.type) {
 					case SDL_MOUSEMOTION:

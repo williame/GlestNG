@@ -28,17 +28,24 @@
 #include "error.hpp"
 
 class spartial_index_t: public bounds_t {
+	/* an octree in this implementation.
+	Objects are bounds rather than points.
+	It consists of lists of children in each of its 8 subtrees, and those
+	children that straddle more than one subtree.  Each straddling child
+	is marked with a bitmask of those subtrees it straddles, to avoid
+	unnecessary checks.
+	*/
 public:
-	spartial_index_t();
-	spartial_index_t(const bounds_t& bounds,spartial_index_t* parent);
+	spartial_index_t(const bounds_t& bounds);
 	void add(object_t* obj);
 	void remove(object_t* obj);
 	void intersection(const ray_t& r,unsigned type,world_t::hits_t& hits);
-	void dump(std::ostream& out,int depth=0) const;
+	void dump(std::ostream& out) const;
 private:
+	spartial_index_t(const bounds_t& bounds,spartial_index_t* parent);
 	spartial_index_t* const parent;
 	struct item_t {
-		item_t(type_t t,object_t* o): straddles(0), type(t), obj(o) {}
+		item_t(type_t t,object_t* o): straddles(~0), type(t), obj(o) {}
 		item_t(unsigned s,type_t t,object_t* o): straddles(s), type(t), obj(o) {}
 		uint8_t straddles;
 		type_t type;
@@ -52,17 +59,17 @@ private:
 		items_t items;
 		spartial_index_t* sub;
 	} sub[8];
-	uint8_t straddles;
+	uint8_t straddlers;
 	items_t items;
 	void init_sub();
-	static void intersection(items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits);
+	static void intersection(items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits,uint8_t straddles=~0);
 };
 
-spartial_index_t::spartial_index_t(): bounds_t(vec_t(-1,-1,-1),vec_t(1,1,1)), parent(NULL) {
+spartial_index_t::spartial_index_t(const bounds_t& bounds): bounds_t(bounds), parent(NULL), straddlers(0) {
 	init_sub();
 }
 
-spartial_index_t::spartial_index_t(const bounds_t& bounds,spartial_index_t* p): bounds_t(bounds), parent(p) {
+spartial_index_t::spartial_index_t(const bounds_t& bounds,spartial_index_t* p): bounds_t(bounds), parent(p), straddlers(0) {
 	assert(p);
 	init_sub();
 }
@@ -102,7 +109,10 @@ static const char* fmtbin(unsigned val,int digits) {
 	return out;
 }
 
-void spartial_index_t::dump(std::ostream& out,int depth) const {
+void spartial_index_t::dump(std::ostream& out) const {
+	int depth = 0;
+	for(spartial_index_t* p=parent; p; p=p->parent)
+		depth += 2;
 	indent(out,depth) << "spartial_index_t<" << *this << ">" << std::endl;
 	for(items_t::const_iterator i=items.begin(); i!=items.end(); i++)
 		indent(out,depth+1) << i->type << "," << fmtbin(i->straddles,8) << "," << *i->obj << std::endl;
@@ -112,7 +122,7 @@ void spartial_index_t::dump(std::ostream& out,int depth) const {
 			for(items_t::const_iterator j=sub[i].items.begin(); j!=sub[i].items.end(); j++)
 				indent(out,depth+2) << j->type << "," << *j->obj << std::endl;
 			if(sub[i].sub)
-				sub[i].sub->dump(out,depth+2);
+				sub[i].sub->dump(out);
 		}
 }
 
@@ -120,7 +130,7 @@ void spartial_index_t::add(object_t* obj) {
 	if(ALL != obj->intersects(*this))
 		panic(*obj << " intersects " << *this << " = " << obj->intersects(*this))
 	// would fit entirely inside a child?  delegate
-	unsigned s = 0;
+	uint8_t s = 0;
 	for(int i=0; i<8; i++)
 		switch(obj->intersects(sub[i].bounds)) {
 		case ALL:
@@ -146,7 +156,7 @@ void spartial_index_t::add(object_t* obj) {
 		}
 	assert(__builtin_popcount(s) > 1);
 	items.push_back(item_t(s,obj->type,obj));
-	straddles |= s;
+	straddlers |= s;
 }
 
 void spartial_index_t::remove(object_t* obj) {
@@ -164,22 +174,25 @@ void spartial_index_t::remove(object_t* obj) {
 }
 
 void spartial_index_t::intersection(const ray_t& r,unsigned type,world_t::hits_t& hits) {
-	if(!intersects(r))
+	if(parent && !intersects(r))
 		panic(*this << " does not intersect " << r <<
 			" (" << sphere_t::intersects(r) << "," << aabb_t::intersects(r) << ")");
+	uint8_t s = 0;
 	for(int i=0; i<8; i++)
-		if((sub[i].sub || sub[i].items.size()) && sub[i].bounds.intersects(r)) {
+		if(((straddlers&(1<<i)) || sub[i].sub || sub[i].items.size()) && sub[i].bounds.intersects(r)) {
+			s |= (1 << i);
 			if(sub[i].sub)
 				sub[i].sub->intersection(r,type,hits);
 			else
 				intersection(sub[i].items,r,type,hits);
 		}
-	intersection(items,r,type,hits);
+	if(s&=straddlers)
+		intersection(items,r,type,hits,s);
 }
 
-void spartial_index_t::intersection(items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits) {
+void spartial_index_t::intersection(items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits,uint8_t straddles) {
 	for(items_t::iterator i=items.begin(); i!=items.end(); i++)
-		if((i->type&type)&&i->obj->intersects(r))
+		if((i->type&type) && (i->straddles&straddles) && i->obj->intersects(r))
 			hits.push_back(world_t::hit_t(
 				i->obj->centre.distance_sqrd(r.o),
 				i->type,
@@ -187,6 +200,7 @@ void spartial_index_t::intersection(items_t& items,const ray_t& r,unsigned type,
 }
 
 struct world_t::pimpl_t {
+	pimpl_t(): idx(bounds_t(vec_t(-1,-1,-1),vec_t(1,1,1))) {}
 	spartial_index_t idx;
 };
 

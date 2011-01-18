@@ -37,6 +37,7 @@ OBJ_GLEST_NG_CPP = \
 	font.opp \
 	ui.opp \
 	world.opp \
+	xml.opp \
 	3d.opp
 
 OBJ_GLEST_NG_C = 
