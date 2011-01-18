@@ -6,7 +6,9 @@
 */
 
 #include <stdlib.h>
+#include <errno.h>
 #include <string.h>
+#include <math.h>
 #include <iostream>
 
 #include "error.hpp"
@@ -28,8 +30,9 @@ std::ostream& operator<<(std::ostream& out,xml_parser_t::type_t type) {
 struct xml_parser_t::token_t {
 	token_t(type_t t,const char* s): 
 		type(t), start(s), len(0),
+		visit(false), error(NULL),
 		parent(NULL), first_child(NULL), next_peer(NULL) {}
-	~token_t() { delete first_child; delete next_peer; }
+	~token_t() { free(error); delete first_child; delete next_peer; }
 	token_t* add_child(type_t t,const char* s) {
 		if(first_child)
 			return first_child->add_peer(t,s);
@@ -53,6 +56,8 @@ struct xml_parser_t::token_t {
 	}
 	const type_t type; 
 	const char* const start;
+	mutable bool visit;
+	mutable char* error;
 	size_t len;
 	token_t *parent, *first_child, *next_peer;
 	std::string str() const {
@@ -69,6 +74,26 @@ struct xml_parser_t::token_t {
 		ret <<">";
 		return ret.str();
 	}
+	std::string path() const {
+		std::string ret = str();
+		for(const token_t* p=parent; p; p = p->parent)
+			ret = p->str() + '/' + ret;
+		return ret;
+	}
+	bool equals(const char* s) const {
+		const char* me = start;
+		while(*s)
+			if(*s++!=*me++)
+				return false;
+		return true;
+	}
+	bool equals(const token_t* t) const {
+		if(t->len != len) return false;
+		for(size_t i=0; i<len; i++)
+			if(start[i] != t->start[i])
+				return false;
+		return true;
+	}
 };
 
 static const char* eat_whitespace(const char* ch) { while(*ch && *ch <= ' ') ch++; return ch; }
@@ -80,26 +105,24 @@ static bool starts_with(const char* str,const char* pre) {
 }
 
 xml_parser_t::xml_parser_t(const char* t,const char* xml): // copies data into internal buffer
-	title(strdup(t)), // nearly RAII; if strdup() throws, title not freed
-	buf(strdup(xml)),
-	doc(NULL) {
-	// parse it, writing control-tokens into it
-	const char *ch = eat_whitespace(buf);
-	if(*ch!='<')
-		data_error("malformed XML, expecting <");
+	title(strdup(t)),
+	buf(strdup(xml)), // nearly RAII; if strdup() throws, title not freed
+	doc(NULL) {}
+	
+void xml_parser_t::parse() {
+	if(doc) return;
+	const char *ch = buf;
 	token_t* tok = NULL;
-	const char *prev = 0;
-	while(*ch) {
-		try {
+	try {
+		ch = eat_whitespace(ch);
+		if(*ch!='<')
+			data_error("malformed XML, expecting <");
+		const char *prev = 0;
+		while(*ch) {
 			if(prev == ch)
 				data_error("internal error parsing "<<ch);
 			prev = ch;
-/*			if(tok)
-				std::cout << "parsing "<<tok->repr();
-			else
-				std::cout << "NO TOKEN";
-			std::cout << " examining "<<*ch<<std::endl;
-*/			if('<' == *ch) {
+			if('<' == *ch) {
 				if(tok && (DATA == tok->type)) {
 					if(eat_whitespace(tok->start) == ch)
 						data_error("unexpected empty token "<<tok->repr());
@@ -119,15 +142,17 @@ xml_parser_t::xml_parser_t(const char* t,const char* xml): // copies data into i
 					if('/' == *ch) {
 						if(!tok) data_error("unexpected close of tag");
 						ch = eat_whitespace(ch+1);
-						if(tok->type == OPEN)
-							tok = tok->add_peer(CLOSE,ch);
-						else {
+						token_t* open = tok;
+						if(tok->type != OPEN) {
 							if(tok->type != DATA)
 								data_error("expecting closing tag to be after data");
-							tok = tok->parent->add_peer(CLOSE,ch);
+							open = tok->parent;
 						}
+						tok = open->add_peer(CLOSE,ch);
 						ch = eat_name(ch);
 						tok->len = ch - tok->start;
+						if(!tok->equals(open))
+							data_error(tok->str()<<" mismatches "<<open->str());
 						ch = eat_whitespace(ch);
 						if('>'!=*ch) data_error("unclosed close tag "<<*ch);
 						const char* peek = eat_whitespace(++ch);
@@ -160,7 +185,6 @@ xml_parser_t::xml_parser_t(const char* t,const char* xml): // copies data into i
 				ch++;
 			} else if('>' == *ch) {
 				if(OPEN == tok->type) {
-					// skip insignificant whitespace
 					const char* peek = eat_whitespace(++ch);
 					if(*peek != '<')
 						tok = tok->add_child(DATA,ch);
@@ -204,15 +228,16 @@ xml_parser_t::xml_parser_t(const char* t,const char* xml): // copies data into i
 				ch = eat_whitespace(ch);
 			} else 
 				data_error("did not understand "<<*ch<<" after"<<tok->repr());
-		} catch(data_error_t* de) {
-			std::cerr << de << std::endl;
-			if(!doc)
-				tok = doc = new token_t(ERROR,ch);
-			else
-				tok = tok->add_peer(ERROR,ch);
-			tok->len = (buf+strlen(buf))-ch;
-			break;
 		}
+	} catch(data_error_t* de) {
+		std::cerr << "Error parsing " << title << " @" << (ch-buf) << ": " << de << std::endl;
+		if(!doc)
+			tok = doc = new token_t(ERROR,ch);
+		else
+			tok = tok->add_peer(ERROR,ch);
+		tok->len = (buf+strlen(buf))-ch;
+		tok->error = strdup(de->str().c_str());
+		throw;
 	}
 }
 	
@@ -247,6 +272,71 @@ bool xml_parser_t::walker_t::next() {
 	}
 }
 
+void xml_parser_t::walker_t::get_tag() {
+	if(!ok()) panic("no token");
+	if(KEY == tok->type)
+		tok = tok->parent;
+	if(OPEN != tok->type)
+		panic("was expecting an open tag, got "<<tok->repr());
+}
+
+void xml_parser_t::walker_t::get_key(const char* key) {
+	get_tag();
+	for(token_t* child = tok->first_child; child; child = child->next_peer)
+		if((KEY == child->type) && child->equals(key)) {
+			tok = child;
+			tok->visit = true;
+			return;
+		}
+	data_error(key << " not found in " << tok->str() << " tag");
+}
+
+xml_parser_t::walker_t& xml_parser_t::walker_t::get_child(const char* tag) {
+	get_tag();
+	for(token_t* child = tok->first_child; child; child = child->next_peer)
+		if((OPEN == child->type) && child->equals(tag)) {
+			tok = child;
+			tok->visit = true;
+			return *this;
+		}
+	data_error(tok->str()<<" tag has no child tag called "<<tag);
+}
+
+xml_parser_t::walker_t& xml_parser_t::walker_t::up() {
+	get_tag();
+	if(!tok->parent)
+		panic("cannot go up from root");
+	tok = tok->parent;
+}
+
+void xml_parser_t::walker_t::check(const char* tag) {
+	get_tag();
+	if(strncmp(tag,tok->start,strlen(tag)))
+		data_error("expecting "<<tag<<" tag, got "<<tok->str());
+	tok->visit = true;
+}
+
+float xml_parser_t::walker_t::value_float(const char* key) {
+	get_key(key);
+	try {
+		if(!tok->first_child || (VALUE != tok->first_child->type))
+			panic("expecting key "<<tok->path()<<" to have a value child");
+		tok = tok->first_child;
+		errno = 0;
+		char* endptr;
+		const float val = strtof(tok->start,&endptr);
+		if(errno) data_error("could not convert "<<tok->path()<<" to float: "<<tok->str()<<" ("<<errno<<": "<<strerror(errno));
+		if(endptr != (tok->start+tok->len)) data_error(tok->path()<<" is not a float: "<<tok->str());
+		if(!isnormal(val)) data_error(tok->path()<<" is not a valid float: "<<tok->str());
+		tok->visit = true;
+		tok = tok->parent;
+		return val;
+	} catch(data_error_t* de) {
+		tok->error = strdup(de->str().c_str());
+		throw;
+	}
+}
+
 std::string xml_parser_t::walker_t::str() const {
 	if(!ok()) panic("no token");
 	return tok->str();
@@ -254,9 +344,80 @@ std::string xml_parser_t::walker_t::str() const {
 
 xml_parser_t::walker_t::walker_t(const token_t* t): tok(t) {}
 
-xml_parser_t::walker_t xml_parser_t::walker() const {
-	if(!doc)
-		data_error("XML file "<<title<<" has no document");
+xml_parser_t::walker_t xml_parser_t::walker() {
+	if(!doc) parse();
 	return walker_t(doc);
 }
+
+static std::ostream& indent(std::ostream& out,int n) {
+	out << std::endl;
+	while(n-- >0)
+		out << "  ";
+	return out;
+}
+
+static std::string html_escape(std::string s,bool visited) {
+	std::string safe;
+	if(visited)
+		safe += "<b>";
+	for(std::string::const_iterator ch=s.begin(); ch!=s.end(); ch++)
+		switch(*ch) {
+		case '&': safe += "&amp;"; break;
+		case '<': safe += "&lt;"; break;
+		case '>': safe += "&gt;"; break;
+		default: safe += *ch;
+		}
+	if(visited)
+		safe += "</b>";
+	return safe;
+}
+
+void xml_parser_t::describe_xml(std::ostream& out) {
+	out << "<html><head><title>" << title << "</title>" <<
+		"<style type=\"text/css\">" <<
+		"body {color:gray;}" <<
+		"b {color:black;}" <<
+		"#E {color:red;}" <<
+		"</style>" <<
+		"</head><body bgcolor=white><pre>";
+	int depth=0;
+	bool in_tag = false;
+	for(walker_t node = walker(); node.ok(); node.next()) {
+		type_t type = node.type();
+		if(node.tok->error) type = ERROR;
+		switch(type) {
+		case OPEN:
+			if(in_tag)
+				out << "&gt;";
+			indent(out,depth++)<<"&lt;"<<html_escape(node.str(),node.tok->visit);
+			in_tag = true;
+			break;
+		case CLOSE:
+			depth--;
+			if(in_tag) {
+				out<<"/&gt;";
+				in_tag = false;
+			} else
+				indent(out,depth)<<"&lt;/"<<html_escape(node.str(),node.tok->visit)<<"&gt;";
+			break;
+		case KEY:
+			out<<" "<<html_escape(node.str(),node.tok->visit);
+			break;
+		case VALUE:
+			out<<"=\""<<html_escape(node.str(),node.tok->visit)<<"\"";
+			break;
+		case DATA:
+			in_tag = false;
+			out<<"&gt;";
+			indent(out,depth)<<html_escape(node.str(),node.tok->visit);
+			break;
+		case ERROR:
+			out<<" <span id=\"E\">"<<(node.tok->error?node.tok->error:"")<<std::endl<<
+				html_escape(node.str(),node.tok->visit)<<"</span> "<<std::endl;
+			break;
+		}
+	}
+	out << "</pre></body></html>" << std::endl;
+}
+
 

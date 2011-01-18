@@ -38,6 +38,7 @@ OBJ_GLEST_NG_CPP = \
 	ui.opp \
 	world.opp \
 	xml.opp \
+	unit.opp \
 	3d.opp
 
 OBJ_GLEST_NG_C = 

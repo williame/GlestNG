@@ -15,6 +15,7 @@ class xml_parser_t {
 public:
 	struct token_t;
 	xml_parser_t(const char* title,const char* xml); // makes a copy
+	void parse();
 	~xml_parser_t();
 	enum type_t {
 		OPEN,
@@ -26,16 +27,27 @@ public:
 	};
 	class walker_t {
 	public:
-		type_t type() const;
+		// depth-first traversal; don't mix with navigation API unless you know the inner workings
 		bool next();
 		bool ok() const { return tok; }
+		// navigation API; preferred way of extracting things
+		void check(const char* tag);
+		walker_t& get_child(const char* tag);
+		walker_t& up();
+		// extract attributes
+		float value_float(const char* key = "value");
+		// query current node
+		type_t type() const;
 		std::string str() const;
 		friend class xml_parser_t;
 	private:
 		walker_t(const token_t* tok);
 		const token_t* tok;
+		void get_key(const char* key);
+		void get_tag();
 	};
-	walker_t walker() const;
+	walker_t walker();
+	void describe_xml(std::ostream& out);
 private:
 	const char* const title;
 	const char* const buf;

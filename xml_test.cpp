@@ -8,7 +8,37 @@
 #include <stdlib.h>
 #include <iostream>
 
-#include "xml.hpp"
+#include "error.hpp"
+#include "unit.hpp"
+
+static bool load_unit(const char* filename) {
+	FILE* f = fopen(filename,"rb");
+	if(!f) {
+		fprintf(stderr,"could not open %s: %d %s\n",
+			filename,errno,strerror(errno));
+		return false;
+	}
+	fseek(f,0,SEEK_END);
+	const long len = ftell(f);
+	fseek(f,0,SEEK_SET);
+	char *body = new char[len+1];
+	if(len != fread(body,1,len,f)) {
+		fprintf(stderr,"could not read in %ld body from %s\n",len,filename);
+		delete[] body;
+		return false;
+	}
+	body[len] = 0;
+	fclose(f);
+	unit_type_t unit("unit",body);
+	try {
+		unit.load_xml();
+	} catch(data_error_t* de) {
+		std::cout << de << std::endl;
+	}
+	unit.describe_xml(std::cout);
+	delete[] body;
+	return true;
+}
 
 static std::ostream& indent(std::ostream& out,int n) {
 	out << std::endl;
@@ -33,6 +63,7 @@ static bool parse(const char* filename) {
 	fclose(f);
 	printf("parsing %s\n",filename);
 	xml_parser_t xml(filename,body);
+	delete[] body;
 	int depth=0;
 	bool in_tag = false;
 	for(xml_parser_t::walker_t node = xml.walker(); node.ok(); node.next()) {
@@ -92,15 +123,17 @@ static void walk() {
 			}
 		}
 		closedir(dp);
-	} else if(path_ends_with(".xml"))
+	} else if(path_ends_with(".xml")) {
 		if(!parse(path))
 			exit(1);
+	}
 }
 
 int main(int argc,char** args) {
 	for(int i=1; i<argc; i++) {
 		strncpy(path,args[i],sizeof(path));
-		walk();
+		if(!load_unit(path))
+			walk();
 	}
 	return 0;
 }
