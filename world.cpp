@@ -22,7 +22,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <sys/time.h>
 
 #include "world.hpp"
 #include "error.hpp"
@@ -304,12 +303,34 @@ void set_now(unsigned now) {
 	_now = now;
 }
 
+#ifdef __WIN32
+	#include <windows.h>
+	uint64_t high_precision_time() {
+		LARGE_INTEGER now;
+		QueryPerformanceCounter(&now);
+		static __int64 base;
+		static double freq;
+		static bool inited = false;
+		if(!inited) {
+			base = now.QuadPart; 
+			LARGE_INTEGER li;
+			QueryPerformanceFrequency(&li);
+			freq = (double)li.QuadPart/1000000000;
+			std::cout << "FREQ "<<li.QuadPart<<","<<freq<<std::endl;
+			inited = true;
+		}
+		std::cout<<"NOW "<<(now.QuadPart-base)<<","<<(now.QuadPart-base)/freq<<std::endl;
+		return (now.QuadPart-base)/freq;	
+	}
+#else	
+	#include <sys/time.h>
+	uint64_t high_precision_time() {
+		static uint64_t base = 0;
+		timespec ts;
+		clock_gettime(CLOCK_MONOTONIC,&ts);
+		if(!base)
+			base = ts.tv_sec;
+		return (ts.tv_sec-base)*1000000000+ts.tv_nsec;
+	}
+#endif
 
-uint64_t high_precision_time() {
-	static uint64_t high_precision_base = 0;
-	timespec ts;
-	clock_gettime(CLOCK_REALTIME,&ts);
-	if(!high_precision_base)
-		high_precision_base = ts.tv_sec;
-	return (ts.tv_sec-high_precision_base)*1000000000+ts.tv_nsec;
-}
