@@ -11,8 +11,8 @@
 #include "utils.hpp"
 #include "error.hpp"
 
-class FILE_stream_t: private file_stream_t {
-	friend class file_stream_t;
+class FILE_stream_t: private istream_t {
+	friend class istream_t;
 public:
 	FILE_stream_t(const char* filename,const char* mode);
 	~FILE_stream_t();
@@ -49,7 +49,7 @@ std::ostream& FILE_stream_t::repr(std::ostream& out) const {
 	return out << filename;
 }
 
-file_stream_t* file_stream_t::open_file(const char* filename,const char* mode) {
-	return new FILE_stream_t(filename,mode);
+istream_t* istream_t::open_file(const char* filename) {
+	return new FILE_stream_t(filename,"r");
 }
 

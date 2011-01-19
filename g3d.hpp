@@ -15,7 +15,7 @@
 
 class model_g3d_t {
 public:
-	model_g3d_t(file_stream_t& in);
+	model_g3d_t(istream_t& in);
 	virtual ~model_g3d_t();
 	const bounds_t& get_bounds() const { return bounds; }
 private:
@@ -23,8 +23,8 @@ private:
 	typedef std::vector<mesh_t*> meshes_t;
 	meshes_t meshes;
 	bounds_t bounds;
-	void load_v3(file_stream_t& in);
-	void load_v4(file_stream_t& in);
+	void load_v3(istream_t& in);
+	void load_v4(istream_t& in);
 };
 
 #endif //__G3D_HPP__

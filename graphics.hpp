@@ -14,13 +14,28 @@
 #include <GL/glew.h>
 #include <SDL.h>
 
+#include <map>
+
+class art_mgr_t {
+public:
+	static art_mgr_t* mgr();
+	GLuint attach_texture(const char* base,const char* filename);
+	void detach_texture(GLuint id);
+private:
+	struct pimpl_t;
+	pimpl_t* pimpl;
+	art_mgr_t();
+};
+
+inline art_mgr_t* art_mgr() { return art_mgr_t::mgr(); }
+
 class graphics_mgr_t {
 public:
 	static graphics_mgr_t* mgr();
-#ifdef USE_GL
-	GLuint alloc_vbo(GLenum target,GLsizeiptr size,const GLvoid* data,GLenum usage);
-	GLuint alloc_2D(SDL_Surface* image);
-#endif
+	GLuint alloc_vbo();
+	void load_vbo(GLuint id,GLenum target,GLsizeiptr size,const GLvoid* data,GLenum usage);
+	GLuint alloc_texture();
+	void load_texture_2D(GLuint id,SDL_Surface* image);
 private:
 	graphics_mgr_t();
 };

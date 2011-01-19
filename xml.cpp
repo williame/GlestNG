@@ -307,6 +307,7 @@ xml_parser_t::walker_t& xml_parser_t::walker_t::up() {
 	if(!tok->parent)
 		panic("cannot go up from root");
 	tok = tok->parent;
+	return *this;
 }
 
 void xml_parser_t::walker_t::check(const char* tag) {

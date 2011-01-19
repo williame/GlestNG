@@ -157,7 +157,7 @@ int main(int argc,char** args) {
 		fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
 		
 		const char* const test_model = "/home/will/.glestadv/old/addons/megapack_v4/techs/megapack_v4/factions/norsemen/units/axe_thrower/models/worker_attacking.g3d";
-		file_stream_t* g3d = file_stream_t::open_file(test_model,"r");
+		istream_t* g3d = istream_t::open_file(test_model);
 		model_g3d_t model(*g3d);
 		delete g3d;
 	

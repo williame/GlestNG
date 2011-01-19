@@ -9,6 +9,7 @@
 #define __ERROR_HPP__
 
 #include <sstream>
+#include "valgrind.h"
 
 class panic_t: public std::stringstream {
 public:
@@ -17,6 +18,7 @@ public:
 
 #define panic(X) { panic_t* panic = new panic_t(); \
 	*panic << __FILE__ << '#' << __LINE__<<" "<<X; \
+	VALGRIND_PRINTF_BACKTRACE("%s",panic->str().c_str()); \
 	throw panic; }
 	
 class data_error_t: public std::stringstream {
@@ -26,8 +28,19 @@ public:
 
 #define data_error(X) { data_error_t* data_error = new data_error_t(); \
 	*data_error << '(' << __FILE__ << '#' << __LINE__<<") "<<X; \
+	VALGRIND_PRINTF_BACKTRACE("%s",data_error->str().c_str()); \
 	throw data_error; }
 	
+class graphics_error_t: public std::stringstream {
+public:
+	graphics_error_t(): std::stringstream("A graphics error occurred: ",ios_base::out|ios_base::ate) {}
+};
+
+#define graphics_error(X) { graphics_error_t* graphics_error = new graphics_error_t(); \
+	*graphics_error << '(' << __FILE__ << '#' << __LINE__<<") "<<X; \
+	VALGRIND_PRINTF_BACKTRACE("%s",graphics_error->str().c_str()); \
+	throw graphics_error; }
+
 inline std::ostream& operator<<(std::ostream& out,std::stringstream* p) {
 	out << p->str();
 	return out;

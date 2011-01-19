@@ -25,27 +25,27 @@ public:
 	size_t size() const { return len; }
 	bool full() const { return len==capacity; }
 	void fill(const T& t);
+	void clear();
 	const size_t capacity;
 private:
 	size_t len;
 	T* data;
 };
 
-class file_stream_t {
+class istream_t {
 public:
-	virtual ~file_stream_t() {}
-	inline uint8_t r_byte();
-	inline uint16_t r_uint16();
-	inline uint32_t r_uint32();
-	inline float r_float32();
-	inline void r_skip(size_t n);
-	static file_stream_t* open_file(const char* filename,const char* mode);
+	virtual ~istream_t() {}
+	inline uint8_t byte();
+	inline uint16_t uint16();
+	inline uint32_t uint32();
+	inline float float32();
+	inline void skip(size_t n);
+	static istream_t* open_file(const char* filename);
 	virtual void read(void* dest,size_t bytes) = 0;
-	virtual void write(const void* src,size_t bytes) = 0;
-	template<int N> std::string r_fixed_str();
+	template<int N> std::string fixed_str();
 	virtual std::ostream& repr(std::ostream& out) const = 0;
 private:
-	template<typename T> T r_();
+	template<typename T> T _r();
 };
 
 template<typename T> fixed_array_t<T>::fixed_array_t(size_t cap,bool filled):
@@ -56,6 +56,11 @@ template<typename T> fixed_array_t<T>::fixed_array_t(size_t cap,bool filled):
 	} else {
 		VALGRIND_MAKE_MEM_UNDEFINED(data,sizeof(T)*capacity);
 	}
+}
+
+template<typename T> void fixed_array_t<T>::clear() {
+	len = 0;
+	VALGRIND_MAKE_MEM_UNDEFINED(data,sizeof(T)*capacity);
 }
 
 template<typename T> size_t fixed_array_t<T>::append(T t) {
@@ -80,31 +85,31 @@ template<typename T> void fixed_array_t<T>::fill(const T& t) {
 	len = capacity;
 }
 
-inline std::ostream& operator<<(std::ostream& out,const file_stream_t& repr) {
+inline std::ostream& operator<<(std::ostream& out,const istream_t& repr) {
 	return repr.repr(out);
 }
 
-template<int N> std::string file_stream_t::r_fixed_str() {
+template<int N> std::string istream_t::fixed_str() {
 	char v[N+1];
 	read(v,N);
 	v[N] = 0;
 	return std::string(v);
 }
 
-template<typename T> T file_stream_t::r_() {
+template<typename T> T istream_t::_r() {
 	T v;
 	read(&v,sizeof(T));
 	return v;
 }
 
 // all source data and target platforms are little-endian
-inline uint8_t file_stream_t::r_byte() { return r_<uint8_t>(); }
-inline uint16_t file_stream_t::r_uint16() { return r_<uint16_t>(); }
-inline uint32_t file_stream_t::r_uint32() { return r_<uint32_t>(); }
-inline float file_stream_t::r_float32() { return r_<float>(); }
+inline uint8_t istream_t::byte() { return _r<uint8_t>(); }
+inline uint16_t istream_t::uint16() { return _r<uint16_t>(); }
+inline uint32_t istream_t::uint32() { return _r<uint32_t>(); }
+inline float istream_t::float32() { return _r<float>(); }
 
-inline void file_stream_t::r_skip(size_t n) {
-	while(n--) r_byte();
+inline void istream_t::skip(size_t n) {
+	while(n--) byte();
 }
 
 #endif //__UTILS_HPP__

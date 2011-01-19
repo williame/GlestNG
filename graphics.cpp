@@ -5,7 +5,7 @@
  (c) William Edwards, 2011; all rights reserved
 */
 
-#include <assert.h>
+#include "error.hpp"
 #include "graphics.hpp"
 
 graphics_mgr_t* graphics_mgr_t::mgr() {
@@ -15,24 +15,36 @@ graphics_mgr_t* graphics_mgr_t::mgr() {
 	return singleton;
 }
 
-GLuint graphics_mgr_t::alloc_vbo(GLenum target,GLsizeiptr size,const GLvoid* data,GLenum usage) {
+GLuint graphics_mgr_t::alloc_vbo() {
 	GLuint buffer;
 	glGenBuffers(1,&buffer);
-	assert(buffer);
-	glBindBuffer(target,buffer);
-	glBufferData(target,size,data,usage);
+	if(!buffer) graphics_error("could not get GL to allocate a VBO ID");
 	return buffer;
 }
 
-GLuint graphics_mgr_t::alloc_2D(SDL_Surface* image) {
-	if(image->w&(image->w-1)) {
-		fprintf(stderr,"error: image width %d is not a power of 2\n",image->w);
-		return 0;
-	}
-	if(image->h&(image->h-1)) {
-		fprintf(stderr,"error: image height %d is not a power of 2\n",image->h);
-		return 0;
-	}
+void graphics_mgr_t::load_vbo(GLuint buffer,GLenum target,GLsizeiptr size,const GLvoid* data,GLenum usage) {
+	if(!buffer) graphics_error("VBO handle not set");
+	glBindBuffer(target,buffer);
+	glBufferData(target,size,data,usage);
+	glBindBuffer(target,0);
+	//#### glCheckErrors
+}
+
+GLuint graphics_mgr_t::alloc_texture() {
+	GLuint texture;
+	glGenTextures(1,&texture);
+	if(!texture)
+		graphics_error("could not allocate a texture handle "<<glGetError());
+	return texture;
+}
+	
+void graphics_mgr_t::load_texture_2D(GLuint texture,SDL_Surface* image) {
+	if(!texture)
+		graphics_error("texture handle not set");
+	if(image->w&(image->w-1))
+		graphics_error("image width "<<image->w<<" is not a power of 2");
+	if(image->h&(image->h-1))
+		graphics_error("image height "<<image->h<<" is not a power of 2");
         GLenum texture_format;
         switch(image->format->BytesPerPixel) {
         case 4:
@@ -42,15 +54,8 @@ GLuint graphics_mgr_t::alloc_2D(SDL_Surface* image) {
         		texture_format = (image->format->Rmask==0xff)? GL_RGB: GL_BGR;
         		break;
         	default:
-                fprintf(stderr,"error: the image is not truecolor (%d Bpp)\n",image->format->BytesPerPixel);
-                return 0;
+        		graphics_error("the image is not truecolor ("<<image->format->BytesPerPixel<<" Bpp)");
         }
-        GLuint texture;
-	glGenTextures(1,&texture);
-	if(!texture) {
-		fprintf(stderr,"error: could not allocate a texture handle %d\n",glGetError());
-		return 0;
-	}
 	glBindTexture(GL_TEXTURE_2D,texture);
 	glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP);
 	glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP);
@@ -62,7 +67,6 @@ GLuint graphics_mgr_t::alloc_2D(SDL_Surface* image) {
 		texture_format,
 		GL_UNSIGNED_BYTE,image->pixels);
 	glBindTexture(GL_TEXTURE_2D,0);
-	return texture;
 }
 
 graphics_mgr_t::graphics_mgr_t() {}
