@@ -8,12 +8,15 @@
 #include "g3d.hpp"
 #include "error.hpp"
 #include "graphics.hpp"
+#include "world.hpp"
 
 struct model_g3d_t::mesh_t {
-	mesh_t(std::string name);
+	mesh_t(std::string name,GLuint index_count);
 	~mesh_t();
+	void draw(int frame);
 	const std::string name;
-	std::vector<GLuint> frames, normals, tex_coords;
+	std::vector<GLuint> vertices, normals, tex_coords;
+	GLuint index_count;
 	GLuint indices;
 	struct tex_coord_t {
 		tex_coord_t() {}
@@ -22,12 +25,21 @@ struct model_g3d_t::mesh_t {
 	};
 };
 
-model_g3d_t::mesh_t::mesh_t(std::string n):
-	name(n), indices(0)
+model_g3d_t::mesh_t::mesh_t(std::string n,GLuint i):
+	name(n), index_count(i), indices(0)
 {}
 
 model_g3d_t::mesh_t::~mesh_t() {
 	//### free VBOs
+}
+
+void model_g3d_t::mesh_t::draw(int frame) {
+        glBindBuffer(GL_ARRAY_BUFFER,vertices[frame]);
+        glVertexPointer(3,GL_FLOAT,0,NULL);
+        glBindBuffer(GL_ARRAY_BUFFER,normals[frame]);
+        glNormalPointer(GL_FLOAT,0,NULL);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,indices);
+        glDrawElements(GL_TRIANGLES,index_count,GL_UNSIGNED_INT,NULL);
 }
 
 model_g3d_t::model_g3d_t(istream_t& in) {
@@ -40,6 +52,8 @@ model_g3d_t::model_g3d_t(istream_t& in) {
 	case 4: load_v4(in); break;
 	default: data_error(in << " is not a supported G3D model version (" << (ver&0xff));
 	}
+        bounds.bounds_fix();
+	std::cout << in << bounds << std::endl;
 }
 
 model_g3d_t::~model_g3d_t() {
@@ -53,14 +67,18 @@ void model_g3d_t::load_v3(istream_t& in) {
 
 void model_g3d_t::load_v4(istream_t& in) {
         const uint16_t mesh_count = in.uint16();
+        if(!mesh_count) data_error(in << " has no meshes");
         if(in.byte()) data_error(in << " is not a G3D mtMorphMesh");
         for(int16_t i=0; i<mesh_count; i++) {
-        		mesh_t* mesh = new mesh_t(in.fixed_str<64>());
-        		meshes.push_back(mesh);
+        		const std::string name = in.fixed_str<64>();
         		const uint32_t frame_count = in.uint32(),
         			vertex_count = in.uint32(),
         			index_count = in.uint32();
         		if(index_count%3) data_error(in << " bad number of indices: " << index_count);
+        		if(meshes.size() && (frame_count != meshes[0]->vertices.size()))
+        			data_error(in << " has meshes this differing frame-counts");
+        		mesh_t* mesh = new mesh_t(name,index_count);
+        		meshes.push_back(mesh);
         		in.skip(8*4);
         		const uint32_t properties = in.uint32(),
         			textures = in.uint32();
@@ -81,9 +99,12 @@ void model_g3d_t::load_v4(istream_t& in) {
 					vec.ptr(),
 					GL_STATIC_DRAW);
 				if(pass)
-					mesh->frames.push_back(vbo);
-				else
-					mesh->frames.push_back(vbo);
+					mesh->normals.push_back(vbo);
+				else {
+					for(uint32_t v=0; v<vertex_count; v++)
+						bounds.bounds_include(vec[v]);
+					mesh->vertices.push_back(vbo);
+				}
 			}
         		if(textures) {
         			fixed_array_t<mesh_t::tex_coord_t> tex(vertex_count);
@@ -110,4 +131,16 @@ void model_g3d_t::load_v4(istream_t& in) {
         			GL_STATIC_DRAW);
         }
 }
+
+void model_g3d_t::draw(float dist_from_camera) {
+	glColor3b(127,0,0);
+	const int frame = (now()/300)%meshes[0]->vertices.size();
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glEnableClientState(GL_NORMAL_ARRAY);
+	for(meshes_t::iterator i=meshes.begin(); i!=meshes.end(); i++)
+		(*i)->draw(frame);
+        glDisableClientState(GL_VERTEX_ARRAY);
+        glDisableClientState(GL_NORMAL_ARRAY);
+}
+
 

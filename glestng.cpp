@@ -23,6 +23,7 @@
 
 SDL_Surface* screen;
 terrain_t* terrain;
+model_g3d_t* model;
 
 perf_t framerate;
 
@@ -76,7 +77,8 @@ void ui() {
 }
 
 void tick() {
-	terrain->draw();
+	//terrain->draw();
+	model->draw(0);
 	ui();
 	SDL_GL_SwapBuffers();
 	SDL_Flip(screen);
@@ -158,7 +160,7 @@ int main(int argc,char** args) {
 		
 		const char* const test_model = "/home/will/.glestadv/old/addons/megapack_v4/techs/megapack_v4/factions/norsemen/units/axe_thrower/models/worker_attacking.g3d";
 		istream_t* g3d = istream_t::open_file(test_model);
-		model_g3d_t model(*g3d);
+		model = new model_g3d_t(*g3d);
 		delete g3d;
 	
 		terrain = gen_planet(5,500,3);

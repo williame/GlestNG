@@ -26,7 +26,7 @@
 #include "world.hpp"
 #include "error.hpp"
 
-class spartial_index_t: public bounds_t {
+class spatial_index_t: public bounds_t {
 	/* an octree in this implementation.
 	Objects are bounds rather than points.
 	It consists of lists of children in each of its 8 subtrees, and those
@@ -35,14 +35,14 @@ class spartial_index_t: public bounds_t {
 	unnecessary checks.
 	*/
 public:
-	spartial_index_t(const bounds_t& bounds);
+	spatial_index_t(const bounds_t& bounds);
 	void add(object_t* obj);
 	void remove(object_t* obj);
 	void intersection(const ray_t& r,unsigned type,world_t::hits_t& hits);
 	void dump(std::ostream& out) const;
 private:
-	spartial_index_t(const bounds_t& bounds,spartial_index_t* parent);
-	spartial_index_t* const parent;
+	spatial_index_t(const bounds_t& bounds,spatial_index_t* parent);
+	spatial_index_t* const parent;
 	struct item_t {
 		item_t(type_t t,object_t* o): straddles(~0), type(t), obj(o) {}
 		item_t(unsigned s,type_t t,object_t* o): straddles(s), type(t), obj(o) {}
@@ -56,7 +56,7 @@ private:
 		sub_t(): sub(NULL) {}
 		bounds_t bounds;
 		items_t items;
-		spartial_index_t* sub;
+		spatial_index_t* sub;
 	} sub[8];
 	uint8_t straddlers;
 	items_t items;
@@ -64,16 +64,16 @@ private:
 	static void intersection(items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits,uint8_t straddles=~0);
 };
 
-spartial_index_t::spartial_index_t(const bounds_t& bounds): bounds_t(bounds), parent(NULL), straddlers(0) {
+spatial_index_t::spatial_index_t(const bounds_t& bounds): bounds_t(bounds), parent(NULL), straddlers(0) {
 	init_sub();
 }
 
-spartial_index_t::spartial_index_t(const bounds_t& bounds,spartial_index_t* p): bounds_t(bounds), parent(p), straddlers(0) {
+spatial_index_t::spatial_index_t(const bounds_t& bounds,spatial_index_t* p): bounds_t(bounds), parent(p), straddlers(0) {
 	assert(p);
 	init_sub();
 }
 
-void spartial_index_t::init_sub() {
+void spatial_index_t::init_sub() {
 	sub[0].bounds = bounds_t(a,centre);
 	sub[1].bounds = bounds_t(vec_t(a.x,a.y,centre.z),vec_t(centre.x,centre.y,b.z));
 	sub[2].bounds = bounds_t(vec_t(a.x,centre.y,a.z),vec_t(centre.x,b.y,centre.z));
@@ -108,11 +108,11 @@ static const char* fmtbin(unsigned val,int digits) {
 	return out;
 }
 
-void spartial_index_t::dump(std::ostream& out) const {
+void spatial_index_t::dump(std::ostream& out) const {
 	int depth = 0;
-	for(spartial_index_t* p=parent; p; p=p->parent)
+	for(spatial_index_t* p=parent; p; p=p->parent)
 		depth += 2;
-	indent(out,depth) << "spartial_index_t<" << *this << ">" << std::endl;
+	indent(out,depth) << "spatial_index_t<" << *this << ">" << std::endl;
 	for(items_t::const_iterator i=items.begin(); i!=items.end(); i++)
 		indent(out,depth+1) << i->type << "," << fmtbin(i->straddles,8) << "," << *i->obj << std::endl;
 	for(int i=0; i<8; i++)
@@ -125,7 +125,7 @@ void spartial_index_t::dump(std::ostream& out) const {
 		}
 }
 
-void spartial_index_t::add(object_t* obj) {
+void spatial_index_t::add(object_t* obj) {
 	if(ALL != obj->intersects(*this))
 		panic(*obj << " intersects " << *this << " = " << obj->intersects(*this))
 	// would fit entirely inside a child?  delegate
@@ -137,16 +137,18 @@ void spartial_index_t::add(object_t* obj) {
 			if(sub[i].sub)
 				sub[i].sub->add(obj);
 			else  if(sub[i].items.size() == SPLIT) {
-				sub[i].sub = new spartial_index_t(sub[i].bounds,this);
+				sub[i].sub = new spatial_index_t(sub[i].bounds,this);
 				// move the items into the sub-node
 				for(items_t::iterator j=sub[i].items.begin(); j!=sub[i].items.end(); j++)
 					sub[i].sub->add(j->obj);
 				sub[i].items.clear();
 				// add the new object
 				sub[i].sub->add(obj);
-			} else
+			} else {
 				// skip straddles
 				sub[i].items.push_back(item_t(obj->type,obj));
+				obj->spatial_index = this;
+			}
 			return;
 		case SOME:
 			s |= (1 << i);
@@ -155,24 +157,25 @@ void spartial_index_t::add(object_t* obj) {
 		}
 	assert(__builtin_popcount(s) > 1);
 	items.push_back(item_t(s,obj->type,obj));
+	obj->spatial_index = this;
 	straddlers |= s;
 }
 
-void spartial_index_t::remove(object_t* obj) {
-	assert(obj->spartial_index == this);
+void spatial_index_t::remove(object_t* obj) {
+	assert(obj->spatial_index == this);
 	if(ALL != obj->intersects(*this))
 		panic(*obj << " intersects " << *this << " = " << obj->intersects(*this))
 	for(items_t::iterator i=items.begin(); i!=items.end(); i++)
 		if(i->obj == obj) {
 			assert(i->type == obj->type);
 			items.erase(i);
-			obj->spartial_index = NULL;
+			obj->spatial_index = NULL;
 			return;
 		}
 	panic("object could not be found in the octree");
 }
 
-void spartial_index_t::intersection(const ray_t& r,unsigned type,world_t::hits_t& hits) {
+void spatial_index_t::intersection(const ray_t& r,unsigned type,world_t::hits_t& hits) {
 	if(parent && !intersects(r))
 		panic(*this << " does not intersect " << r <<
 			" (" << sphere_t::intersects(r) << "," << aabb_t::intersects(r) << ")");
@@ -189,7 +192,7 @@ void spartial_index_t::intersection(const ray_t& r,unsigned type,world_t::hits_t
 		intersection(items,r,type,hits,s);
 }
 
-void spartial_index_t::intersection(items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits,uint8_t straddles) {
+void spatial_index_t::intersection(items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits,uint8_t straddles) {
 	for(items_t::iterator i=items.begin(); i!=items.end(); i++)
 		if((i->type&type) && (i->straddles&straddles) && i->obj->intersects(r))
 			hits.push_back(world_t::hit_t(
@@ -200,7 +203,7 @@ void spartial_index_t::intersection(items_t& items,const ray_t& r,unsigned type,
 
 struct world_t::pimpl_t {
 	pimpl_t(): idx(bounds_t(vec_t(-1,-1,-1),vec_t(1,1,1))) {}
-	spartial_index_t idx;
+	spatial_index_t idx;
 };
 
 world_t* world_t::get_world() {
@@ -213,13 +216,13 @@ world_t* world_t::get_world() {
 world_t::world_t(): pimpl(new pimpl_t()) {}
 
 void world_t::add(object_t* obj) {
-	assert(!obj->spartial_index);
+	assert(!obj->spatial_index);
 	pimpl->idx.add(obj);
 }
 
 void world_t::remove(object_t* obj) {
-	if(obj->spartial_index)
-		obj->spartial_index->remove(obj);
+	if(obj->spatial_index)
+		obj->spatial_index->remove(obj);
 }
 
 static bool cmp_hits_distance(const world_t::hit_t& a,const world_t::hit_t& b) {
@@ -260,11 +263,11 @@ void world_t::dump(std::ostream& out) const {
 	pimpl->idx.dump(out);
 }
 
-object_t::object_t(type_t t): type(t), spartial_index(NULL) {}
+object_t::object_t(type_t t): type(t), spatial_index(NULL) {}
 
 object_t::~object_t() {
-	if(spartial_index)
-		spartial_index->remove(this);
+	if(spatial_index)
+		spatial_index->remove(this);
 }
 
 perf_t::perf_t() {

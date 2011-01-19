@@ -18,6 +18,7 @@ public:
 	model_g3d_t(istream_t& in);
 	virtual ~model_g3d_t();
 	const bounds_t& get_bounds() const { return bounds; }
+	void draw(float dist_from_camera);
 private:
 	struct mesh_t;
 	typedef std::vector<mesh_t*> meshes_t;

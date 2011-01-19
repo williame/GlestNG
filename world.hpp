@@ -23,31 +23,31 @@ enum type_t {
 };
 
 class world_t;
-class spartial_index_t;
+class spatial_index_t;
 
 class object_t: public bounds_t {
 public:
 	virtual ~object_t();
-	bool in_world() const { return spartial_index; }
+	bool in_world() const { return spatial_index; }
 	virtual void draw() = 0;
 	virtual bool refine_intersection(const ray_t& r,vec_t& I) = 0;
 protected:
 	object_t(type_t type);
 	const type_t type;
 private:
-	friend class spartial_index_t;
+	friend class spatial_index_t;
 	friend class world_t;
-	spartial_index_t* spartial_index;
+	spatial_index_t* spatial_index;
 };
 
-class world_t { // *the* spartial index of what is where in the world
+class world_t { // *the* spatial index of what is where in the world
 public:
 	static world_t* get_world();
 	void add(object_t* obj);
 	void remove(object_t* obj);
 	struct hit_t {
 		hit_t(float d_,type_t t,object_t* o): d(d_),type(t),obj(o) {}
-		float d; // distance from the origin (of ray or fustrum)
+		float d; // distance from the origin (of ray or frustum)
 		type_t type;
 		object_t* obj;
 	};
