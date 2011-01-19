@@ -54,7 +54,8 @@ struct mesh_t: public object_t {
 struct planet_t: public terrain_t {
 	planet_t	(size_t recursionLevel,size_t iterations,size_t smoothing_passes);
 	~planet_t();
-	void intersection(const ray_t& r,test_hits_t& hits);
+	void intersection(const ray_t& r,test_hits_t& hits) const;
+	bool surface_at(const vec_t& normal,vec_t& pt) const;
 	static size_t num_points(size_t recursionLevel);
 	static size_t num_faces(size_t recursionLevel);
 	GLuint midpoint(GLuint a,GLuint b);
@@ -332,7 +333,7 @@ planet_t::~planet_t() {
 		delete meshes[i];
 }
 
-void planet_t::intersection(const ray_t& r,test_hits_t& hits) {
+void planet_t::intersection(const ray_t& r,test_hits_t& hits) const {
 	hits.clear();
 	vec_t pt;
 	for(meshes_t::const_iterator i=meshes.begin(); i!=meshes.end(); i++)
@@ -354,10 +355,6 @@ void planet_t::divide(const face_t& tri,size_t recursionLevel,size_t depth) {
 		divide(face_t(tri.c,c,b),recursionLevel,depth);
 		divide(face_t(a,b,c),recursionLevel,depth);
 	}
-}
-
-static float randf() {
-	return (float)rand()/RAND_MAX;
 }
 
 void planet_t::gen(size_t iterations,size_t smoothing_passes) {
@@ -538,8 +535,19 @@ void planet_t::draw() {
         glDisableClientState(GL_NORMAL_ARRAY);
 }
 
-bool planet_t::intersection(int x,int y,vec_t& pt) {
-	return false;
+bool planet_t::surface_at(const vec_t& normal,vec_t& pt) const {
+	world_t::hits_t hits;
+	ray_t ray(vec_t(0,0,0),normal*2);
+	world()->intersection(ray,TERRAIN,hits,world_t::SORT_BY_DISTANCE);
+	bool hit = false;
+	for(world_t::hits_t::const_iterator h=hits.begin(); h!=hits.end(); h++) {
+		vec_t p;
+		if(h->obj->refine_intersection(ray,p) && (!hit || (p.magnitude_sqrd() < pt.magnitude_sqrd()))) {
+			hit = true;
+			pt = p;
+		}
+	}
+	return hit;
 }
 
 terrain_t* gen_planet(size_t recursionLevel,size_t iterations,size_t smoothing_passes) {

@@ -77,8 +77,8 @@ void ui() {
 }
 
 void tick() {
-	//terrain->draw();
-	model->draw(0);
+	terrain->draw();
+	//model->draw(0);
 	ui();
 	SDL_GL_SwapBuffers();
 	SDL_Flip(screen);
@@ -103,28 +103,37 @@ void click(int x,int y) {
 	uint64_t ns = high_precision_time()-start;
 	std::cout << std::endl << "click(" << x << "," << y << ") " << ray << " (" << ns << " ns)"<< std::endl;
 	selection = false;
-	bool hit = false;
 	for(world_t::hits_t::iterator i=hits.begin(); i!=hits.end(); i++) {
 		vec_t pt;
 		start = high_precision_time();
-		hit = i->obj->refine_intersection(ray,pt);
+		bool hit = i->obj->refine_intersection(ray,pt);
 		ns = high_precision_time()-start;
 		if(hit) {
-			selection = true;
-			selected_point = pt;
-			std::cout << "HIT " << selected_point << ": ";
+			std::cout << "hit " << pt << " ";
+			if(!selection || (pt.distance_sqrd(ray.o)<selected_point.distance_sqrd(ray.o))) {
+				selection = true;
+				selected_point = pt;
+				std::cout << "BEST ";
+			}
 		} else
 			std::cout << "miss ";
 		std::cout << *i << " (" << ns << " ns)" << std::endl;
 	}
+	if(selection) std::cout << "SELECTION: " << selected_point << std::endl;
 	// the slow way
 	terrain_t::test_hits_t test;
+	start = high_precision_time();
 	terrain->intersection(ray,test);
+	ns = high_precision_time()-start;
+	std::cout << "(slow check: " << ns << " ns)" << std::endl;
 	for(terrain_t::test_hits_t::iterator i=test.begin(); i!=test.end(); i++)
 		std::cout << "TEST " <<
 			(i->obj->sphere_t::intersects(ray)?"+":"-") << 
 			(i->obj->aabb_t::intersects(ray)?"+":"-") <<
 			*i->obj << i->hit << std::endl;
+	vec_t surface;
+	if(selection && terrain->surface_at(selected_point,surface))
+		std::cout << "(surface_at " << surface << " - " << selected_point << " = " << (selected_point-surface) << ")" << std::endl;
 }
 
 struct v4_t {
@@ -145,11 +154,12 @@ int main(int argc,char** args) {
 		atexit(SDL_Quit);
 		
 		SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
-		screen = SDL_SetVideoMode(1024,768,32,SDL_OPENGL|SDL_HWSURFACE|SDL_DOUBLEBUF/*|SDL_FULLSCREEN*/);
+		screen = SDL_SetVideoMode(1024,768,32,SDL_OPENGL/*|SDL_FULLSCREEN*/);
 		if(!screen) {
 			fprintf(stderr,"Unable to create SDL screen: %s\n",SDL_GetError());
 			return EXIT_FAILURE;
 		}
+		SDL_WM_SetCaption("GlestNG","GlestNG");
 	
 		GLenum err = glewInit();
 		if(GLEW_OK != err) {
@@ -164,7 +174,7 @@ int main(int argc,char** args) {
 		delete g3d;
 	
 		terrain = gen_planet(5,500,3);
-		world()->dump(std::cout);
+		//world()->dump(std::cout);
 	
 		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),
 			mat_amb(.7,.7,.7,1.), mat_dif(.8,.8,.8,1.), mat_spec(1.,1.,1.,1.);

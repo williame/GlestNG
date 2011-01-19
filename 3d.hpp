@@ -82,6 +82,7 @@ struct bounds_t: public sphere_t, public aabb_t {
 	bool intersects(const ray_t& r) const;
 	intersection_t intersects(const bounds_t& a) const;
 	void bounds_fix();
+	inline bounds_t operator+(const vec_t& pos) const;
 };
 
 struct triangle_t {
@@ -189,7 +190,13 @@ inline intersection_t sphere_t::intersects(const sphere_t& s) const {
 	return MISS;
 }
 
-// pretty printers for logs and panics and things
+inline bounds_t bounds_t::operator+(const vec_t& pos) const {
+	bounds_t ret = *this;
+	ret.a += pos;
+	ret.b += pos;
+	ret.centre += pos;
+	return ret;
+}
 
 inline std::ostream& operator<<(std::ostream& out,const vec_t& v) {
 	out << "vec_t<" << v.x << "," << v.y << "," << v.z << ">";

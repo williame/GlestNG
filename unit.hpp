@@ -10,7 +10,17 @@
 
 #include <string>
 
+#include "world.hpp"
 #include "xml.hpp"
+
+class unit_type_t;
+
+class unit_t: public object_t {
+public:
+	unit_t(unit_type_t& type);
+private:
+	unit_type_t& type;
+};
 
 class unit_type_t {
 public:

@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <string>
+#include <stdlib.h>
 
 #include "utils.hpp"
 #include "error.hpp"
@@ -53,3 +54,6 @@ istream_t* istream_t::open_file(const char* filename) {
 	return new FILE_stream_t(filename,"r");
 }
 
+float randf() {
+	return (float)rand()/RAND_MAX;
+}

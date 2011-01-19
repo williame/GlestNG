@@ -40,12 +40,12 @@ public:
 	void remove(object_t* obj);
 	void intersection(const ray_t& r,unsigned type,world_t::hits_t& hits);
 	void dump(std::ostream& out) const;
+	bool moves(const object_t* obj,const vec_t& relative) const;
 private:
 	spatial_index_t(const bounds_t& bounds,spatial_index_t* parent);
 	spatial_index_t* const parent;
 	struct item_t {
-		item_t(type_t t,object_t* o): straddles(~0), type(t), obj(o) {}
-		item_t(unsigned s,type_t t,object_t* o): straddles(s), type(t), obj(o) {}
+		item_t(uint8_t s,type_t t,object_t* o): straddles(s), type(t), obj(o) {}
 		uint8_t straddles;
 		type_t type;
 		object_t* obj;
@@ -126,14 +126,18 @@ void spatial_index_t::dump(std::ostream& out) const {
 }
 
 void spatial_index_t::add(object_t* obj) {
-	if(ALL != obj->intersects(*this))
-		panic(*obj << " intersects " << *this << " = " << obj->intersects(*this))
+	const bounds_t bounds = obj->pos_bounds();
+	if(ALL != bounds.intersects(*this)) {
+		if(!parent)
+			panic(*obj << "(" << obj->pos << "," << bounds << ") intersects " << *this << " = " << bounds.intersects(*this))
+		parent->add(obj);
+	}
 	// would fit entirely inside a child?  delegate
-	uint8_t s = 0;
+	obj->straddles = 0;
 	for(int i=0; i<8; i++)
-		switch(obj->intersects(sub[i].bounds)) {
+		switch(bounds.intersects(sub[i].bounds)) {
 		case ALL:
-			assert(!s);
+			assert(!obj->straddles);
 			if(sub[i].sub)
 				sub[i].sub->add(obj);
 			else  if(sub[i].items.size() == SPLIT) {
@@ -145,26 +149,31 @@ void spatial_index_t::add(object_t* obj) {
 				// add the new object
 				sub[i].sub->add(obj);
 			} else {
-				// skip straddles
-				sub[i].items.push_back(item_t(obj->type,obj));
+				obj->straddles |= (1 << i);
+				sub[i].items.push_back(item_t(obj->straddles,obj->type,obj));
 				obj->spatial_index = this;
 			}
 			return;
 		case SOME:
-			s |= (1 << i);
+			obj->straddles |= (1 << i);
 			break;
 		default:;
 		}
-	assert(__builtin_popcount(s) > 1);
-	items.push_back(item_t(s,obj->type,obj));
+	assert(__builtin_popcount(obj->straddles) > 1);
+	items.push_back(item_t(obj->straddles,obj->type,obj));
 	obj->spatial_index = this;
-	straddlers |= s;
+	straddlers |= obj->straddles;
 }
 
 void spatial_index_t::remove(object_t* obj) {
 	assert(obj->spatial_index == this);
 	if(ALL != obj->intersects(*this))
 		panic(*obj << " intersects " << *this << " = " << obj->intersects(*this))
+	assert(obj->straddles);
+	items_t& items = (
+		__builtin_popcount(obj->straddles)>1? 
+		this->items:
+		sub[__builtin_ffs(obj->straddles)-1].items);
 	for(items_t::iterator i=items.begin(); i!=items.end(); i++)
 		if(i->obj == obj) {
 			assert(i->type == obj->type);
@@ -174,6 +183,25 @@ void spatial_index_t::remove(object_t* obj) {
 		}
 	panic("object could not be found in the octree");
 }
+
+bool spatial_index_t::moves(const object_t* obj,const vec_t& relative) const {
+	assert(obj->spatial_index == this);
+	assert(obj->straddles);
+	const bounds_t bounds = obj->pos_bounds()+relative;
+	if(__builtin_popcount(obj->straddles)>1) {
+		if(ALL != bounds.intersects(*this)) return false;
+		for(int i=0; i<8; i++)
+			if(SOME == bounds.intersects(sub[i].bounds)) {
+				if(~obj->straddles & (1<<i)) return false;
+			} else {
+				if(obj->straddles & (1<<i)) return false;
+			}
+		return true;
+	} else {
+		const int i = __builtin_ffs(obj->straddles)-1;
+		return (bounds.intersects(sub[i].bounds) == ALL);
+	}
+}	
 
 void spatial_index_t::intersection(const ray_t& r,unsigned type,world_t::hits_t& hits) {
 	if(parent && !intersects(r))
@@ -263,12 +291,33 @@ void world_t::dump(std::ostream& out) const {
 	pimpl->idx.dump(out);
 }
 
-object_t::object_t(type_t t): type(t), spatial_index(NULL) {}
+object_t::object_t(type_t t): type(t), spatial_index(NULL), pos(0,0,0) {}
 
 object_t::~object_t() {
 	if(spatial_index)
 		spatial_index->remove(this);
 }
+
+void object_t::set_pos(const vec_t& absolute) {
+	if(spatial_index && spatial_index->moves(this,absolute-pos)) {
+		// remember old values
+		const vec_t old_pos = pos;
+		spatial_index_t* const idx = spatial_index;
+		try {
+			// see if it succeeds
+			idx->remove(this);
+			pos = absolute;
+			idx->add(this);
+		} catch(...) {
+			// restore and throw error
+			pos = old_pos;
+			idx->add(this);
+			throw;
+		}
+	} else
+		pos = absolute;
+}
+
 
 perf_t::perf_t() {
 	reset();

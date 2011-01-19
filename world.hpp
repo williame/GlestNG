@@ -31,6 +31,10 @@ public:
 	bool in_world() const { return spatial_index; }
 	virtual void draw() = 0;
 	virtual bool refine_intersection(const ray_t& r,vec_t& I) = 0;
+	bounds_t pos_bounds() const { return *this+pos; }
+	vec_t get_pos() const { return pos; }
+	void move(const vec_t& relative) { set_pos(pos+relative); }
+	void set_pos(const vec_t& absolute);
 protected:
 	object_t(type_t type);
 	const type_t type;
@@ -38,6 +42,8 @@ private:
 	friend class spatial_index_t;
 	friend class world_t;
 	spatial_index_t* spatial_index;
+	vec_t pos;
+	uint8_t straddles;
 };
 
 class world_t { // *the* spatial index of what is where in the world

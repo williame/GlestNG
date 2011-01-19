@@ -48,6 +48,8 @@ private:
 	template<typename T> T _r();
 };
 
+float randf();
+
 template<typename T> fixed_array_t<T>::fixed_array_t(size_t cap,bool filled):
 	capacity(cap), len(0), data(new T[cap])
 {

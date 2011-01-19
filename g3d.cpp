@@ -50,10 +50,10 @@ model_g3d_t::model_g3d_t(istream_t& in) {
 	switch(ver>>24) {
 	case 3: load_v3(in); break;
 	case 4: load_v4(in); break;
-	default: data_error(in << " is not a supported G3D model version (" << (ver&0xff));
+	default: data_error(in << " is not a supported G3D model version (" << (ver&0xff) << ")");
 	}
         bounds.bounds_fix();
-	std::cout << in << bounds << std::endl;
+	std::cout << in << " " << bounds << std::endl;
 }
 
 model_g3d_t::~model_g3d_t() {
@@ -134,7 +134,7 @@ void model_g3d_t::load_v4(istream_t& in) {
 
 void model_g3d_t::draw(float dist_from_camera) {
 	glColor3b(127,0,0);
-	const int frame = (now()/300)%meshes[0]->vertices.size();
+	const int frame = (now()/100)%meshes[0]->vertices.size();
         glEnableClientState(GL_VERTEX_ARRAY);
         glEnableClientState(GL_NORMAL_ARRAY);
 	for(meshes_t::iterator i=meshes.begin(); i!=meshes.end(); i++)
