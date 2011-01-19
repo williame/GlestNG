@@ -47,6 +47,12 @@ struct ray_t {
 	vec_t o, d;
 };
 
+struct face_t {
+	face_t() {}
+	face_t(int a_,int b_,int c_): a(a_), b(b_), c(c_) {}
+	int a,b,c;
+};
+
 enum intersection_t {
 	SOME,
 	ALL,
@@ -82,23 +88,6 @@ struct triangle_t {
 	triangle_t(const vec_t a_,const vec_t b_,const vec_t c_): a(a_), b(b_), c(c_) {}
 	vec_t a, b, c;
 	bool intersection(const ray_t& r,vec_t& I) const;
-};
-
-template<typename T> class fixed_array_t {
-public:
-	fixed_array_t(size_t capacity,bool filled=false);
-	virtual ~fixed_array_t() { delete[] data; }
-	T* ptr() const { return data; }
-	size_t append(T t);
-	T& operator[](size_t i);
-	const T& operator[](size_t i) const;
-	size_t size() const { return len; }
-	bool full() const { return len==capacity; }
-	void fill(const T& t);
-	const size_t capacity;
-private:
-	size_t len;
-	T* data;
 };
 
 inline float sqrd(float x) { return x*x; }
@@ -198,38 +187,6 @@ inline intersection_t sphere_t::intersects(const sphere_t& s) const {
 	if(d<b)
 		return SOME;
 	return MISS;
-}
-
-template<typename T> fixed_array_t<T>::fixed_array_t(size_t cap,bool filled):
-	capacity(cap), len(0), data(new T[cap])
-{
-	if(filled) {
-		len = capacity;
-	} else {
-		VALGRIND_MAKE_MEM_UNDEFINED(data,sizeof(T)*capacity);
-	}
-}
-
-template<typename T> size_t fixed_array_t<T>::append(T t) {
-	assert(len<capacity);
-	data[len] = t;
-	return len++;
-}
-
-template<typename T> T& fixed_array_t<T>::operator[](size_t i) {
-	assert(i<len);
-	return data[i];
-}
-	
-template<typename T> const T& fixed_array_t<T>::operator[](size_t i) const {
-	assert(i<len);
-	return data[i];
-}
-
-template<typename T> void fixed_array_t<T>::fill(const T& t) {
-	for(size_t i=0; i<capacity; i++)
-		data[i] = t;
-	len = capacity;
 }
 
 // pretty printers for logs and panics and things

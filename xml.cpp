@@ -56,9 +56,9 @@ struct xml_parser_t::token_t {
 	}
 	const type_t type; 
 	const char* const start;
+	size_t len;
 	mutable bool visit;
 	mutable char* error;
-	size_t len;
 	token_t *parent, *first_child, *next_peer;
 	std::string str() const {
 		std::string ret;

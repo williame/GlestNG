@@ -20,17 +20,12 @@
 #include "terrain.hpp"
 #include "graphics.hpp"
 #include "world.hpp"
+#include "utils.hpp"
 
 enum {
 	DIVIDE_THRESHOLD = 4,
 	FACE_IDX = 18, // how much to shift to get the ID of the mesh the face belongs to?
 	FACE_MASK = (1<<FACE_IDX)-1,
-};
-
-struct face_t {
-	face_t() {}
-	face_t(GLuint a_,GLuint b_,GLuint c_): a(a_), b(b_), c(c_) {}
-	GLuint a,b,c;
 };
 
 struct rgb_t {

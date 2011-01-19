@@ -19,6 +19,7 @@
 #include "terrain.hpp"
 #include "font.hpp"
 #include "2d.hpp"
+#include "g3d.hpp"
 
 SDL_Surface* screen;
 terrain_t* terrain;
@@ -154,6 +155,11 @@ int main(int argc,char** args) {
 			return EXIT_FAILURE;
 		}
 		fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
+		
+		const char* const test_model = "/home/will/.glestadv/old/addons/megapack_v4/techs/megapack_v4/factions/norsemen/units/axe_thrower/models/worker_attacking.g3d";
+		file_stream_t* g3d = file_stream_t::open_file(test_model,"r");
+		model_g3d_t model(*g3d);
+		delete g3d;
 	
 		terrain = gen_planet(5,500,3);
 		world()->dump(std::cout);
@@ -229,6 +235,9 @@ int main(int argc,char** args) {
 		}
 		delete terrain;
 		return EXIT_SUCCESS;
+	} catch(data_error_t* de) {
+		std::cerr << de << std::endl;
+		return EXIT_FAILURE;
 	} catch(panic_t* panic) {
 		std::cerr << panic << std::endl;
 		return EXIT_FAILURE;
