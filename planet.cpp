@@ -394,40 +394,46 @@ void planet_t::gen(size_t iterations,size_t smoothing_passes) {
 		const float a = 1.0f - (((adj[p]-mn)/s)*t);
 		adj[p] = a;
 	}
-	// classify it
-	const float POLAR = 0.7f;
-	for(size_t p=0; p<points.size(); p++) {
-		const float y = points[p].y;
-		const bool polar = (y < -POLAR || y > POLAR);
-		if(adj[p] > WATER_LEVEL) {
-			if((adj[p] > MOUNTAIN_LEVEL))
-				types.append(MOUNTAIN);
-			else if(polar)
-				types.append(ICE_FLOW);
-			else
-				types.append(LAND);	
-		} else {
-			if(polar)
-				types.append(ICE);
-			else
-				types.append(WATER);
-		}	
-	}
+	// classify mountains
+	types.fill(LAND);
+	for(size_t p=0; p<points.size(); p++)
+		if(adj[p] > MOUNTAIN_LEVEL)
+			types[p] = MOUNTAIN;
 	// smooth land that isn't mountains
 	std::cout << ": smoothing land with " << smoothing_passes << " passes" << std::endl;
 	for(size_t i=0; i<smoothing_passes; i++) {
 		for(size_t p=0; p<points.size(); p++) {
 			if(types[p] == LAND || types[p] == ICE_FLOW) {
 				float a = adj[p];
-				for(int n=0; n<6; n++)
+				int n = 0;
+				for(; n<6; n++)
 					if(adjacent_points[p].adj[n] == adjacent_t::EMPTY)
 						break;
 					else
 						a += adj[adjacent_points[p].adj[n]];
-				a /= adjacent_points[p].size()+1;
+				a /= n+1;
 				adj[p] = a;
 			}
 		}
+	}
+	// reclassify it
+	const float POLAR = 0.7f;
+	for(size_t p=0; p<points.size(); p++) {
+		const float y = points[p].y;
+		const bool polar = (y < -POLAR || y > POLAR);
+		if(adj[p] > WATER_LEVEL) {
+			if((adj[p] > MOUNTAIN_LEVEL))
+				types[p] = MOUNTAIN;
+			else if(polar)
+				types[p] = ICE_FLOW;
+			else
+				types[p] = LAND;	
+		} else {
+			if(polar)
+				types[p] = ICE;
+			else
+				types[p] = WATER;
+		}	
 	}
 	// set heights
 	for(size_t p=0; p<points.size(); p++)
@@ -435,8 +441,8 @@ void planet_t::gen(size_t iterations,size_t smoothing_passes) {
 			points[p] *= WATER_LEVEL;
 		else {
 			points[p] *= adj[p];
-			if(points[p].magintude() < WATER_LEVEL)
-				panic(p << "," << points[p] << " is "<<points[p].magnitude);
+			if(points[p].magnitude() < WATER_LEVEL)
+				panic(p << "," << points[p] << "," << adj[p] << "," << types[p] << " is "<<points[p].magnitude());
 		}
 	// colour it
 	const rgb_t WATER_COLOUR(0,0,0xff),
