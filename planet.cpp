@@ -433,8 +433,11 @@ void planet_t::gen(size_t iterations,size_t smoothing_passes) {
 	for(size_t p=0; p<points.size(); p++)
 		if(types[p] == WATER || types[p] == ICE)
 			points[p] *= WATER_LEVEL;
-		else
+		else {
 			points[p] *= adj[p];
+			if(points[p].magintude() < WATER_LEVEL)
+				panic(p << "," << points[p] << " is "<<points[p].magnitude);
+		}
 	// colour it
 	const rgb_t WATER_COLOUR(0,0,0xff),
 		ICE_COLOUR(0xff,0xff,0xff),

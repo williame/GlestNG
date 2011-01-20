@@ -33,6 +33,9 @@ class spatial_index_t: public bounds_t {
 	children that straddle more than one subtree.  Each straddling child
 	is marked with a bitmask of those subtrees it straddles, to avoid
 	unnecessary checks.
+	*** It currently walks through the bounding boxes recursively, whereas it could use breshenham or
+	at least derive the subdivisions based upon the intersection of the centred XY XZ YZ planes
+	instead of treating each box individually.
 	*/
 public:
 	spatial_index_t(const bounds_t& bounds);
