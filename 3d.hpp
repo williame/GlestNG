@@ -94,6 +94,7 @@ struct triangle_t {
 };
 
 struct frustum_t {
+	frustum_t() {}
 	frustum_t(const matrix_t& projection,const matrix_t& modelview);
 	bool contains(const vec_t& pt) const;
 	intersection_t contains(const sphere_t& sphere,double& d) const; // d is distance from camera

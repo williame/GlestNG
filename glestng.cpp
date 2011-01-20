@@ -24,6 +24,7 @@
 SDL_Surface* screen;
 
 perf_t framerate;
+uint64_t frame_count = 0;
 
 bool selection = false;
 vec_t selected_point;
@@ -76,14 +77,16 @@ void ui() {
 }
 
 void tick() {
-	matrix_t projection, modelview;
-	glGetDoublev(GL_MODELVIEW_MATRIX,projection.d);
-	glGetDoublev(GL_PROJECTION_MATRIX,modelview.d);
-	frustum_t frustum(projection,modelview);
-	world_t::hits_t visible;
-	world()->intersection(frustum,TERRAIN,visible,world_t::SORT_BY_DISTANCE);
+	frame_count++;
+	const world_t::hits_t& visible = world()->visible();
 	terrain()->draw_init();
-	for(world_t::hits_t::iterator v=visible.begin(); v!=visible.end(); v++) 
+#if 0
+	if(frame_count < visible.size()) {
+		for(int64_t i=frame_count; i>=0; i--)
+			visible[visible.size()-i-1].obj->draw(visible[visible.size()-i-1].d);
+	} else 
+#endif
+	for(world_t::hits_t::const_iterator v=visible.begin(); v!=visible.end(); v++) 
 		v->obj->draw(v->d);
 	terrain()->draw_done();
 	visible_objects = visible.size();
@@ -210,6 +213,12 @@ int main(int argc,char** args) {
 		const float left = -(float)screen->w/(float)screen->h;
 		glOrtho(left,-left,-1,1,10,-10);
 		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+		
+		matrix_t projection, modelview;
+		glGetDoublev(GL_MODELVIEW_MATRIX,projection.d);
+		glGetDoublev(GL_PROJECTION_MATRIX,modelview.d);
+		world()->set_frustum(projection,modelview);
 		
 		bool quit = false;
 		SDL_Event event;

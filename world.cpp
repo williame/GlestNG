@@ -35,17 +35,17 @@ class spatial_index_t: public bounds_t {
 	unnecessary checks.
 	*/
 public:
-	spatial_index_t(world_t& world,const bounds_t& bounds);
+	spatial_index_t(const bounds_t& bounds);
 	void add(object_t* obj);
 	void remove(object_t* obj);
 	void intersection(const ray_t& r,unsigned type,world_t::hits_t& hits) const;
-	void intersection(const frustum_t& f,unsigned type,world_t::hits_t& hits) const;
+	void intersection(const frustum_t& f,unsigned type,world_t::hits_t& hits,bool world_frustum) const;
 	void dump(std::ostream& out) const;
 	bool moves(const object_t* obj,const vec_t& relative) const;
-	void add_all(const vec_t& origin,unsigned type,world_t::hits_t& hits) const;
+	void add_all(const vec_t& origin,unsigned type,world_t::hits_t& hits,bool world_frustum) const;
+	void clear_frustum();
 private:
-	spatial_index_t(world_t& world,const bounds_t& bounds,spatial_index_t* parent);
-	world_t& world;
+	spatial_index_t(const bounds_t& bounds,spatial_index_t* parent);
 	spatial_index_t* const parent;
 	struct item_t {
 		item_t(uint8_t s,type_t t,object_t* o): straddles(s), type(t), obj(o) {}
@@ -62,19 +62,31 @@ private:
 		spatial_index_t* sub;
 	} sub[8];
 	uint8_t straddlers;
+	mutable uint8_t frustum;
 	items_t items;
 	void init_sub();
 	static void intersection(const items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits,uint8_t straddles=~0);
 	static void intersection(const items_t& items,const frustum_t& f,unsigned type,world_t::hits_t& hits,uint8_t straddles=~0);
 };
 
-spatial_index_t::spatial_index_t(world_t& w,const bounds_t& bounds):
-	world(w), bounds_t(bounds), parent(NULL), straddlers(0) {
+struct world_t::pimpl_t {
+	pimpl_t(): idx(bounds_t(vec_t(-1,-1,-1),vec_t(1,1,1))), has_frustum(false) {}
+	void add_visible(object_t* obj);
+	void remove_visible(object_t* obj);
+	spatial_index_t idx;
+	bool has_frustum;
+	frustum_t frustum;
+	hits_t visible;
+	int visible_dirty; // index of first unsorted entry; consider tombstones and unsorted part
+};
+
+spatial_index_t::spatial_index_t(const bounds_t& bounds):
+	bounds_t(bounds), parent(NULL), straddlers(0), frustum(0) {
 	init_sub();
 }
 
-spatial_index_t::spatial_index_t(world_t& w,const bounds_t& bounds,spatial_index_t* p):
-	world(w), bounds_t(bounds), parent(p), straddlers(0) {
+spatial_index_t::spatial_index_t(const bounds_t& bounds,spatial_index_t* p):
+	bounds_t(bounds), parent(p), straddlers(0), frustum(0) {
 	assert(p);
 	init_sub();
 }
@@ -147,17 +159,29 @@ void spatial_index_t::add(object_t* obj) {
 			if(sub[i].sub)
 				sub[i].sub->add(obj);
 			else  if(sub[i].items.size() == SPLIT) {
-				sub[i].sub = new spatial_index_t(world,sub[i].bounds,this);
+				sub[i].sub = new spatial_index_t(sub[i].bounds,this);
 				// move the items into the sub-node
 				for(items_t::iterator j=sub[i].items.begin(); j!=sub[i].items.end(); j++)
 					sub[i].sub->add(j->obj);
 				sub[i].items.clear();
 				// add the new object
 				sub[i].sub->add(obj);
+				// frustum flags for new sub
+				if(frustum & (1<<i)) {
+					for(int j=0; j<8; j++)
+						if(world()->frustum().contains(sub[i].sub->sub[j].bounds))
+							sub[i].sub->frustum |= (1 << j);
+				}
 			} else {
+				if(!sub[i].items.size() && (~frustum & (1 << i)) && world()->has_frustum()) {
+					if(world()->frustum().contains(sub[i].bounds))
+						frustum &= (1 << i);
+				}
 				obj->straddles |= (1 << i);
 				sub[i].items.push_back(item_t(obj->straddles,obj->type,obj));
 				obj->spatial_index = this;
+				if(frustum & (1<<i))
+					world()->pimpl->add_visible(obj);
 			}
 			return;
 		case SOME:
@@ -169,6 +193,8 @@ void spatial_index_t::add(object_t* obj) {
 	items.push_back(item_t(obj->straddles,obj->type,obj));
 	obj->spatial_index = this;
 	straddlers |= obj->straddles;
+	if(frustum & obj->straddles)
+		world()->pimpl->add_visible(obj);
 }
 
 void spatial_index_t::remove(object_t* obj) {
@@ -187,6 +213,9 @@ void spatial_index_t::remove(object_t* obj) {
 			obj->spatial_index = NULL;
 			return;
 		}
+	if(obj->straddles & frustum) { // possibly visible?
+		world()->pimpl->remove_visible(obj);
+	}
 	panic("object could not be found in the octree");
 }
 
@@ -247,10 +276,10 @@ void spatial_index_t::intersection(const items_t& items,const frustum_t& f,unsig
 		}
 }
 
-void spatial_index_t::intersection(const frustum_t& f,unsigned type,world_t::hits_t& hits) const {
+void spatial_index_t::intersection(const frustum_t& f,unsigned type,world_t::hits_t& hits,bool world_frustum) const {
 	switch(f.contains(*this)) {
 	case ALL:
-		add_all(vec_t(0,0,-1),type,hits);
+		add_all(vec_t(0,0,-1),type,hits,world_frustum);
 		return;
 	case SOME:
 		break;
@@ -263,18 +292,22 @@ void spatial_index_t::intersection(const frustum_t& f,unsigned type,world_t::hit
 		if(((straddlers&(1<<i)) || sub[i].sub || sub[i].items.size()) && (MISS != f.contains(sub[i].bounds))) {
 			s |= (1 << i);
 			if(sub[i].sub)
-				sub[i].sub->intersection(f,type,hits);
+				sub[i].sub->intersection(f,type,hits,world_frustum);
 			else
 				intersection(sub[i].items,f,type,hits);
 		}
 	if(s&=straddlers)
 		intersection(items,f,type,hits,s);
+	if(world_frustum)
+		frustum = s;
 }
 
-void spatial_index_t::add_all(const vec_t& origin,unsigned type,world_t::hits_t& hits) const {
+void spatial_index_t::add_all(const vec_t& origin,unsigned type,world_t::hits_t& hits,bool world_frustum) const {
+	if(world_frustum)
+		frustum = ~0;
 	for(int s=0; s<8; s++)
 		if(sub[s].sub)
-			sub[s].sub->add_all(origin,type,hits);
+			sub[s].sub->add_all(origin,type,hits,world_frustum);
 		else
 			for(items_t::const_iterator i=sub[s].items.begin(); i!=sub[s].items.end(); i++)
 				if(i->obj->type & type) {
@@ -294,10 +327,38 @@ void spatial_index_t::add_all(const vec_t& origin,unsigned type,world_t::hits_t&
 		}
 }
 
-struct world_t::pimpl_t {
-	pimpl_t(world_t& world): idx(world,bounds_t(vec_t(-1,-1,-1),vec_t(1,1,1))) {}
-	spatial_index_t idx;
-};
+void spatial_index_t::clear_frustum() {
+	if(!frustum) {
+		if(parent) panic(*this << " cannot clear the frustum when I\'m not visible");
+		return;
+	}
+	for(int s=0; s<8; s++)
+		if(sub[s].sub && (frustum&(1<<s)))
+			sub[s].sub->clear_frustum();
+	frustum = 0;
+}
+
+void world_t::pimpl_t::add_visible(object_t* obj) {
+	double d;
+	const bool is_vis = world()->frustum().contains(*obj,d);
+	//### optimise with visible_dirty
+	for(size_t i=0; i<visible.size(); i++)
+		if(visible[i].obj == obj) {
+			if(!is_vis)
+				visible.erase(visible.begin()+i);
+			return;
+		}
+	if(is_vis)
+		visible.push_back(hit_t(d,obj->type,obj));
+}
+
+void world_t::pimpl_t::remove_visible(object_t* obj) {
+	for(size_t i=0; i<visible.size(); i++)
+		if(visible[i].obj == obj) {
+			visible.erase(visible.begin()+i);
+			return;
+		}
+}
 
 world_t* world_t::get_world() {
 	static world_t* singleton = NULL;
@@ -306,7 +367,7 @@ world_t* world_t::get_world() {
 	return singleton;
 }
 
-world_t::world_t(): pimpl(this,new pimpl_t()) {}
+world_t::world_t(): pimpl(new pimpl_t()) {}
 
 void world_t::add(object_t* obj) {
 	assert(!obj->spatial_index);
@@ -358,12 +419,48 @@ void world_t::intersection(const ray_t& r,unsigned type,hits_t& hits,sort_by_t s
 }
 
 void world_t::intersection(const frustum_t& f,unsigned type,hits_t& hits,sort_by_t sort_by) {
-	pimpl->idx.intersection(f,type,hits);
+	pimpl->idx.intersection(f,type,hits,false);
 	sort(hits,sort_by);
 }
 
 void world_t::dump(std::ostream& out) const {
 	pimpl->idx.dump(out);
+}
+
+void world_t::set_frustum(const matrix_t& projection,const matrix_t& modelview) {
+	clear_frustum();
+	pimpl->has_frustum = true;
+	pimpl->frustum = frustum_t(projection,modelview);
+	pimpl->idx.intersection(pimpl->frustum,~0,pimpl->visible,true);
+	pimpl->visible_dirty = pimpl->visible.size()-1;
+}
+
+void world_t::clear_frustum() {
+	if(pimpl->has_frustum) {
+		pimpl->idx.clear_frustum();
+		pimpl->visible.clear();
+		pimpl->has_frustum = false;
+	}
+}
+
+bool world_t::has_frustum() const {
+	return pimpl->has_frustum;
+}
+
+const frustum_t& world_t::frustum() const {
+	if(!has_frustum()) panic("there is no frustum set on the world");
+	return pimpl->frustum;
+}
+
+
+const world_t::hits_t& world_t::visible() const {
+	if(!has_frustum()) panic("there is no frustum set on the world");
+	if(pimpl->visible_dirty) {
+		//### optimisation: could only sort the dirty tail
+		sort(pimpl->visible,SORT_BY_TYPE_THEN_DISTANCE);
+		pimpl->visible_dirty = -1;
+	}
+	return pimpl->visible;
 }
 
 object_t::object_t(type_t t): type(t), spatial_index(NULL), pos(0,0,0) {}
