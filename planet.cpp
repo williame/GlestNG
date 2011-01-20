@@ -21,6 +21,7 @@
 #include "graphics.hpp"
 #include "world.hpp"
 #include "utils.hpp"
+#include "error.hpp"
 
 enum {
 	DIVIDE_THRESHOLD = 4,
@@ -39,7 +40,7 @@ struct planet_t;
 struct mesh_t: public object_t {
 	mesh_t(planet_t& planet,face_t tri,size_t recursionLevel);
 	void calc_bounds();
-	void draw();
+	void draw(float d);
 	bool refine_intersection(const ray_t& r,vec_t& I);
 	planet_t& planet;
 	const GLuint ID;
@@ -60,6 +61,8 @@ struct planet_t: public terrain_t {
 	static size_t num_faces(size_t recursionLevel);
 	GLuint midpoint(GLuint a,GLuint b);
 	GLuint find_face(GLuint a,GLuint b,GLuint c);
+	void draw_init();
+	void draw_done();
 	void draw();
 	void divide(const face_t& tri,size_t recursionLevel,size_t depth);
 	void gen(size_t iterations,size_t smoothing_passes);
@@ -183,7 +186,7 @@ void mesh_t::init_gl() {
 		GL_STATIC_DRAW);
 }
 
-void mesh_t::draw() {
+void mesh_t::draw(float) {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,faces);
         glDrawRangeElements(GL_TRIANGLES,mn_point,mx_point,((stop-start)+1)*3,GL_UNSIGNED_INT,NULL);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
@@ -508,7 +511,7 @@ void planet_t::init_gl() {
 }
 #endif
 
-void planet_t::draw() {
+void planet_t::draw_init() {
 	static const double PI = 3.14159265;
 	const double r = fmod(now()/20.0,360)*(PI/180.0);
 	const vec_t sun = this->sun.rotate(r,vec_t(0,1,0),vec_t(0,-1,0));
@@ -528,8 +531,9 @@ void planet_t::draw() {
         glBindBuffer(GL_ARRAY_BUFFER,vbo.colours);
         glColorPointer(3,GL_UNSIGNED_BYTE,0,NULL);
         glBindBuffer(GL_ARRAY_BUFFER,0);
-	for(meshes_t::iterator i=meshes.begin(); i!=meshes.end(); i++)
-		(*i)->draw();
+}
+
+void planet_t::draw_done() {
         glDisableClientState(GL_COLOR_ARRAY);
         glDisableClientState(GL_VERTEX_ARRAY);
         glDisableClientState(GL_NORMAL_ARRAY);
@@ -550,6 +554,14 @@ bool planet_t::surface_at(const vec_t& normal,vec_t& pt) const {
 	return hit;
 }
 
-terrain_t* gen_planet(size_t recursionLevel,size_t iterations,size_t smoothing_passes) {
-	return new planet_t(recursionLevel,iterations,smoothing_passes);
+static terrain_t* _terrain = NULL;
+
+terrain_t* terrain_t::get_terrain() {
+	if(!_terrain) panic("no terrain");
+	return _terrain;
+}
+
+void terrain_t::gen_planet(size_t recursionLevel,size_t iterations,size_t smoothing_passes) {
+	if(_terrain) panic("terrain already exists");
+	_terrain = new planet_t(recursionLevel,iterations,smoothing_passes);
 }

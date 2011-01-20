@@ -22,13 +22,12 @@
 #include "g3d.hpp"
 
 SDL_Surface* screen;
-terrain_t* terrain;
-model_g3d_t* model;
 
 perf_t framerate;
 
 bool selection = false;
 vec_t selected_point;
+int visible_objects = 0;
 
 void ui() {
 	glDisable(GL_LIGHTING);
@@ -65,8 +64,8 @@ void ui() {
 	glViewport(0,0,screen->w,screen->h);
 	gluOrtho2D(0,screen->w,0,screen->h);
 	glColor3f(1,1,1);
-	char fps[12];
-	snprintf(fps,sizeof(fps),"%u fps",(unsigned)framerate.per_second(now()));
+	static char fps[128];
+	snprintf(fps,sizeof(fps),"%u fps, %d visible objects",(unsigned)framerate.per_second(now()),visible_objects);
 	font_mgr()->draw(10,10,fps);
 	glPopMatrix();
 	glMatrixMode(GL_PROJECTION);
@@ -77,8 +76,17 @@ void ui() {
 }
 
 void tick() {
-	terrain->draw();
-	//model->draw(0);
+	matrix_t projection, modelview;
+	glGetDoublev(GL_MODELVIEW_MATRIX,projection.d);
+	glGetDoublev(GL_PROJECTION_MATRIX,modelview.d);
+	frustum_t frustum(projection,modelview);
+	world_t::hits_t visible;
+	world()->intersection(frustum,TERRAIN,visible,world_t::SORT_BY_DISTANCE);
+	terrain()->draw_init();
+	for(world_t::hits_t::iterator v=visible.begin(); v!=visible.end(); v++) 
+		v->obj->draw(v->d);
+	terrain()->draw_done();
+	visible_objects = visible.size();
 	ui();
 	SDL_GL_SwapBuffers();
 	SDL_Flip(screen);
@@ -88,16 +96,16 @@ void tick() {
 
 void click(int x,int y) {
 	uint64_t start = high_precision_time();
-	double mv[16], p[16], a, b, c;
+	double mv[16], p[16], a, b, c, d, e, f;
 	glGetDoublev(GL_MODELVIEW_MATRIX,mv);
 	glGetDoublev(GL_PROJECTION_MATRIX,p);
 	GLint viewport[4];
 	glGetIntegerv(GL_VIEWPORT,viewport);
-	gluUnProject(x,y,10,mv,p,viewport,&a,&b,&c);
+	gluUnProject(x,y,1,mv,p,viewport,&a,&b,&c);
 	const vec_t origin(a,b,c);
-	gluUnProject(x,y,-10,mv,p,viewport,&a,&b,&c);
-	const vec_t dest(a,b,c);
-	ray_t ray(origin,dest-origin);
+	gluUnProject(x,y,-1,mv,p,viewport,&d,&e,&f);
+	const vec_t dir(d-a,e-b,f-c);
+	ray_t ray(origin,dir);
 	world_t::hits_t hits;
 	world()->intersection(ray,TERRAIN,hits);
 	uint64_t ns = high_precision_time()-start;
@@ -123,7 +131,7 @@ void click(int x,int y) {
 	// the slow way
 	terrain_t::test_hits_t test;
 	start = high_precision_time();
-	terrain->intersection(ray,test);
+	terrain()->intersection(ray,test);
 	ns = high_precision_time()-start;
 	std::cout << "(slow check: " << ns << " ns)" << std::endl;
 	for(terrain_t::test_hits_t::iterator i=test.begin(); i!=test.end(); i++)
@@ -132,7 +140,7 @@ void click(int x,int y) {
 			(i->obj->aabb_t::intersects(ray)?"+":"-") <<
 			*i->obj << i->hit << std::endl;
 	vec_t surface;
-	if(selection && terrain->surface_at(selected_point,surface))
+	if(selection && terrain()->surface_at(selected_point,surface))
 		std::cout << "(surface_at " << surface << " - " << selected_point << " = " << (selected_point-surface) << ")" << std::endl;
 }
 
@@ -168,12 +176,7 @@ int main(int argc,char** args) {
 		}
 		fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
 		
-		const char* const test_model = "/home/will/.glestadv/old/addons/megapack_v4/techs/megapack_v4/factions/norsemen/units/axe_thrower/models/worker_attacking.g3d";
-		istream_t* g3d = istream_t::open_file(test_model);
-		model = new model_g3d_t(*g3d);
-		delete g3d;
-	
-		terrain = gen_planet(5,500,3);
+		terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);
 	
 		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),
@@ -245,7 +248,6 @@ int main(int argc,char** args) {
 			framerate.tick(now());
 			tick();
 		}
-		delete terrain;
 		return EXIT_SUCCESS;
 	} catch(data_error_t* de) {
 		std::cerr << de << std::endl;

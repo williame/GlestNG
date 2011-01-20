@@ -29,7 +29,7 @@ class object_t: public bounds_t {
 public:
 	virtual ~object_t();
 	bool in_world() const { return spatial_index; }
-	virtual void draw() = 0;
+	virtual void draw(float d) = 0; // distance from camera
 	virtual bool refine_intersection(const ray_t& r,vec_t& I) = 0;
 	bounds_t pos_bounds() const { return *this+pos; }
 	vec_t get_pos() const { return pos; }
@@ -64,7 +64,9 @@ public:
 		SORT_BY_TYPE,
 		SORT_BY_TYPE_THEN_DISTANCE,
 	};
+	void sort(hits_t& hits,sort_by_t sort_by) const;
 	void intersection(const ray_t& r,unsigned type,hits_t& hits,sort_by_t sort_by = SORT_BY_DISTANCE);
+	void intersection(const frustum_t& f,unsigned type,hits_t& hits,sort_by_t sort_by = SORT_BY_TYPE_THEN_DISTANCE);
 	void dump(std::ostream& out) const;
 private:
 	world_t();

@@ -38,9 +38,11 @@ public:
 	spatial_index_t(const bounds_t& bounds);
 	void add(object_t* obj);
 	void remove(object_t* obj);
-	void intersection(const ray_t& r,unsigned type,world_t::hits_t& hits);
+	void intersection(const ray_t& r,unsigned type,world_t::hits_t& hits) const;
+	void intersection(const frustum_t& f,unsigned type,world_t::hits_t& hits) const;
 	void dump(std::ostream& out) const;
 	bool moves(const object_t* obj,const vec_t& relative) const;
+	void add_all(const vec_t& origin,unsigned type,world_t::hits_t& hits) const;
 private:
 	spatial_index_t(const bounds_t& bounds,spatial_index_t* parent);
 	spatial_index_t* const parent;
@@ -61,7 +63,8 @@ private:
 	uint8_t straddlers;
 	items_t items;
 	void init_sub();
-	static void intersection(items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits,uint8_t straddles=~0);
+	static void intersection(const items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits,uint8_t straddles=~0);
+	static void intersection(const items_t& items,const frustum_t& f,unsigned type,world_t::hits_t& hits,uint8_t straddles=~0);
 };
 
 spatial_index_t::spatial_index_t(const bounds_t& bounds): bounds_t(bounds), parent(NULL), straddlers(0) {
@@ -203,10 +206,13 @@ bool spatial_index_t::moves(const object_t* obj,const vec_t& relative) const {
 	}
 }	
 
-void spatial_index_t::intersection(const ray_t& r,unsigned type,world_t::hits_t& hits) {
-	if(parent && !intersects(r))
-		panic(*this << " does not intersect " << r <<
-			" (" << sphere_t::intersects(r) << "," << aabb_t::intersects(r) << ")");
+void spatial_index_t::intersection(const ray_t& r,unsigned type,world_t::hits_t& hits) const {
+	if(!intersects(r)) {
+		if(parent)
+			panic(*this << " does not intersect " << r <<
+				" (" << sphere_t::intersects(r) << "," << aabb_t::intersects(r) << ")");
+		return;
+	}
 	uint8_t s = 0;
 	for(int i=0; i<8; i++)
 		if(((straddlers&(1<<i)) || sub[i].sub || sub[i].items.size()) && sub[i].bounds.intersects(r)) {
@@ -220,13 +226,69 @@ void spatial_index_t::intersection(const ray_t& r,unsigned type,world_t::hits_t&
 		intersection(items,r,type,hits,s);
 }
 
-void spatial_index_t::intersection(items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits,uint8_t straddles) {
-	for(items_t::iterator i=items.begin(); i!=items.end(); i++)
+void spatial_index_t::intersection(const items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits,uint8_t straddles) {
+	for(items_t::const_iterator i=items.begin(); i!=items.end(); i++)
 		if((i->type&type) && (i->straddles&straddles) && i->obj->intersects(r))
 			hits.push_back(world_t::hit_t(
 				i->obj->centre.distance_sqrd(r.o),
 				i->type,
 				i->obj));
+}
+
+void spatial_index_t::intersection(const items_t& items,const frustum_t& f,unsigned type,world_t::hits_t& hits,uint8_t straddles) {
+	for(items_t::const_iterator i=items.begin(); i!=items.end(); i++)
+		if((i->type&type) && (i->straddles&straddles)) {
+			double d;
+			if(MISS != f.contains(*i->obj,d))
+				hits.push_back(world_t::hit_t(sqrd(d),i->type,i->obj));
+		}
+}
+
+void spatial_index_t::intersection(const frustum_t& f,unsigned type,world_t::hits_t& hits) const {
+	switch(f.contains(*this)) {
+	case ALL:
+		add_all(vec_t(0,0,-1),type,hits);
+		return;
+	case SOME:
+		break;
+	case MISS:
+		if(parent) panic(*this << " does not intersect frustum");
+		return;
+	}
+	uint8_t s = 0;
+	for(int i=0; i<8; i++)
+		if(((straddlers&(1<<i)) || sub[i].sub || sub[i].items.size()) && (MISS != f.contains(sub[i].bounds))) {
+			s |= (1 << i);
+			if(sub[i].sub)
+				sub[i].sub->intersection(f,type,hits);
+			else
+				intersection(sub[i].items,f,type,hits);
+		}
+	if(s&=straddlers)
+		intersection(items,f,type,hits,s);
+}
+
+void spatial_index_t::add_all(const vec_t& origin,unsigned type,world_t::hits_t& hits) const {
+	for(int s=0; s<8; s++)
+		if(sub[s].sub)
+			sub[s].sub->add_all(origin,type,hits);
+		else
+			for(items_t::const_iterator i=sub[s].items.begin(); i!=sub[s].items.end(); i++)
+				if(i->obj->type & type) {
+					float d = origin.distance_sqrd(i->obj->centre);
+					hits.push_back(world_t::hit_t(
+						d,
+						i->obj->type,
+						i->obj));
+				}
+	for(items_t::const_iterator i=items.begin(); i!=items.end(); i++)
+		if(i->obj->type & type) {
+			float d = origin.distance_sqrd(i->obj->centre);
+			hits.push_back(world_t::hit_t(
+				d,
+				i->obj->type,
+				i->obj));
+		}
 }
 
 struct world_t::pimpl_t {
@@ -267,8 +329,7 @@ static bool cmp_hits_type_then_distance(const world_t::hit_t& a,const world_t::h
 	return (a.type < b.type);
 }
 
-void world_t::intersection(const ray_t& r,unsigned type,hits_t& hits,sort_by_t sort_by) {
-	pimpl->idx.intersection(r,type,hits);
+void world_t::sort(hits_t& hits,sort_by_t sort_by) const {
 	bool (*func)(const world_t::hit_t& a,const world_t::hit_t& b);
 	switch(sort_by) {
 	case SORT_BY_DISTANCE:
@@ -285,6 +346,17 @@ void world_t::intersection(const ray_t& r,unsigned type,hits_t& hits,sort_by_t s
 		return;
 	};
 	std::sort(hits.begin(),hits.end(),func);
+}
+
+
+void world_t::intersection(const ray_t& r,unsigned type,hits_t& hits,sort_by_t sort_by) {
+	pimpl->idx.intersection(r,type,hits);
+	sort(hits,sort_by);
+}
+
+void world_t::intersection(const frustum_t& f,unsigned type,hits_t& hits,sort_by_t sort_by) {
+	pimpl->idx.intersection(f,type,hits);
+	sort(hits,sort_by);
 }
 
 void world_t::dump(std::ostream& out) const {
