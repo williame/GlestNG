@@ -35,7 +35,7 @@ class spatial_index_t: public bounds_t {
 	unnecessary checks.
 	*/
 public:
-	spatial_index_t(const bounds_t& bounds);
+	spatial_index_t(world_t& world,const bounds_t& bounds);
 	void add(object_t* obj);
 	void remove(object_t* obj);
 	void intersection(const ray_t& r,unsigned type,world_t::hits_t& hits) const;
@@ -44,7 +44,8 @@ public:
 	bool moves(const object_t* obj,const vec_t& relative) const;
 	void add_all(const vec_t& origin,unsigned type,world_t::hits_t& hits) const;
 private:
-	spatial_index_t(const bounds_t& bounds,spatial_index_t* parent);
+	spatial_index_t(world_t& world,const bounds_t& bounds,spatial_index_t* parent);
+	world_t& world;
 	spatial_index_t* const parent;
 	struct item_t {
 		item_t(uint8_t s,type_t t,object_t* o): straddles(s), type(t), obj(o) {}
@@ -67,11 +68,13 @@ private:
 	static void intersection(const items_t& items,const frustum_t& f,unsigned type,world_t::hits_t& hits,uint8_t straddles=~0);
 };
 
-spatial_index_t::spatial_index_t(const bounds_t& bounds): bounds_t(bounds), parent(NULL), straddlers(0) {
+spatial_index_t::spatial_index_t(world_t& w,const bounds_t& bounds):
+	world(w), bounds_t(bounds), parent(NULL), straddlers(0) {
 	init_sub();
 }
 
-spatial_index_t::spatial_index_t(const bounds_t& bounds,spatial_index_t* p): bounds_t(bounds), parent(p), straddlers(0) {
+spatial_index_t::spatial_index_t(world_t& w,const bounds_t& bounds,spatial_index_t* p):
+	world(w), bounds_t(bounds), parent(p), straddlers(0) {
 	assert(p);
 	init_sub();
 }
@@ -144,7 +147,7 @@ void spatial_index_t::add(object_t* obj) {
 			if(sub[i].sub)
 				sub[i].sub->add(obj);
 			else  if(sub[i].items.size() == SPLIT) {
-				sub[i].sub = new spatial_index_t(sub[i].bounds,this);
+				sub[i].sub = new spatial_index_t(world,sub[i].bounds,this);
 				// move the items into the sub-node
 				for(items_t::iterator j=sub[i].items.begin(); j!=sub[i].items.end(); j++)
 					sub[i].sub->add(j->obj);
@@ -292,7 +295,7 @@ void spatial_index_t::add_all(const vec_t& origin,unsigned type,world_t::hits_t&
 }
 
 struct world_t::pimpl_t {
-	pimpl_t(): idx(bounds_t(vec_t(-1,-1,-1),vec_t(1,1,1))) {}
+	pimpl_t(world_t& world): idx(world,bounds_t(vec_t(-1,-1,-1),vec_t(1,1,1))) {}
 	spatial_index_t idx;
 };
 
@@ -303,7 +306,7 @@ world_t* world_t::get_world() {
 	return singleton;
 }
 
-world_t::world_t(): pimpl(new pimpl_t()) {}
+world_t::world_t(): pimpl(this,new pimpl_t()) {}
 
 void world_t::add(object_t* obj) {
 	assert(!obj->spatial_index);
