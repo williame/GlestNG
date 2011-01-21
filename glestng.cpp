@@ -108,19 +108,29 @@ void ui() {
 
 struct test_t: public object_t {
 	enum { MIN_AGE = 60*5, MAX_AGE = 60*8, };
-	static const float SZ, MARGIN;
+	static const float SZ, MARGIN, SPEED;
+	static bounds_t legal;
 	test_t(): object_t(UNIT), age(MIN_AGE+(rand()%(MAX_AGE-MIN_AGE))),
 		r(128+(rand()%128)), g(128+(rand()%128)), b(128+(rand()%128)),
-		rx(randf()), ry(randf()), rz(randf())
+		rx(randf()), ry(randf()), rz(randf()),
+		dir(randf(),randf(),randf())
 	{
 		set_pos(vec_t(randf()-MARGIN,randf()-MARGIN,randf()-MARGIN));
 		bounds_include(vec_t(-SZ,-SZ,-SZ));
 		bounds_include(vec_t(SZ,SZ,SZ));
 		bounds_fix();
 		world()->add(this);
+		dir.normalise();
+		dir *= SPEED;
 	}
 	bool tick() {
-		return (age-- <= 0);
+		if(age-- <= 0) return false;
+		vec_t p = get_pos();
+		p.x += dir.x; if((p.x<legal.a.x)||(p.x>legal.b.x)) { dir.x = -dir.x; p.x += dir.x; }
+		p.y += dir.y; if((p.y<legal.a.y)||(p.y>legal.b.y)) { dir.y = -dir.y; p.y += dir.y; }
+		p.z += dir.z; if((p.z<legal.a.z)||(p.z>legal.b.z)) { dir.z = -dir.z; p.z += dir.z; }
+		set_pos(p);
+		return true;
 	}
 	void draw(float) {
 		glColor3ub(r,g,b);
@@ -130,15 +140,18 @@ struct test_t: public object_t {
 	int age;
 	const uint8_t r,g,b;
 	const float rx, ry, rz;
+	vec_t dir;
 };
-const float test_t::SZ = 0.05, test_t::MARGIN = test_t::SZ*2;
+const float test_t::SZ = 0.05, test_t::MARGIN = test_t::SZ*2, test_t::SPEED = 0.01;
+bounds_t test_t::legal(vec_t(-1.0+MARGIN,-1.0+MARGIN,-1.0+MARGIN),
+	vec_t(1.0-MARGIN,1.0-MARGIN,1.0-MARGIN));
 
 void spatial_test() {
-	enum { MIN_OBJS = 1000, MAX_OBJS = 2000, };
+	enum { MIN_OBJS = 10, MAX_OBJS = 20, };
 	static std::vector<test_t*> objs;
 	for(int i=objs.size()-1; i>=0; i--) {
 		test_t* obj = objs[i];
-		if(obj->tick()) {
+		if(!obj->tick()) {
 			objs.erase(objs.begin()+i);
 			delete obj;
 		}
