@@ -147,7 +147,7 @@ bounds_t test_t::legal(vec_t(-1.0+MARGIN,-1.0+MARGIN,-1.0+MARGIN),
 	vec_t(1.0-MARGIN,1.0-MARGIN,1.0-MARGIN));
 
 void spatial_test() {
-	enum { MIN_OBJS = 10, MAX_OBJS = 20, };
+	enum { MIN_OBJS = 1000, MAX_OBJS = 2000, };
 	static std::vector<test_t*> objs;
 	for(int i=objs.size()-1; i>=0; i--) {
 		test_t* obj = objs[i];

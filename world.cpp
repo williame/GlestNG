@@ -103,7 +103,7 @@ void spatial_index_t::init_sub() {
 	sub[5].bounds = bounds_t(vec_t(centre.x,a.y,centre.z),vec_t(b.x,centre.y,b.z));
 	sub[6].bounds = bounds_t(vec_t(centre.x,centre.y,a.z),vec_t(b.x,b.y,centre.z));
 	sub[7].bounds = bounds_t(centre,b);
-#ifndef NDEBUG
+#if 0 //ndef NDEBUG
 	for(int i=0; i<8; i++) {
 		intersection_t bang = sub[i].bounds.intersects(*this);
 		if(bang != ALL)
@@ -156,6 +156,7 @@ void spatial_index_t::add(object_t* obj) {
 		if(!parent)
 			panic(*obj << "(" << obj->pos << "," << bounds << ") intersects " << *this << " = " << bounds.intersects(*this))
 		parent->add(obj);
+		return;
 	}
 	// would fit entirely inside a child?  delegate
 	obj->straddles = 0;
@@ -196,8 +197,11 @@ void spatial_index_t::add(object_t* obj) {
 			break;
 		default:;
 		}
-	if(__builtin_popcount(obj->straddles) < 2)
+	if(__builtin_popcount(obj->straddles) < 2) {
+		for(int i=0; i<8; i++)
+			std::cerr << i << ": " << sub[i].bounds << " = " << bounds.intersects(sub[i].bounds) << std::endl;
 		panic(obj<<"does not straddle "<<*this<<" ("<<fmtbin(obj->straddles,8)<<")");
+	}
 	items.push_back(item_t(obj->straddles,obj->type,obj));
 	obj->spatial_index = this;
 	straddlers |= obj->straddles;
