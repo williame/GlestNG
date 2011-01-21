@@ -30,31 +30,37 @@ bool selection = false;
 vec_t selected_point;
 int visible_objects = 0;
 
+void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
+	glPushMatrix();		
+	glTranslatef(pos.x,pos.y,pos.z);
+	glScalef(scale,scale,scale);
+	glRotatef(360.0/rx,1,0,0);
+	glRotatef(360.0/ry,0,1,0);
+	glRotatef(360.0/rz,0,0,1);
+	glBegin(GL_TRIANGLES);		
+		//NeHe lesson 5 pyramid		
+		glVertex3f( 0.0f, 1.0f, 0.0f);		
+		glVertex3f(-1.0f,-1.0f, 1.0f);		
+		glVertex3f( 1.0f,-1.0f, 1.0f);		
+		glVertex3f( 0.0f, 1.0f, 0.0f);		
+		glVertex3f( 1.0f,-1.0f, 1.0f);		
+		glVertex3f( 1.0f,-1.0f, -1.0f);		
+		glVertex3f( 0.0f, 1.0f, 0.0f);		
+		glVertex3f( 1.0f,-1.0f, -1.0f);		
+		glVertex3f(-1.0f,-1.0f, -1.0f);		
+		glVertex3f( 0.0f, 1.0f, 0.0f);		
+		glVertex3f(-1.0f,-1.0f,-1.0f);		
+		glVertex3f(-1.0f,-1.0f, 1.0f);		
+	glEnd();					
+	glPopMatrix();
+}
+
 void ui() {
 	glDisable(GL_LIGHTING);
 	glDisable(GL_DEPTH_TEST);
 	if(selection) {
-		glPushMatrix();
-		const float x=selected_point.x, y=selected_point.y, z=selected_point.z;
-		glTranslatef(x,-y,-z);
-		glScalef(0.03,0.03,0.03);
 		glColor3f(1,0,0);
-		glBegin(GL_TRIANGLES);		
-			//NeHe lesson 5 pyramid		
-			glVertex3f( 0.0f, 1.0f, 0.0f);		
-			glVertex3f(-1.0f,-1.0f, 1.0f);		
-			glVertex3f( 1.0f,-1.0f, 1.0f);		
-			glVertex3f( 0.0f, 1.0f, 0.0f);		
-			glVertex3f( 1.0f,-1.0f, 1.0f);		
-			glVertex3f( 1.0f,-1.0f, -1.0f);		
-			glVertex3f( 0.0f, 1.0f, 0.0f);		
-			glVertex3f( 1.0f,-1.0f, -1.0f);		
-			glVertex3f(-1.0f,-1.0f, -1.0f);		
-			glVertex3f( 0.0f, 1.0f, 0.0f);		
-			glVertex3f(-1.0f,-1.0f,-1.0f);		
-			glVertex3f(-1.0f,-1.0f, 1.0f);		
-		glEnd();					
-		glPopMatrix();
+		caret(selected_point,0.03,0,0,0);
 	}
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
@@ -76,20 +82,69 @@ void ui() {
 	glEnable(GL_LIGHTING);
 }
 
+struct test_t: public object_t {
+	enum { MIN_AGE = 60*5, MAX_AGE = 60*8, };
+	static const float SZ;
+	test_t(): object_t(UNIT), age(MIN_AGE+(rand()%(MAX_AGE-MIN_AGE))),
+		r(128+(rand()%128)), g(128+(rand()%128)), b(128+(rand()%128)),
+		rx(randf()), ry(randf()), rz(randf())
+	{
+		set_pos(vec_t(randf()-SZ,randf()-SZ,randf()-SZ));
+		bounds_include(vec_t(-SZ,-SZ,-SZ));
+		bounds_include(vec_t(SZ,SZ,SZ));
+		bounds_fix();
+		world()->add(this);
+	}
+	bool tick() {
+		return (age-- <= 0);
+	}
+	void draw(float) {
+		glColor3ub(r,g,b);
+		caret(get_pos(),SZ,rx,ry,rz);
+	}
+	bool refine_intersection(const ray_t&, vec_t&) { return false; }
+	int age;
+	const uint8_t r,g,b;
+	const float rx, ry, rz;
+};
+const float test_t::SZ = 0.05;
+
+void spatial_test() {
+	enum { MIN_OBJS = 100, MAX_OBJS = 200, };
+	static std::vector<test_t*> objs;
+	for(int i=objs.size()-1; i>=0; i--) {
+		test_t* obj = objs[i];
+		if(obj->tick()) {
+			objs.erase(objs.begin()+i);
+			delete obj;
+		}
+	}
+	if(!objs.size() < MIN_OBJS) {
+		const size_t n = MIN_OBJS+(rand()%(MAX_OBJS-MIN_OBJS));
+		while(objs.size()<n) {
+			objs.push_back(new test_t());
+		}
+	}
+}
+
 void tick() {
 	frame_count++;
+	spatial_test();
 	const world_t::hits_t& visible = world()->visible();
-	terrain()->draw_init();
-#if 0
-	if(frame_count < visible.size()) {
-		for(int64_t i=frame_count; i>=0; i--)
-			visible[visible.size()-i-1].obj->draw(visible[visible.size()-i-1].d);
-	} else 
-#endif
-	for(world_t::hits_t::const_iterator v=visible.begin(); v!=visible.end(); v++) 
-		v->obj->draw(v->d);
-	terrain()->draw_done();
 	visible_objects = visible.size();
+	if(visible_objects) {
+		bool in_terrain = (terrain() && visible[0].type == TERRAIN);
+		if(in_terrain) terrain()->draw_init();
+		for(world_t::hits_t::const_iterator v=visible.begin(); v!=visible.end(); v++) {
+			if(in_terrain && (v->type != TERRAIN)) {
+				terrain()->draw_done();
+				in_terrain = false;
+			}
+			v->obj->draw(v->d);
+		}
+		if(in_terrain)
+			terrain()->draw_done();
+	}
 	ui();
 	SDL_GL_SwapBuffers();
 	SDL_Flip(screen);
@@ -104,9 +159,9 @@ void click(int x,int y) {
 	glGetDoublev(GL_PROJECTION_MATRIX,p);
 	GLint viewport[4];
 	glGetIntegerv(GL_VIEWPORT,viewport);
-	gluUnProject(x,y,1,mv,p,viewport,&a,&b,&c);
+	gluUnProject(x,viewport[3]-y,-1,mv,p,viewport,&a,&b,&c);
 	const vec_t origin(a,b,c);
-	gluUnProject(x,y,-1,mv,p,viewport,&d,&e,&f);
+	gluUnProject(x,viewport[3]-y,1,mv,p,viewport,&d,&e,&f);
 	const vec_t dir(d-a,e-b,f-c);
 	ray_t ray(origin,dir);
 	world_t::hits_t hits;
@@ -179,7 +234,7 @@ int main(int argc,char** args) {
 		}
 		fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
 		
-		terrain_t::gen_planet(5,500,3);
+		//terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);
 	
 		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),

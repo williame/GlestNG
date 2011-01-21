@@ -178,7 +178,7 @@ void spatial_index_t::add(object_t* obj) {
 			} else {
 				if(!sub[i].items.size() && (~frustum & (1 << i)) && world()->has_frustum()) {
 					if(world()->frustum().contains(sub[i].bounds))
-						frustum &= (1 << i);
+						frustum |= (1 << i);
 				}
 				obj->straddles |= (1 << i);
 				sub[i].items.push_back(item_t(obj->straddles,obj->type,obj));
@@ -202,13 +202,16 @@ void spatial_index_t::add(object_t* obj) {
 
 void spatial_index_t::remove(object_t* obj) {
 	assert(obj->spatial_index == this);
-	if(ALL != obj->intersects(*this))
-		panic(*obj << " intersects " << *this << " = " << obj->intersects(*this))
+	const bounds_t bounds = obj->pos_bounds();
+	if(ALL != bounds.intersects(*this))
+		panic(*obj << " intersects " << *this << " = " << bounds.intersects(*this))
 	assert(obj->straddles);
 	items_t& items = (
 		__builtin_popcount(obj->straddles)>1? 
 		this->items:
 		sub[__builtin_ffs(obj->straddles)-1].items);
+	if(obj->straddles & frustum) // possibly visible?
+		world()->pimpl->remove_visible(obj);
 	for(items_t::iterator i=items.begin(); i!=items.end(); i++)
 		if(i->obj == obj) {
 			assert(i->type == obj->type);
@@ -216,9 +219,6 @@ void spatial_index_t::remove(object_t* obj) {
 			obj->spatial_index = NULL;
 			return;
 		}
-	if(obj->straddles & frustum) { // possibly visible?
-		world()->pimpl->remove_visible(obj);
-	}
 	panic("object could not be found in the octree");
 }
 
@@ -292,7 +292,7 @@ void spatial_index_t::intersection(const frustum_t& f,unsigned type,world_t::hit
 	}
 	uint8_t s = 0;
 	for(int i=0; i<8; i++)
-		if(((straddlers&(1<<i)) || sub[i].sub || sub[i].items.size()) && (MISS != f.contains(sub[i].bounds))) {
+		if(f.contains(sub[i].bounds)) {
 			s |= (1 << i);
 			if(sub[i].sub)
 				sub[i].sub->intersection(f,type,hits,world_frustum);

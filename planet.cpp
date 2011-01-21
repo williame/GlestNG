@@ -566,7 +566,6 @@ bool planet_t::surface_at(const vec_t& normal,vec_t& pt) const {
 static terrain_t* _terrain = NULL;
 
 terrain_t* terrain_t::get_terrain() {
-	if(!_terrain) panic("no terrain");
 	return _terrain;
 }
 

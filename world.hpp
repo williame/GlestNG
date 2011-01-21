@@ -20,6 +20,10 @@ enum type_t {
 	area you can | them together (so its important they are powers of 2) */
 	TERRAIN = 0x01,
 	BUILDING = 0x02,
+	UNIT = 0x04,
+	// these are masks by category
+	FIXED = TERRAIN|BUILDING,
+	MOVING = UNIT,
 };
 
 class world_t;
