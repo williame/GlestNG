@@ -37,7 +37,8 @@ void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
 	glRotatef(360.0/rx,1,0,0);
 	glRotatef(360.0/ry,0,1,0);
 	glRotatef(360.0/rz,0,0,1);
-	glBegin(GL_QUADS);		
+	glBegin(GL_QUADS);	
+		// classic NeHe	
 		// Front Face
 		glNormal3f( 0.0f, 0.0f, 1.0f); // Normal Pointing Towards Viewer
 		glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 1 (Front)
@@ -133,7 +134,7 @@ struct test_t: public object_t {
 const float test_t::SZ = 0.05, test_t::MARGIN = test_t::SZ*2;
 
 void spatial_test() {
-	enum { MIN_OBJS = 10, MAX_OBJS = 20, };
+	enum { MIN_OBJS = 1000, MAX_OBJS = 2000, };
 	static std::vector<test_t*> objs;
 	for(int i=objs.size()-1; i>=0; i--) {
 		test_t* obj = objs[i];
