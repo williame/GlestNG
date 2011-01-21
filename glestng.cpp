@@ -351,10 +351,10 @@ int main(int argc,char** args) {
 		}
 		return EXIT_SUCCESS;
 	} catch(data_error_t* de) {
-		std::cerr << de << std::endl;
+		std::cerr << "Oh! " << de << std::endl;
 		return EXIT_FAILURE;
 	} catch(panic_t* panic) {
-		std::cerr << panic << std::endl;
+		std::cerr << "Oh! " << panic << std::endl;
 		return EXIT_FAILURE;
 	}
 }

@@ -39,9 +39,9 @@ public:
 	vec_t get_pos() const { return pos; }
 	void move(const vec_t& relative) { set_pos(pos+relative); }
 	void set_pos(const vec_t& absolute);
+	const type_t type;
 protected:
 	object_t(type_t type);
-	const type_t type;
 private:
 	friend class spatial_index_t;
 	friend class world_t;
@@ -113,6 +113,7 @@ inline std::ostream& operator<<(std::ostream& out,type_t type) {
 	switch(type) {
 	case TERRAIN: out << "TERRAIN"; break;
 	case BUILDING: out << "BUILDING"; break;
+	case UNIT: out << "UNIT"; break;
 	default: out << (int)type << "!";
 	}
 	out << ">";
@@ -122,6 +123,10 @@ inline std::ostream& operator<<(std::ostream& out,type_t type) {
 inline std::ostream& operator<<(std::ostream& out,const world_t::hit_t& hit) {
 	out << "hit<" << hit.d << "," << hit.type << "," << *hit.obj << ">";
 	return out;
+}
+
+inline std::ostream& operator<<(std::ostream& out,const object_t* obj) {
+	return out << "object_t<" << obj->type << "," << obj->pos_bounds() << ">";
 }
 
 #endif //__WORLD_HPP__

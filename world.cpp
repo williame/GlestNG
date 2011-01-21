@@ -104,13 +104,17 @@ void spatial_index_t::init_sub() {
 	sub[6].bounds = bounds_t(vec_t(centre.x,centre.y,a.z),vec_t(b.x,b.y,centre.z));
 	sub[7].bounds = bounds_t(centre,b);
 #ifndef NDEBUG
-	for(int i=0; i<8; i++)
+	for(int i=0; i<8; i++) {
+		intersection_t bang = sub[i].bounds.intersects(*this);
+		if(bang != ALL)
+			panic(i<<":"<<sub[i].bounds<<" intersects "<<*this<<" "<<bang);
 		for(int j=0; j<8; j++) {
 			if(j==i) continue;
-			intersection_t bang = sub[i].bounds.intersects(sub[j].bounds);
+			bang = sub[i].bounds.intersects(sub[j].bounds);
 			if(bang != MISS)
 				panic(i<<":"<<sub[i].bounds<<" intersects "<<j<<":"<<sub[j].bounds<<" "<<bang);
 		}
+	}
 #endif
 }
 
@@ -120,8 +124,8 @@ static std::ostream& indent(std::ostream& out,int depth) {
 	return out;
 }
 
-static const char* fmtbin(unsigned val,int digits) {
-	static char out[33];
+static std::string fmtbin(unsigned val,int digits) {
+	static char out[65];
 	char *o = out;
 	for(int i=0; i<digits; i++,val>>=1)
 		*o++ = (val&1?'1':'0');
@@ -192,7 +196,8 @@ void spatial_index_t::add(object_t* obj) {
 			break;
 		default:;
 		}
-	assert(__builtin_popcount(obj->straddles) > 1);
+	if(__builtin_popcount(obj->straddles) < 2)
+		panic(obj<<"does not straddle "<<*this<<" ("<<fmtbin(obj->straddles,8)<<")");
 	items.push_back(item_t(obj->straddles,obj->type,obj));
 	obj->spatial_index = this;
 	straddlers |= obj->straddles;
@@ -204,7 +209,7 @@ void spatial_index_t::remove(object_t* obj) {
 	assert(obj->spatial_index == this);
 	const bounds_t bounds = obj->pos_bounds();
 	if(ALL != bounds.intersects(*this))
-		panic(*obj << " intersects " << *this << " = " << bounds.intersects(*this))
+		panic(obj << " intersects " << *this << " = " << bounds.intersects(*this))
 	assert(obj->straddles);
 	items_t& items = (
 		__builtin_popcount(obj->straddles)>1? 
@@ -227,17 +232,17 @@ bool spatial_index_t::moves(const object_t* obj,const vec_t& relative) const {
 	assert(obj->straddles);
 	const bounds_t bounds = obj->pos_bounds()+relative;
 	if(__builtin_popcount(obj->straddles)>1) {
-		if(ALL != bounds.intersects(*this)) return false;
+		if(ALL != bounds.intersects(*this)) return true;
 		for(int i=0; i<8; i++)
 			if(SOME == bounds.intersects(sub[i].bounds)) {
-				if(~obj->straddles & (1<<i)) return false;
+				if(~obj->straddles & (1<<i)) return true;
 			} else {
-				if(obj->straddles & (1<<i)) return false;
+				if(obj->straddles & (1<<i)) return true;
 			}
-		return true;
+		return false;
 	} else {
 		const int i = __builtin_ffs(obj->straddles)-1;
-		return (bounds.intersects(sub[i].bounds) == ALL);
+		return (bounds.intersects(sub[i].bounds) != ALL);
 	}
 }	
 
