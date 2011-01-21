@@ -540,12 +540,14 @@ void planet_t::draw_init() {
         glBindBuffer(GL_ARRAY_BUFFER,vbo.colours);
         glColorPointer(3,GL_UNSIGNED_BYTE,0,NULL);
         glBindBuffer(GL_ARRAY_BUFFER,0);
+        //glEnable(GL_CULL_FACE);
 }
 
 void planet_t::draw_done() {
         glDisableClientState(GL_COLOR_ARRAY);
         glDisableClientState(GL_VERTEX_ARRAY);
         glDisableClientState(GL_NORMAL_ARRAY);
+        //glDisable(GL_CULL_FACE);
 }
 
 bool planet_t::surface_at(const vec_t& normal,vec_t& pt) const {

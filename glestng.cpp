@@ -136,7 +136,10 @@ struct test_t: public object_t {
 		glColor3ub(r,g,b);
 		caret(get_pos(),SZ,rx,ry,rz);
 	}
-	bool refine_intersection(const ray_t&, vec_t&) { return false; }
+	bool refine_intersection(const ray_t&, vec_t& I) { 
+		I = centre;
+		return true;
+	}
 	int age;
 	const uint8_t r,g,b;
 	const float rx, ry, rz;
@@ -169,14 +172,22 @@ void tick() {
 	spatial_test();
 	const world_t::hits_t& visible = world()->visible();
 	visible_objects = visible.size();
+//#define EXPLAIN // useful for seeing if it does draw front-to-back
+#ifdef EXPLAIN
+	for(size_t MAX_OBJS=1; MAX_OBJS<visible_objects; MAX_OBJS++) {
+#else
+	const size_t MAX_OBJS = visible_objects;
+#endif
 	if(visible_objects) {
 		bool in_terrain = (terrain() && visible[0].type == TERRAIN);
 		if(in_terrain) terrain()->draw_init();
-		for(world_t::hits_t::const_iterator v=visible.begin(); v!=visible.end(); v++) {
+		size_t i = 0;
+		for(world_t::hits_t::const_iterator v=visible.begin(); v!=visible.end() && i<MAX_OBJS; v++, i++) {
 			if(in_terrain && (v->type != TERRAIN)) {
 				terrain()->draw_done();
 				in_terrain = false;
-			}
+			} else if((v->type == TERRAIN) && !in_terrain)
+				panic("was not expecting "<<*v);
 			v->obj->draw(v->d);
 		}
 		if(in_terrain)
@@ -187,6 +198,9 @@ void tick() {
 	SDL_Flip(screen);
 	glClearColor(.2,.1,.2,1);
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+#ifdef EXPLAIN
+	}
+#endif
 }
 
 void click(int x,int y) {
@@ -202,9 +216,9 @@ void click(int x,int y) {
 	const vec_t dir(d-a,e-b,f-c);
 	ray_t ray(origin,dir);
 	world_t::hits_t hits;
-	world()->intersection(ray,TERRAIN,hits);
+	world()->intersection(ray,~0,hits);
 	uint64_t ns = high_precision_time()-start;
-	std::cout << std::endl << "click(" << x << "," << y << ") " << ray << " (" << ns << " ns)"<< std::endl;
+	std::cout << std::endl << "click(" << x << "," << y << ") " << ray << " (" << ns << " ns) "<<hits.size()<< std::endl;
 	selection = false;
 	for(world_t::hits_t::iterator i=hits.begin(); i!=hits.end(); i++) {
 		vec_t pt;
@@ -213,7 +227,8 @@ void click(int x,int y) {
 		ns = high_precision_time()-start;
 		if(hit) {
 			std::cout << "hit " << pt << " ";
-			if(!selection || (pt.distance_sqrd(ray.o)<selected_point.distance_sqrd(ray.o))) {
+			if(!selection ||
+				(pt.distance_sqrd(ray.o)<selected_point.distance_sqrd(ray.o))) {
 				selection = true;
 				selected_point = pt;
 				std::cout << "BEST ";
@@ -224,19 +239,21 @@ void click(int x,int y) {
 	}
 	if(selection) std::cout << "SELECTION: " << selected_point << std::endl;
 	// the slow way
-	terrain_t::test_hits_t test;
-	start = high_precision_time();
-	terrain()->intersection(ray,test);
-	ns = high_precision_time()-start;
-	std::cout << "(slow check: " << ns << " ns)" << std::endl;
-	for(terrain_t::test_hits_t::iterator i=test.begin(); i!=test.end(); i++)
-		std::cout << "TEST " <<
-			(i->obj->sphere_t::intersects(ray)?"+":"-") << 
-			(i->obj->aabb_t::intersects(ray)?"+":"-") <<
-			*i->obj << i->hit << std::endl;
-	vec_t surface;
-	if(selection && terrain()->surface_at(selected_point,surface))
-		std::cout << "(surface_at " << surface << " - " << selected_point << " = " << (selected_point-surface) << ")" << std::endl;
+	if(terrain()) {
+		terrain_t::test_hits_t test;
+		start = high_precision_time();
+		terrain()->intersection(ray,test);
+		ns = high_precision_time()-start;
+		std::cout << "(slow check: " << ns << " ns)" << std::endl;
+		for(terrain_t::test_hits_t::iterator i=test.begin(); i!=test.end(); i++)
+			std::cout << "TEST " <<
+				(i->obj->sphere_t::intersects(ray)?"+":"-") << 
+				(i->obj->aabb_t::intersects(ray)?"+":"-") <<
+				*i->obj << i->hit << std::endl;
+		vec_t surface;
+		if(selection && terrain()->surface_at(selected_point,surface))
+			std::cout << "(surface_at " << surface << " - " << selected_point << " = " << (selected_point-surface) << ")" << std::endl;
+	}
 }
 
 struct v4_t {
@@ -271,7 +288,7 @@ int main(int argc,char** args) {
 		}
 		fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
 		
-		//terrain_t::gen_planet(5,500,3);
+		terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);
 	
 		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),
@@ -296,7 +313,8 @@ int main(int argc,char** args) {
 		glEnable(GL_COLOR_MATERIAL);
 		glEnable(GL_RESCALE_NORMAL);
 		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-		glEnable(GL_NORMALIZE);
+		//glEnable(GL_NORMALIZE);
+		glFrontFace(GL_CW);
 		glEnable(GL_BLEND);
 		glEnable(GL_TEXTURE_2D);
 		glViewport(0,0,screen->w,screen->h);

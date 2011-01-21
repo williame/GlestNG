@@ -36,6 +36,10 @@ class spatial_index_t: public bounds_t {
 	*** It currently walks through the bounding boxes recursively, whereas it could use breshenham or
 	at least derive the subdivisions based upon the intersection of the centred XY XZ YZ planes
 	instead of treating each box individually.
+	*** In smoke-test 14% of time was spent in add/remove_visible() - this could be heavily optimised
+	to avoid the O(n) unnecessarily and also to have, say, an unsorted 'dirty' list and tombstoning etc
+	to defer as much as possible until the visible() list is requested again.  All the interescts
+	code did not show on the profiling.
 	*/
 public:
 	spatial_index_t(const bounds_t& bounds);
@@ -272,11 +276,14 @@ void spatial_index_t::intersection(const ray_t& r,unsigned type,world_t::hits_t&
 
 void spatial_index_t::intersection(const items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits,uint8_t straddles) {
 	for(items_t::const_iterator i=items.begin(); i!=items.end(); i++)
-		if((i->type&type) && (i->straddles&straddles) && i->obj->intersects(r))
-			hits.push_back(world_t::hit_t(
-				i->obj->centre.distance_sqrd(r.o),
-				i->type,
-				i->obj));
+		if((i->type&type) && (i->straddles&straddles)) {
+			const bounds_t bounds = i->obj->pos_bounds();
+			if(bounds.intersects(r))
+				hits.push_back(world_t::hit_t(
+					bounds.centre.distance_sqrd(r.o),
+					i->type,
+					i->obj));
+		}
 }
 
 void spatial_index_t::intersection(const items_t& items,const frustum_t& f,unsigned type,world_t::hits_t& hits,uint8_t straddles) {
