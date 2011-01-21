@@ -37,20 +37,43 @@ void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
 	glRotatef(360.0/rx,1,0,0);
 	glRotatef(360.0/ry,0,1,0);
 	glRotatef(360.0/rz,0,0,1);
-	glBegin(GL_TRIANGLES);		
-		//NeHe lesson 5 pyramid		
-		glVertex3f( 0.0f, 1.0f, 0.0f);		
-		glVertex3f(-1.0f,-1.0f, 1.0f);		
-		glVertex3f( 1.0f,-1.0f, 1.0f);		
-		glVertex3f( 0.0f, 1.0f, 0.0f);		
-		glVertex3f( 1.0f,-1.0f, 1.0f);		
-		glVertex3f( 1.0f,-1.0f, -1.0f);		
-		glVertex3f( 0.0f, 1.0f, 0.0f);		
-		glVertex3f( 1.0f,-1.0f, -1.0f);		
-		glVertex3f(-1.0f,-1.0f, -1.0f);		
-		glVertex3f( 0.0f, 1.0f, 0.0f);		
-		glVertex3f(-1.0f,-1.0f,-1.0f);		
-		glVertex3f(-1.0f,-1.0f, 1.0f);		
+	glBegin(GL_QUADS);		
+		// Front Face
+		glNormal3f( 0.0f, 0.0f, 1.0f); // Normal Pointing Towards Viewer
+		glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 1 (Front)
+		glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 2 (Front)
+		glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Front)
+		glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 4 (Front)
+		// Back Face
+		glNormal3f( 0.0f, 0.0f,-1.0f); // Normal Pointing Away From Viewer
+		glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Back)
+		glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 2 (Back)
+		glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 3 (Back)
+		glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 4 (Back)
+		// Top Face
+		glNormal3f( 0.0f, 1.0f, 0.0f); // Normal Pointing Up
+		glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 1 (Top)
+		glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 2 (Top)
+		glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Top)
+		glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 4 (Top)
+		// Bottom Face
+		glNormal3f( 0.0f,-1.0f, 0.0f); // Normal Pointing Down
+		glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Bottom)
+		glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 2 (Bottom)
+		glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 3 (Bottom)
+		glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 4 (Bottom)
+		// Right face
+		glNormal3f( 1.0f, 0.0f, 0.0f); // Normal Pointing Right
+		glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 1 (Right)
+		glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 2 (Right)
+		glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Right)
+		glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 4 (Right)
+		// Left Face
+		glNormal3f(-1.0f, 0.0f, 0.0f); // Normal Pointing Left
+		glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Left)
+		glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 2 (Left)
+		glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 3 (Left)
+		glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 4 (Left)
 	glEnd();					
 	glPopMatrix();
 }
@@ -84,12 +107,12 @@ void ui() {
 
 struct test_t: public object_t {
 	enum { MIN_AGE = 60*5, MAX_AGE = 60*8, };
-	static const float SZ;
+	static const float SZ, MARGIN;
 	test_t(): object_t(UNIT), age(MIN_AGE+(rand()%(MAX_AGE-MIN_AGE))),
 		r(128+(rand()%128)), g(128+(rand()%128)), b(128+(rand()%128)),
 		rx(randf()), ry(randf()), rz(randf())
 	{
-		set_pos(vec_t(randf()-SZ,randf()-SZ,randf()-SZ));
+		set_pos(vec_t(randf()-MARGIN,randf()-MARGIN,randf()-MARGIN));
 		bounds_include(vec_t(-SZ,-SZ,-SZ));
 		bounds_include(vec_t(SZ,SZ,SZ));
 		bounds_fix();
@@ -107,10 +130,10 @@ struct test_t: public object_t {
 	const uint8_t r,g,b;
 	const float rx, ry, rz;
 };
-const float test_t::SZ = 0.05;
+const float test_t::SZ = 0.05, test_t::MARGIN = test_t::SZ*2;
 
 void spatial_test() {
-	enum { MIN_OBJS = 100, MAX_OBJS = 200, };
+	enum { MIN_OBJS = 10, MAX_OBJS = 20, };
 	static std::vector<test_t*> objs;
 	for(int i=objs.size()-1; i>=0; i--) {
 		test_t* obj = objs[i];
