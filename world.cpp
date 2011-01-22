@@ -450,6 +450,11 @@ void world_t::set_frustum(const matrix_t& projection,const matrix_t& modelview) 
 	clear_frustum();
 	pimpl->has_frustum = true;
 	pimpl->frustum = frustum_t(projection,modelview);
+	//#### DEBUG
+	pimpl->frustum.bounds.bounds_include(vec_t(-1,-1,-1));
+	pimpl->frustum.bounds.bounds_include(vec_t(0,0,0));
+	pimpl->frustum.bounds.bounds_fix();
+	//#### DEBUG
 	pimpl->idx.intersection(pimpl->frustum,~0,pimpl->visible,true);
 	pimpl->visible_dirty = pimpl->visible.size()-1;
 }

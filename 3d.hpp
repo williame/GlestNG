@@ -101,6 +101,7 @@ struct frustum_t {
 	intersection_t contains(const aabb_t& box) const;
 	intersection_t contains(const bounds_t& bounds,double& d) const;
 	double side[6][4];
+	bounds_t bounds; //#### DEBUG
 };
 
 inline float sqrd(float x) { return x*x; }

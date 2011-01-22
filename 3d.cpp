@@ -265,6 +265,7 @@ bool frustum_t::contains(const vec_t& pt) const {
 }
 
 intersection_t frustum_t::contains(const sphere_t& s,double& d) const {
+	return s.intersects(bounds); //#### DEBUG
 	int c = 0;
 	for(int p=0; p<6; p++ ) {
 		d = side[p][0]*s.centre.x+side[p][1]*s.centre.y+side[p][2]*s.centre.z+side[p][3];
@@ -278,6 +279,7 @@ intersection_t frustum_t::contains(const sphere_t& s,double& d) const {
 }
 
 intersection_t frustum_t::contains(const aabb_t& box) const {
+	return box.intersects(bounds); //#### DEBUG
 	// occasional false positives
 	intersection_t ret = ALL;
 	for(int p=0; p<6; p++ ) {
