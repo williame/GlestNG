@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "3d.hpp"
+#include "fs.hpp"
 #include "utils.hpp"
 
 class model_g3d_t {

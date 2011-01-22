@@ -32,22 +32,6 @@ private:
 	T* data;
 };
 
-class istream_t {
-public:
-	virtual ~istream_t() {}
-	inline uint8_t byte();
-	inline uint16_t uint16();
-	inline uint32_t uint32();
-	inline float float32();
-	inline void skip(size_t n);
-	static istream_t* open_file(const char* filename);
-	virtual void read(void* dest,size_t bytes) = 0;
-	template<int N> std::string fixed_str();
-	virtual std::ostream& repr(std::ostream& out) const = 0;
-private:
-	template<typename T> T _r();
-};
-
 float randf();
 
 template<typename T> fixed_array_t<T>::fixed_array_t(size_t cap,bool filled):
@@ -85,33 +69,6 @@ template<typename T> void fixed_array_t<T>::fill(const T& t) {
 	for(size_t i=0; i<capacity; i++)
 		data[i] = t;
 	len = capacity;
-}
-
-inline std::ostream& operator<<(std::ostream& out,const istream_t& repr) {
-	return repr.repr(out);
-}
-
-template<int N> std::string istream_t::fixed_str() {
-	char v[N+1];
-	read(v,N);
-	v[N] = 0;
-	return std::string(v);
-}
-
-template<typename T> T istream_t::_r() {
-	T v;
-	read(&v,sizeof(T));
-	return v;
-}
-
-// all source data and target platforms are little-endian
-inline uint8_t istream_t::byte() { return _r<uint8_t>(); }
-inline uint16_t istream_t::uint16() { return _r<uint16_t>(); }
-inline uint32_t istream_t::uint32() { return _r<uint32_t>(); }
-inline float istream_t::float32() { return _r<float>(); }
-
-inline void istream_t::skip(size_t n) {
-	while(n--) byte();
 }
 
 #endif //__UTILS_HPP__

@@ -41,7 +41,8 @@ OBJ_GLEST_NG_CPP = \
 	unit.opp \
 	3d.opp \
 	g3d.opp \
-	utils.opp
+	utils.opp \
+	fs.opp
 
 OBJ_GLEST_NG_C = 
 		

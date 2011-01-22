@@ -20,6 +20,7 @@
 #include "font.hpp"
 #include "2d.hpp"
 #include "g3d.hpp"
+#include "utils.hpp"
 
 SDL_Surface* screen;
 
