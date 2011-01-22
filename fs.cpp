@@ -61,7 +61,7 @@ public:
 	bool is_dir(const std::string& path) const;
 	std::string canocial(const std::string& path) const;
 	std::string join(const std::string& path,const std::string& sub) const;
-	istream_t* open(const std::string& path);
+	std::auto_ptr<istream_t> open(const std::string& path);
 	list_t list_dirs(const std::string& path);
 	list_t list_files(const std::string& path);
 private:
@@ -89,34 +89,46 @@ bool fs_t::is_dir(const std::string& path) const { return _is_dir(canocial(path)
 
 std::string fs_t::canocial(const std::string& path) const {
 	//### tidy up and .. and check its not breaking root
-	return path;
+	if(path.find(data_directory)==0)
+		return path;
+	return data_directory+'/'+path;
 }
 
 std::string fs_t::join(const std::string& path,const std::string& sub) const {
 	return canocial(path+'/'+sub);
 }
 
-istream_t* fs_t::open(const std::string& path) {
-	return new FILE_stream_t(canocial(path).c_str(),"r");
+std::auto_ptr<istream_t> fs_t::open(const std::string& path) {
+	return std::auto_ptr<istream_t>(new FILE_stream_t(canocial(path).c_str(),"r"));
 }
 
-static int _filter_files(const struct dirent64 *d) { return _is_file(d->d_name); }
-static int _filter_dirs(const struct dirent64 *d) { return _is_dir(d->d_name); }
+static int _one(const struct dirent64 *d) { return 1; }
 
-static fs_mgr_t::list_t _list(const char* path,int (*filter)(const struct dirent64*),const char* tag) {
+fs_mgr_t::list_t fs_t::list_dirs(const std::string& path) {
 	struct dirent64 **eps;
 	fs_mgr_t::list_t dirs;
-	if(int n = scandir64(path,&eps,filter,alphasort64)) {
-		if(-1 == n) c_error("list_"<<tag<<"("<<path<<")");
+	if(int n = scandir64(canocial(path).c_str(),&eps,_one,alphasort64)) {
+		if(-1 == n) c_error("list_dirs("<<path<<")");
 		for(int i=0; i<n; i++)
-			dirs.push_back(eps[i]->d_name);
+			if((eps[i]->d_name[0] != '.') && is_dir(join(path,eps[i]->d_name)))
+				dirs.push_back(eps[i]->d_name);
 		free(eps);
 	}
 	return dirs;
 }
 
-fs_mgr_t::list_t fs_t::list_dirs(const std::string& path) { return _list(path.c_str(),_filter_dirs,"dirs"); }
-fs_mgr_t::list_t fs_t::list_files(const std::string& path) { return _list(path.c_str(),_filter_files,"files"); }
+fs_mgr_t::list_t fs_t::list_files(const std::string& path) {
+	struct dirent64 **eps;
+	fs_mgr_t::list_t files;
+	if(int n = scandir64(canocial(path).c_str(),&eps,_one,alphasort64)) {
+		if(-1 == n) c_error("list_files("<<path<<")");
+		for(int i=0; i<n; i++)
+			if((eps[i]->d_name[0] != '.') && is_file(join(path,eps[i]->d_name)))
+				files.push_back(eps[i]->d_name);
+		free(eps);
+	}
+	return files;
+}
 
 static fs_mgr_t* _fs = NULL;
 

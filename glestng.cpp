@@ -31,6 +31,8 @@ bool selection = false;
 vec_t selected_point;
 int visible_objects = 0;
 
+std::auto_ptr<model_g3d_t> model;
+
 void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
 	glPushMatrix();		
 	glTranslatef(pos.x,pos.y,pos.z);
@@ -38,45 +40,49 @@ void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
 	if(rx) glRotatef(360.0/rx,1,0,0);
 	if(ry) glRotatef(360.0/ry,0,1,0);
 	if(rz) glRotatef(360.0/rz,0,0,1);
-	glBegin(GL_QUADS);	
-		// classic NeHe	
-		// Front Face
-		glNormal3f( 0.0f, 0.0f, 1.0f); // Normal Pointing Towards Viewer
-		glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 1 (Front)
-		glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 2 (Front)
-		glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Front)
-		glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 4 (Front)
-		// Back Face
-		glNormal3f( 0.0f, 0.0f,-1.0f); // Normal Pointing Away From Viewer
-		glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Back)
-		glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 2 (Back)
-		glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 3 (Back)
-		glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 4 (Back)
-		// Top Face
-		glNormal3f( 0.0f, 1.0f, 0.0f); // Normal Pointing Up
-		glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 1 (Top)
-		glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 2 (Top)
-		glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Top)
-		glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 4 (Top)
-		// Bottom Face
-		glNormal3f( 0.0f,-1.0f, 0.0f); // Normal Pointing Down
-		glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Bottom)
-		glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 2 (Bottom)
-		glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 3 (Bottom)
-		glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 4 (Bottom)
-		// Right face
-		glNormal3f( 1.0f, 0.0f, 0.0f); // Normal Pointing Right
-		glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 1 (Right)
-		glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 2 (Right)
-		glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Right)
-		glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 4 (Right)
-		// Left Face
-		glNormal3f(-1.0f, 0.0f, 0.0f); // Normal Pointing Left
-		glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Left)
-		glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 2 (Left)
-		glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 3 (Left)
-		glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 4 (Left)
-	glEnd();			
+	if(model.get()) {
+		model->draw(0);
+	} else {
+		glBegin(GL_QUADS);	
+			// classic NeHe	
+			// Front Face
+			glNormal3f( 0.0f, 0.0f, 1.0f); // Normal Pointing Towards Viewer
+			glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 1 (Front)
+			glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 2 (Front)
+			glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Front)
+			glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 4 (Front)
+			// Back Face
+			glNormal3f( 0.0f, 0.0f,-1.0f); // Normal Pointing Away From Viewer
+			glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Back)
+			glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 2 (Back)
+			glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 3 (Back)
+			glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 4 (Back)
+			// Top Face
+			glNormal3f( 0.0f, 1.0f, 0.0f); // Normal Pointing Up
+			glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 1 (Top)
+			glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 2 (Top)
+			glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Top)
+			glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 4 (Top)
+			// Bottom Face
+			glNormal3f( 0.0f,-1.0f, 0.0f); // Normal Pointing Down
+			glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Bottom)
+			glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 2 (Bottom)
+			glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 3 (Bottom)
+			glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 4 (Bottom)
+			// Right face
+			glNormal3f( 1.0f, 0.0f, 0.0f); // Normal Pointing Right
+			glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 1 (Right)
+			glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 2 (Right)
+			glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Right)
+			glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 4 (Right)
+			// Left Face
+			glNormal3f(-1.0f, 0.0f, 0.0f); // Normal Pointing Left
+			glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Left)
+			glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 2 (Left)
+			glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 3 (Left)
+			glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 4 (Left)
+		glEnd();	
+	}		
 	glPopMatrix();
 }
 
@@ -268,8 +274,6 @@ struct v4_t {
 	float v[4];
 };
 
-static float zoom_factor = 1.0;
-
 void camera() {
 	glViewport(0,0,screen->w,screen->h);
 	glMatrixMode(GL_PROJECTION);
@@ -281,17 +285,45 @@ void camera() {
 	glLoadIdentity();
 	glTranslatef(0,0,-3);
 //	glRotatef(90,0,1,0);
-//	gluLookAt(0,0,-1,0,0,1,0,1,0);
+	glPushMatrix();
+	glScalef(2,2,2); // just test frustum culling but putting some stuff outside
 	matrix_t projection, modelview;
 	glGetDoublev(GL_MODELVIEW_MATRIX,projection.d);
 	glGetDoublev(GL_PROJECTION_MATRIX,modelview.d);
 	world()->set_frustum(projection,modelview);
+	glPopMatrix();
+}
+
+void load(const char* data_directory) {
+	fs_mgr_t::create(data_directory);
+	// this is just some silly test code - find a random model
+	typedef fs_mgr_t::list_t list_t;
+	const list_t techtrees = fs()->list_dirs("techs");
+	const std::string techtree = std::string("techs")+'/'+techtrees[rand()%techtrees.size()];
+	const list_t factions = fs()->list_dirs(techtree+"/factions");
+	const std::string faction = techtree+"/factions/"+factions[rand()%factions.size()];
+	const list_t units = fs()->list_dirs(faction+"/units");
+	const std::string unit = faction+"/units/"+units[rand()%units.size()];
+	const list_t models = fs()->list_files(unit+"/models");
+	std::string g3d;
+	for(list_t::const_iterator i=models.begin(); i!=models.end(); i++)
+		if(i->find(".g3d") == (i->size()-4)) {
+			g3d = unit + "/models/" + *i;
+			break;
+		}
+	if(!g3d.size()) data_error("no G3D models in "<<unit<<"/models");
+	// and load it
+	std::cout << "loading "<<g3d<<std::endl;
+	std::auto_ptr<istream_t> istream = fs()->open(g3d);
+	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*istream));
 }
 
 int main(int argc,char** args) {
 	
-	try {
+	srand(time(NULL));
 	
+	try {
+		
 		if (SDL_Init(SDL_INIT_VIDEO)) {
 			fprintf(stderr,"Unable to initialize SDL: %s\n",SDL_GetError());
 			return EXIT_FAILURE;
@@ -316,6 +348,8 @@ int main(int argc,char** args) {
 			return EXIT_FAILURE;
 		}
 		fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
+
+		load("/home/will/Games/megaglest-3.3.7.2");
 		
 		terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);

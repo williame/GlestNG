@@ -10,6 +10,7 @@
 
 #include <ostream>
 #include <vector>
+#include <memory>
 #include <inttypes.h>
 
 class istream_t {
@@ -36,7 +37,7 @@ public:
 	virtual bool is_file(const std::string& path) const = 0;
 	virtual bool is_dir(const std::string& path) const = 0;
 	virtual std::string join(const std::string& path,const std::string& sub) const = 0;
-	virtual istream_t* open(const std::string& path) = 0;
+	virtual std::auto_ptr<istream_t> open(const std::string& path) = 0;
 	typedef std::vector<std::string> list_t;
 	virtual list_t list_dirs(const std::string& path) = 0;
 	virtual list_t list_files(const std::string& path) = 0;
