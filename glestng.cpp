@@ -34,9 +34,9 @@ void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
 	glPushMatrix();		
 	glTranslatef(pos.x,pos.y,pos.z);
 	glScalef(scale,scale,scale);
-	glRotatef(360.0/rx,1,0,0);
-	glRotatef(360.0/ry,0,1,0);
-	glRotatef(360.0/rz,0,0,1);
+	if(rx) glRotatef(360.0/rx,1,0,0);
+	if(ry) glRotatef(360.0/ry,0,1,0);
+	if(rz) glRotatef(360.0/rz,0,0,1);
 	glBegin(GL_QUADS);	
 		// classic NeHe	
 		// Front Face
@@ -75,17 +75,17 @@ void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
 		glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 2 (Left)
 		glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 3 (Left)
 		glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 4 (Left)
-	glEnd();					
+	glEnd();			
 	glPopMatrix();
 }
 
 void ui() {
-	glDisable(GL_LIGHTING);
-	glDisable(GL_DEPTH_TEST);
 	if(selection) {
 		glColor3f(1,0,0);
 		caret(selected_point,0.03,0,0,0);
 	}
+	glDisable(GL_LIGHTING);
+	glDisable(GL_DEPTH_TEST);
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 	glLoadIdentity();
@@ -152,7 +152,7 @@ typedef std::vector<test_t*> tests_t;
 tests_t objs;
 
 void spatial_test() {
-	enum { MIN_OBJS = 1000, MAX_OBJS = 2000, };
+	enum { MIN_OBJS = 500, MAX_OBJS = 700, };
 	for(int i=objs.size()-1; i>=0; i--) {
 		test_t* obj = objs[i];
 		if(!obj->tick()) {
@@ -170,9 +170,9 @@ void spatial_test() {
 
 void tick() {
 	frame_count++;
-	//spatial_test();
+	spatial_test();
 	const world_t::hits_t& visible = world()->visible();
-	visible_objects = 0; //visible.size();
+	visible_objects = visible.size();
 //#define EXPLAIN // useful for seeing if it does draw front-to-back
 #ifdef EXPLAIN
 	for(size_t MAX_OBJS=1; MAX_OBJS<visible_objects; MAX_OBJS++) {
@@ -274,11 +274,12 @@ void camera() {
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	const float wh = (float)screen->w/(float)screen->h;
+//	glOrtho(-wh,wh,-1,1,-1,1);
 	gluPerspective(45.0,wh,1,10);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	glTranslatef(0,0,-3);
-	glRotatef(90,0,1,0);
+//	glRotatef(90,0,1,0);
 //	gluLookAt(0,0,-1,0,0,1,0,1,0);
 	matrix_t projection, modelview;
 	glGetDoublev(GL_MODELVIEW_MATRIX,projection.d);
@@ -297,7 +298,11 @@ int main(int argc,char** args) {
 		atexit(SDL_Quit);
 		
 		SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
+#if 0
+		screen = SDL_SetVideoMode(1440,900,32,SDL_OPENGL|SDL_FULLSCREEN);
+#else
 		screen = SDL_SetVideoMode(1024,768,32,SDL_OPENGL/*|SDL_FULLSCREEN*/);
+#endif
 		if(!screen) {
 			fprintf(stderr,"Unable to create SDL screen: %s\n",SDL_GetError());
 			return EXIT_FAILURE;
