@@ -148,10 +148,11 @@ struct test_t: public object_t {
 const float test_t::SZ = 0.05, test_t::MARGIN = test_t::SZ*2, test_t::SPEED = 0.01;
 bounds_t test_t::legal(vec_t(-1.0+MARGIN,-1.0+MARGIN,-1.0+MARGIN),
 	vec_t(1.0-MARGIN,1.0-MARGIN,1.0-MARGIN));
+typedef std::vector<test_t*> tests_t;
+tests_t objs;
 
 void spatial_test() {
 	enum { MIN_OBJS = 1000, MAX_OBJS = 2000, };
-	static std::vector<test_t*> objs;
 	for(int i=objs.size()-1; i>=0; i--) {
 		test_t* obj = objs[i];
 		if(!obj->tick()) {
@@ -169,9 +170,9 @@ void spatial_test() {
 
 void tick() {
 	frame_count++;
-	spatial_test();
+	//spatial_test();
 	const world_t::hits_t& visible = world()->visible();
-	visible_objects = visible.size();
+	visible_objects = 0; //visible.size();
 //#define EXPLAIN // useful for seeing if it does draw front-to-back
 #ifdef EXPLAIN
 	for(size_t MAX_OBJS=1; MAX_OBJS<visible_objects; MAX_OBJS++) {
@@ -192,6 +193,9 @@ void tick() {
 		}
 		if(in_terrain)
 			terrain()->draw_done();
+	} else {
+		for(tests_t::iterator i=objs.begin(); i!=objs.end(); i++)
+			(*i)->draw(0);
 	}
 	ui();
 	SDL_GL_SwapBuffers();
@@ -263,6 +267,25 @@ struct v4_t {
 	float v[4];
 };
 
+static float zoom_factor = 1.0;
+
+void camera() {
+	glViewport(0,0,screen->w,screen->h);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	const float wh = (float)screen->w/(float)screen->h;
+	gluPerspective(45.0,wh,1,10);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glTranslatef(0,0,-3);
+	glRotatef(90,0,1,0);
+//	gluLookAt(0,0,-1,0,0,1,0,1,0);
+	matrix_t projection, modelview;
+	glGetDoublev(GL_MODELVIEW_MATRIX,projection.d);
+	glGetDoublev(GL_PROJECTION_MATRIX,modelview.d);
+	world()->set_frustum(projection,modelview);
+}
+
 int main(int argc,char** args) {
 	
 	try {
@@ -317,18 +340,7 @@ int main(int argc,char** args) {
 		glFrontFace(GL_CW);
 		glEnable(GL_BLEND);
 		glEnable(GL_TEXTURE_2D);
-		glViewport(0,0,screen->w,screen->h);
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		const float left = -(float)screen->w/(float)screen->h;
-		glOrtho(left,-left,-1,1,10,-10);
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
-		
-		matrix_t projection, modelview;
-		glGetDoublev(GL_MODELVIEW_MATRIX,projection.d);
-		glGetDoublev(GL_PROJECTION_MATRIX,modelview.d);
-		world()->set_frustum(projection,modelview);
+		camera();
 		
 		bool quit = false;
 		SDL_Event event;
@@ -339,6 +351,7 @@ int main(int argc,char** args) {
 			set_now(SDL_GetTicks()-start);
 			// only eat events 10 times a second
 			if((now()-last_event) > 100) {
+				bool moved = false;
 				while(!quit && SDL_PollEvent(&event)) {
 					switch (event.type) {
 					case SDL_MOUSEMOTION:
@@ -353,6 +366,9 @@ int main(int argc,char** args) {
 						switch(event.key.keysym.sym) {
 						case SDLK_ESCAPE:
 							quit = true;
+							break;
+						case SDLK_LEFT:
+							moved = true;
 							break;
 						default:;
 						}
