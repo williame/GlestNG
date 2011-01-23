@@ -133,7 +133,6 @@ void model_g3d_t::load_v4(istream_t& in) {
 }
 
 void model_g3d_t::draw(float dist_from_camera) {
-	glColor3b(127,0,0);
 	const int frame = (now()/100)%meshes[0]->vertices.size();
         glEnableClientState(GL_VERTEX_ARRAY);
         glEnableClientState(GL_NORMAL_ARRAY);

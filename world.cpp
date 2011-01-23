@@ -74,6 +74,7 @@ private:
 	void init_sub();
 	static void intersection(const items_t& items,const ray_t& r,unsigned type,world_t::hits_t& hits,uint8_t straddles=~0);
 	static void intersection(const items_t& items,const frustum_t& f,unsigned type,world_t::hits_t& hits,uint8_t straddles=~0);
+	static void add_all(const items_t& items,const vec_t& origin,unsigned type,world_t::hits_t& hits);
 };
 
 struct world_t::pimpl_t {
@@ -289,9 +290,9 @@ void spatial_index_t::intersection(const items_t& items,const ray_t& r,unsigned 
 void spatial_index_t::intersection(const items_t& items,const frustum_t& f,unsigned type,world_t::hits_t& hits,uint8_t straddles) {
 	for(items_t::const_iterator i=items.begin(); i!=items.end(); i++)
 		if((i->type&type) && (i->straddles&straddles)) {
-			double d;
-			if(MISS != f.contains(*i->obj,d))
-				hits.push_back(world_t::hit_t(sqrd(d),i->type,i->obj));
+			const bounds_t bounds = i->obj->pos_bounds();
+			if(MISS != f.contains(bounds))
+				hits.push_back(world_t::hit_t(f.eye.distance_sqrd(bounds.centre),i->type,i->obj));
 		}
 }
 
@@ -308,17 +309,38 @@ void spatial_index_t::intersection(const frustum_t& f,unsigned type,world_t::hit
 	}
 	uint8_t s = 0;
 	for(int i=0; i<8; i++)
-		if(f.contains(sub[i].bounds)) {
+		switch(f.contains(sub[i].bounds)) {
+		case ALL:
+			s |= (1 << i);
+			if(sub[i].sub)
+				sub[i].sub->add_all(f.eye,type,hits,world_frustum);
+			else
+				add_all(sub[i].items,f.eye,type,hits);
+			break;
+		case SOME:
 			s |= (1 << i);
 			if(sub[i].sub)
 				sub[i].sub->intersection(f,type,hits,world_frustum);
 			else
 				intersection(sub[i].items,f,type,hits);
+			break;
+		default:;
 		}
 	if(s&=straddlers)
 		intersection(items,f,type,hits,s);
 	if(world_frustum)
 		frustum = s;
+}
+
+void spatial_index_t::add_all(const items_t& items,const vec_t& origin,unsigned type,world_t::hits_t& hits) {
+	for(items_t::const_iterator i=items.begin(); i!=items.end(); i++)
+		if(i->obj->type & type) {
+			float d = origin.distance_sqrd(i->obj->pos_bounds().centre);
+			hits.push_back(world_t::hit_t(
+				d,
+				i->obj->type,
+				i->obj));
+		}
 }
 
 void spatial_index_t::add_all(const vec_t& origin,unsigned type,world_t::hits_t& hits,bool world_frustum) const {
@@ -328,22 +350,8 @@ void spatial_index_t::add_all(const vec_t& origin,unsigned type,world_t::hits_t&
 		if(sub[s].sub)
 			sub[s].sub->add_all(origin,type,hits,world_frustum);
 		else
-			for(items_t::const_iterator i=sub[s].items.begin(); i!=sub[s].items.end(); i++)
-				if(i->obj->type & type) {
-					float d = origin.distance_sqrd(i->obj->centre);
-					hits.push_back(world_t::hit_t(
-						d,
-						i->obj->type,
-						i->obj));
-				}
-	for(items_t::const_iterator i=items.begin(); i!=items.end(); i++)
-		if(i->obj->type & type) {
-			float d = origin.distance_sqrd(i->obj->centre);
-			hits.push_back(world_t::hit_t(
-				d,
-				i->obj->type,
-				i->obj));
-		}
+			add_all(sub[s].items,origin,type,hits);
+	add_all(items,origin,type,hits);
 }
 
 void spatial_index_t::clear_frustum() {
@@ -358,9 +366,7 @@ void spatial_index_t::clear_frustum() {
 }
 
 void world_t::pimpl_t::add_visible(object_t* obj) {
-	double d;
-	const bool is_vis = world()->frustum().contains(*obj,d);
-	//### optimise with visible_dirty
+	const bool is_vis = frustum.contains(obj->pos_bounds());
 	for(size_t i=0; i<visible.size(); i++)
 		if(visible[i].obj == obj) {
 			if(!is_vis)
@@ -368,7 +374,7 @@ void world_t::pimpl_t::add_visible(object_t* obj) {
 			return;
 		}
 	if(is_vis)
-		visible.push_back(hit_t(d,obj->type,obj));
+		visible.push_back(hit_t(frustum.eye.distance_sqrd(obj->pos_bounds().centre),obj->type,obj));
 }
 
 void world_t::pimpl_t::remove_visible(object_t* obj) {
@@ -446,15 +452,10 @@ void world_t::dump(std::ostream& out) const {
 	pimpl->idx.dump(out);
 }
 
-void world_t::set_frustum(const matrix_t& projection,const matrix_t& modelview) {
+void world_t::set_frustum(const vec_t& eye,const matrix_t& proj_modelview) {
 	clear_frustum();
 	pimpl->has_frustum = true;
-	pimpl->frustum = frustum_t(projection,modelview);
-	//#### DEBUG
-	pimpl->frustum.bounds.bounds_include(vec_t(-1,-1,-1));
-	pimpl->frustum.bounds.bounds_include(vec_t(0,0,0));
-	pimpl->frustum.bounds.bounds_fix();
-	//#### DEBUG
+	pimpl->frustum = frustum_t(eye,proj_modelview);
 	pimpl->idx.intersection(pimpl->frustum,~0,pimpl->visible,true);
 	pimpl->visible_dirty = pimpl->visible.size()-1;
 }

@@ -120,7 +120,8 @@ struct test_t: public object_t {
 	test_t(): object_t(UNIT), age(MIN_AGE+(rand()%(MAX_AGE-MIN_AGE))),
 		r(128+(rand()%128)), g(128+(rand()%128)), b(128+(rand()%128)),
 		rx(randf()), ry(randf()), rz(randf()),
-		dir(randf(),randf(),randf())
+		dir(randf(),randf(),randf()),
+		drawn(frame_count)
 	{
 		set_pos(vec_t(randf()-MARGIN,randf()-MARGIN,randf()-MARGIN));
 		bounds_include(vec_t(-SZ,-SZ,-SZ));
@@ -140,7 +141,13 @@ struct test_t: public object_t {
 		return true;
 	}
 	void draw(float) {
+		drawn = frame_count;
 		glColor3ub(r,g,b);
+		caret(get_pos(),SZ,rx,ry,rz);
+	}
+	void draw_bad() {
+		drawn = frame_count;
+		glColor3ub(0xff,0,0);
 		caret(get_pos(),SZ,rx,ry,rz);
 	}
 	bool refine_intersection(const ray_t&, vec_t& I) { 
@@ -151,6 +158,7 @@ struct test_t: public object_t {
 	const uint8_t r,g,b;
 	const float rx, ry, rz;
 	vec_t dir;
+	uint64_t drawn;
 };
 const float test_t::SZ = 0.05, test_t::MARGIN = test_t::SZ*2, test_t::SPEED = 0.01;
 bounds_t test_t::legal(vec_t(-1.0+MARGIN,-1.0+MARGIN,-1.0+MARGIN),
@@ -159,14 +167,21 @@ typedef std::vector<test_t*> tests_t;
 tests_t objs;
 
 void spatial_test() {
-	enum { MIN_OBJS = 500, MAX_OBJS = 700, };
+	size_t bad = 0;
+	enum { MIN_OBJS = 150, MAX_OBJS = 170, };
 	for(int i=objs.size()-1; i>=0; i--) {
 		test_t* obj = objs[i];
+		if(obj->drawn != frame_count) {
+			obj->draw_bad();
+			bad++;
+		}
 		if(!obj->tick()) {
 			objs.erase(objs.begin()+i);
 			delete obj;
 		}
 	}
+	if(bad)
+		std::cerr << "("<<bad<<" objects were not drawn)" << std::endl;
 	if(!objs.size() < MIN_OBJS) {
 		const size_t n = MIN_OBJS+(rand()%(MAX_OBJS-MIN_OBJS));
 		while(objs.size()<n) {
@@ -176,8 +191,8 @@ void spatial_test() {
 }
 
 void tick() {
-	frame_count++;
 	spatial_test();
+	frame_count++;
 	const world_t::hits_t& visible = world()->visible();
 	visible_objects = visible.size();
 //#define EXPLAIN // useful for seeing if it does draw front-to-back
@@ -285,13 +300,10 @@ void camera() {
 	glLoadIdentity();
 	glTranslatef(0,0,-3);
 //	glRotatef(90,0,1,0);
-	glPushMatrix();
-	glScalef(2,2,2); // just test frustum culling but putting some stuff outside
 	matrix_t projection, modelview;
 	glGetDoublev(GL_MODELVIEW_MATRIX,projection.d);
 	glGetDoublev(GL_PROJECTION_MATRIX,modelview.d);
-	world()->set_frustum(projection,modelview);
-	glPopMatrix();
+	world()->set_frustum(vec_t(0,0,-3),projection*modelview);
 }
 
 void load(const char* data_directory) {
@@ -351,7 +363,7 @@ int main(int argc,char** args) {
 
 		load("/home/will/Games/megaglest-3.3.7.2");
 		
-		terrain_t::gen_planet(5,500,3);
+//###		terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);
 	
 		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),

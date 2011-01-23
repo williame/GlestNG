@@ -186,143 +186,49 @@ bool triangle_t::intersection(const ray_t& r,vec_t& I) const {
     return true; // I is in T
 }
 
-frustum_t::frustum_t(const matrix_t& projection,const matrix_t& modelview) {
-	// http://www.crownandcutlass.com/features/technicaldetails/frustum.html
-	const matrix_t clip = projection * modelview;
-	/* Extract the numbers for the RIGHT plane */
-	side[0][0] = clip.d[ 3] - clip.d[ 0];
-	side[0][1] = clip.d[ 7] - clip.d[ 4];
-	side[0][2] = clip.d[11] - clip.d[ 8];
-	side[0][3] = clip.d[15] - clip.d[12];
-	/* Normalize the result */
-	double t = sqrt(sqrd(side[0][0])+sqrd(side[0][1])+sqrd(side[0][2]));
-	side[0][0] /= t;
-	side[0][1] /= t;
-	side[0][2] /= t;
-	side[0][3] /= t;
-	/* Extract the numbers for the LEFT plane */
-	side[1][0] = clip.d[ 3] + clip.d[ 0];
-	side[1][1] = clip.d[ 7] + clip.d[ 4];
-	side[1][2] = clip.d[11] + clip.d[ 8];
-	side[1][3] = clip.d[15] + clip.d[12];
-	/* Normalize the result */
-	t = sqrt(sqrd(side[1][0])+sqrd(side[1][1])+sqrd(side[1][2]));
-	side[1][0] /= t;
-	side[1][1] /= t;
-	side[1][2] /= t;
-	side[1][3] /= t;	
-	/* Extract the BOTTOM plane */
-	side[2][0] = clip.d[ 3] + clip.d[ 1];
-	side[2][1] = clip.d[ 7] + clip.d[ 5];
-	side[2][2] = clip.d[11] + clip.d[ 9];
-	side[2][3] = clip.d[15] + clip.d[13];
-	/* Normalize the result */
-	t = sqrt(sqrd(side[2][0])+sqrd(side[2][1])+sqrd(side[2][2]));
-	side[2][0] /= t;
-	side[2][1] /= t;
-	side[2][2] /= t;
-	side[2][3] /= t;
-	/* Extract the TOP plane */
-	side[3][0] = clip.d[ 3] - clip.d[ 1];
-	side[3][1] = clip.d[ 7] - clip.d[ 5];
-	side[3][2] = clip.d[11] - clip.d[ 9];
-	side[3][3] = clip.d[15] - clip.d[13];
-	/* Normalize the result */
-	t = sqrt(sqrd(side[3][0])+sqrd(side[3][1])+sqrd(side[3][2]));
-	side[3][0] /= t;
-	side[3][1] /= t;
-	side[3][2] /= t;
-	side[3][3] /= t;
-	/* Extract the FAR plane */
-	side[4][0] = clip.d[ 3] - clip.d[ 2];
-	side[4][1] = clip.d[ 7] - clip.d[ 6];
-	side[4][2] = clip.d[11] - clip.d[10];
-	side[4][3] = clip.d[15] - clip.d[14];
-	/* Normalize the result */
-	t = sqrt(sqrd(side[4][0])+sqrd(side[4][1])+sqrd(side[4][2]));
-	side[4][0] /= t;
-	side[4][1] /= t;
-	side[4][2] /= t;
-	side[4][3] /= t;
-	/* Extract the NEAR plane */
-	side[5][0] = clip.d[ 3] + clip.d[ 2];
-	side[5][1] = clip.d[ 7] + clip.d[ 6];
-	side[5][2] = clip.d[11] + clip.d[10];
-	side[5][3] = clip.d[15] + clip.d[14];
-	/* Normalize the result */
-	t = sqrt(sqrd(side[5][0])+sqrd(side[5][1])+sqrd(side[5][2]));
-	side[5][0] /= t;
-	side[5][1] /= t;
-	side[5][2] /= t;
-	side[5][3] /= t;	
-}
-
-bool frustum_t::contains(const vec_t& pt) const {
-	for(int p=0; p<6; p++ )
-		if(side[p][0]*pt.x+side[p][1]*pt.y+side[p][2]*pt.z+side[p][3] <= 0)
-			return false;
-	return true;
-}
-
-intersection_t frustum_t::contains(const sphere_t& s,double& d) const {
-	return s.intersects(bounds); //#### DEBUG
-	int c = 0;
-	for(int p=0; p<6; p++ ) {
-		d = side[p][0]*s.centre.x+side[p][1]*s.centre.y+side[p][2]*s.centre.z+side[p][3];
-		if(d <= -s.radius)
-			return MISS;
-		if(d > s.radius)
-			c++;
+void plane_t::normalise() {
+	const float n = sqrt(sqrd(a)+sqrd(b)+sqrd(c)+sqrd(d));
+	if(n) {
+		a /= n;
+		b /= n;
+		c /= n;
+		d /= n;
 	}
-   	d += s.radius;
-   	return (c==6? ALL: SOME);
+}
+
+frustum_t::frustum_t(const vec_t& e,const matrix_t& vp): eye(e) {
+	// http://www.crownandcutlass.com/features/technicaldetails/frustum.html
+	const plane_t
+		col0(vp(0,0), vp(1,0), vp(2,0), vp(3,0)),
+		col1(vp(0,1), vp(1,1), vp(2,1), vp(3,1)),
+		col2(vp(0,2), vp(1,2), vp(2,2), vp(3,2)),
+		col3(vp(0,3), vp(1,3), vp(2,3), vp(3,3));
+	// Planes face inward
+	side[0] = (col2);    // near
+	side[1] = (col3-col2);  // far
+	side[2] = (col3+col0);  // left
+	side[3] = (col3-col0);  // right
+	side[4] = (col3-col1);  // top
+	side[5] = (col3+col1);  // bottom
+	for(int i=0; i<6; i++) {
+		side[i].normalise();
+		for(int j=0; j<3; j++)
+			sign[i][j] = side[i][j] > 0.0f;
+	}
 }
 
 intersection_t frustum_t::contains(const aabb_t& box) const {
-	return box.intersects(bounds); //#### DEBUG
-	// occasional false positives
-	intersection_t ret = ALL;
-	for(int p=0; p<6; p++ ) {
-		int c = 0;
-		if(side[p][0]*box.a.x+side[p][1]*box.a.y+side[p][2]*box.a.z+side[p][3]>0) {
-			if(ret == SOME) continue; else c++;
+	const vec_t* const dir[2] = {&box.a,&box.b};
+	for(int i=0; i<6; i++ ) {
+		vec_t P,Q;
+		// For each coordinate axis x, y, z...
+		for(int j = 0; j < 3; ++j) {
+			P[j] = dir[sign[i][j]]->operator[](j);
+			Q[j] = dir[!sign[i][j]]->operator[](j);
 		}
-		if(side[p][0]*box.b.x+side[p][1]*box.a.y+side[p][2]*box.a.z+side[p][3]>0) {
-			if(ret == SOME) continue; else c++;
-		}
-		if(side[p][0]*box.a.x+side[p][1]*box.b.y+side[p][2]*box.a.z+side[p][3]>0) {
-			if(ret == SOME) continue; else c++;
-		}
-		if(side[p][0]*box.b.x+side[p][1]*box.b.y+side[p][2]*box.a.z+side[p][3]>0) {
-			if(ret == SOME) continue; else c++;
-		}
-		if(side[p][0]*box.a.x+side[p][1]*box.a.y+side[p][2]*box.b.z+side[p][3]>0) {
-			if(ret == SOME) continue; else c++;
-		}
-		if(side[p][0]*box.b.x+side[p][1]*box.a.y+side[p][2]*box.b.z+side[p][3]>0) {
-			if(ret == SOME) continue; else c++;
-		}
-		if(side[p][0]*box.a.x+side[p][1]*box.b.y+side[p][2]*box.b.z+side[p][3]>0) {
-			if(ret == SOME) continue; else c++;
-		}
-		if(side[p][0]*box.b.x+side[p][1]*box.b.y+side[p][2]*box.b.z+side[p][3]>0) {
-			if(ret == SOME) continue; else c++;
-		}
-		if(!c) return MISS;
-		if(c!=8) ret = SOME;
-	}
-	return ret;
-}
-
-intersection_t frustum_t::contains(const bounds_t& bounds,double& d) const {
-	switch(contains((const sphere_t&)bounds,d)) {
-		case ALL:
-			return ALL;
-		case SOME:
-			return contains((const aabb_t&)bounds);
-		case MISS:
+		if(side[i].dot(P) < 0.0f)
 			return MISS;
-		default: panic("wtf is the compiler warning me about?");
 	}
+	return SOME; //not got ALL
 }
 

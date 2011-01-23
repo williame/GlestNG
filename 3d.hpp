@@ -11,11 +11,13 @@
 #include <stddef.h>
 #include <assert.h>
 #include <iostream>
+#include "error.hpp"
 
 struct matrix_t {
 	double d[16];
 	inline matrix_t operator*(const matrix_t& o) const;
 	inline matrix_t& operator*=(const matrix_t& o);
+	inline double operator()(int r,int c) const { return d[r*4+c]; }
 };
 
 struct vec_t {
@@ -32,6 +34,8 @@ struct vec_t {
 	inline vec_t operator+(const vec_t& v) const;
 	inline vec_t& operator/=(float d);
 	inline vec_t operator/(float d) const;
+	inline float operator[](int i) const;
+	inline float& operator[](int i);
 	inline vec_t cross(const vec_t& v) const;
 	inline float dot(const vec_t& v) const;
 	inline float magnitude_sqrd() const;
@@ -93,15 +97,24 @@ struct triangle_t {
 	bool intersection(const ray_t& r,vec_t& I) const;
 };
 
+struct plane_t {
+	plane_t() {}
+	plane_t(float a_,float b_,float c_,float d_): a(a_), b(b_), c(c_), d(d_) {}
+	float a, b, c, d;
+	inline plane_t operator+(const plane_t& o) const;
+	inline plane_t operator-(const plane_t& o) const;
+	inline float dot(const vec_t& v) const;
+	inline float operator[](int i) const;
+	void normalise();
+};
+
 struct frustum_t {
 	frustum_t() {}
-	frustum_t(const matrix_t& projection,const matrix_t& modelview);
-	bool contains(const vec_t& pt) const;
-	intersection_t contains(const sphere_t& sphere,double& d) const; // d is distance from camera
+	frustum_t(const vec_t& eye,const matrix_t& proj_modelview);
 	intersection_t contains(const aabb_t& box) const;
-	intersection_t contains(const bounds_t& bounds,double& d) const;
-	double side[6][4];
-	bounds_t bounds; //#### DEBUG
+	vec_t eye;
+	plane_t side[6];
+	bool sign[6][3];
 };
 
 inline float sqrd(float x) { return x*x; }
@@ -197,6 +210,24 @@ inline vec_t vec_t::operator/(float d) const {
 	return ret;
 }
 
+inline float vec_t::operator[](int i) const {
+	switch(i) {
+	case 0: return x;
+	case 1: return y;
+	case 2: return z;
+	default: panic("bad index "<<i);
+	}
+}
+
+inline float& vec_t::operator[](int i) {
+	switch(i) {
+	case 0: return x;
+	case 1: return y;
+	case 2: return z;
+	default: panic("bad index "<<i);
+	}
+}
+
 inline vec_t vec_t::cross(const vec_t& v) const {
 	return vec_t(y*v.z-z*v.y,z*v.x-x*v.z,x*v.y-y*v.x);
 }
@@ -234,6 +265,28 @@ inline bounds_t bounds_t::operator+(const vec_t& pos) const {
 	ret.b += pos;
 	ret.centre += pos;
 	return ret;
+}
+
+inline plane_t plane_t::operator+(const plane_t& o) const {
+	return plane_t(a+o.a,b+o.b,c+o.c,d+o.d);
+}
+
+inline plane_t plane_t::operator-(const plane_t& o) const {
+	return plane_t(a-o.a,b-o.b,c-o.c,d-o.d);
+}
+
+inline float plane_t::dot(const vec_t& v) const {
+	return a*v.x+b*v.y+c*v.z+d;
+}
+
+inline float plane_t::operator[](int i) const {
+	switch(i) {
+	case 0: return a;
+	case 1: return b;
+	case 2: return c;
+	case 3: return d;
+	default: panic("bad index "<<i);
+	}
 }
 
 inline std::ostream& operator<<(std::ostream& out,const vec_t& v) {
