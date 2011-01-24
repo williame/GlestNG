@@ -20,6 +20,8 @@ struct matrix_t {
 	inline double operator()(int r,int c) const { return d[r*4+c]; }
 };
 
+struct ray_t;
+
 struct vec_t {
 	vec_t() {}
 	vec_t(float x_,float y_,float z_): x(x_), y(y_), z(z_) {}
@@ -41,6 +43,7 @@ struct vec_t {
 	inline float magnitude_sqrd() const;
 	float magnitude() const;
 	inline float distance_sqrd(const vec_t& v) const;
+	vec_t nearest(const ray_t& r) const;
 	float distance(const vec_t& v) const;
 	vec_t& normalise();
 	static vec_t normalise(const vec_t& v);
@@ -48,9 +51,12 @@ struct vec_t {
 	vec_t rotate(float rad,const vec_t& axis1,const vec_t& axis2) const;
 };
 
-struct ray_t {
-	ray_t(const vec_t& o_,const vec_t& d_): o(o_), d(d_) {}
+struct ray_t { // a line segment
+	ray_t(const vec_t& o_,const vec_t& d_): o(o_), d(d_), ddot(d_.dot(d_)) {}
+	vec_t nearest(const vec_t& pt) const;
+	float nearest_inf(const vec_t& pt) const;
 	vec_t o, d;
+	float ddot;
 };
 
 struct face_t {
@@ -78,6 +84,7 @@ struct aabb_t { //axis-aligned bounding box
 	vec_t a, b;
 	bool intersects(const ray_t& r) const;
 	intersection_t intersects(const aabb_t& o) const;
+	inline vec_t corner(int corner) const;
 };
 
 struct bounds_t: public sphere_t, public aabb_t {
@@ -89,6 +96,14 @@ struct bounds_t: public sphere_t, public aabb_t {
 	intersection_t intersects(const bounds_t& a) const;
 	void bounds_fix();
 	inline bounds_t operator+(const vec_t& pos) const;
+};
+
+struct cone_t: public ray_t { // with a radius at both extents
+	cone_t(const vec_t& o,float o_radius_,const vec_t& d,float d_radius_):
+		ray_t(o,d), o_radius(o_radius_), d_radius(d_radius_),
+		od(o_radius_/d_radius_) {}
+	float o_radius, d_radius, od;
+	intersection_t contains(const sphere_t& sphere) const;
 };
 
 struct triangle_t {
@@ -111,10 +126,11 @@ struct plane_t {
 struct frustum_t {
 	frustum_t() {}
 	frustum_t(const vec_t& eye,const matrix_t& proj_modelview);
+	intersection_t contains(const sphere_t& sphere) const;
 	intersection_t contains(const aabb_t& box) const;
+	intersection_t contains(const bounds_t& bounds) const;
 	vec_t eye;
 	plane_t side[6];
-	bool sign[6][3];
 };
 
 inline float sqrd(float x) { return x*x; }
@@ -257,6 +273,20 @@ inline intersection_t sphere_t::intersects(const sphere_t& s) const {
 	if(d<b)
 		return SOME;
 	return MISS;
+}
+
+inline vec_t aabb_t::corner(int corner) const {
+	switch(corner) {
+	case 0: return a;
+	case 1: return vec_t(a.x,a.y,b.z);
+	case 2: return vec_t(a.x,b.y,b.z);
+	case 3: return vec_t(a.x,b.y,a.z);
+	case 4: return vec_t(b.x,a.y,a.z);
+	case 5: return vec_t(b.x,b.y,b.z);
+	case 6: return b;
+	case 7: return vec_t(b.x,b.y,a.z);
+	default: panic("bad index "<<corner);
+	}
 }
 
 inline bounds_t bounds_t::operator+(const vec_t& pos) const {

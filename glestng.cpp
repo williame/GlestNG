@@ -21,6 +21,8 @@
 #include "2d.hpp"
 #include "g3d.hpp"
 #include "utils.hpp"
+#include "ui.hpp"
+#include "ui_xml_editor.hpp"
 
 SDL_Surface* screen;
 
@@ -82,7 +84,7 @@ void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
 			glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 3 (Left)
 			glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 4 (Left)
 		glEnd();	
-	}		
+	}
 	glPopMatrix();
 }
 
@@ -91,26 +93,12 @@ void ui() {
 		glColor3f(1,0,0);
 		caret(selected_point,0.03,0,0,0);
 	}
-	glDisable(GL_LIGHTING);
-	glDisable(GL_DEPTH_TEST);
-	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
-	glLoadIdentity();
-	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
-	glLoadIdentity();
-	glViewport(0,0,screen->w,screen->h);
-	gluOrtho2D(0,screen->w,0,screen->h);
-	glColor3f(1,1,1);
 	static char fps[128];
 	snprintf(fps,sizeof(fps),"%u fps, %d visible objects",(unsigned)framerate.per_second(now()),visible_objects);
-	font_mgr()->draw(10,10,fps);
-	glPopMatrix();
-	glMatrixMode(GL_PROJECTION);
-	glPopMatrix();
-	glMatrixMode(GL_MODELVIEW);
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_LIGHTING);
+	static ui_label_t* label = new ui_label_t("this is a test");
+	label->set_pos(vec2_t(10,10));
+	label->set_text(fps);
+	ui_mgr()->draw();
 }
 
 struct test_t: public object_t {
@@ -180,8 +168,8 @@ void spatial_test() {
 			delete obj;
 		}
 	}
-	if(bad)
-		std::cerr << "("<<bad<<" objects were not drawn)" << std::endl;
+//	if(bad)
+//		std::cerr << "("<<bad<<" objects were not drawn)" << std::endl;
 	if(!objs.size() < MIN_OBJS) {
 		const size_t n = MIN_OBJS+(rand()%(MAX_OBJS-MIN_OBJS));
 		while(objs.size()<n) {
@@ -300,13 +288,21 @@ void camera() {
 	glLoadIdentity();
 	glTranslatef(0,0,-3);
 //	glRotatef(90,0,1,0);
+//	glPushMatrix();
+	glScalef(2,2,2);
 	matrix_t projection, modelview;
 	glGetDoublev(GL_MODELVIEW_MATRIX,projection.d);
 	glGetDoublev(GL_PROJECTION_MATRIX,modelview.d);
 	world()->set_frustum(vec_t(0,0,-3),projection*modelview);
+//	glPopMatrix();
 }
 
 void load(const char* data_directory) {
+#if 0
+	fs_mgr_t::create(".");
+	std::auto_ptr<istream_t> istream = fs()->open("data/GlestLogo.g3d");
+	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*istream));
+#else
 	fs_mgr_t::create(data_directory);
 	// this is just some silly test code - find a random model
 	typedef fs_mgr_t::list_t list_t;
@@ -315,19 +311,26 @@ void load(const char* data_directory) {
 	const list_t factions = fs()->list_dirs(techtree+"/factions");
 	const std::string faction = techtree+"/factions/"+factions[rand()%factions.size()];
 	const list_t units = fs()->list_dirs(faction+"/units");
-	const std::string unit = faction+"/units/"+units[rand()%units.size()];
-	const list_t models = fs()->list_files(unit+"/models");
+	const std::string unit = units[rand()%units.size()];
+	const std::string unitp = faction+"/units/"+unit;
+	const std::string xml_name = unitp+"/"+unit+".xml";
+	const list_t models = fs()->list_files(unitp+"/models");
 	std::string g3d;
 	for(list_t::const_iterator i=models.begin(); i!=models.end(); i++)
 		if(i->find(".g3d") == (i->size()-4)) {
-			g3d = unit + "/models/" + *i;
+			g3d = unitp + "/models/" + *i;
 			break;
 		}
-	if(!g3d.size()) data_error("no G3D models in "<<unit<<"/models");
+	if(!g3d.size()) data_error("no G3D models in "<<unitp<<"/models");
 	// and load it
+	std::cout << "loading "<<xml_name<<std::endl;
+	std::auto_ptr<istream_t> xstream = fs()->open(xml_name);
+	ui_xml_editor_t* xml = new ui_xml_editor_t(xml_name,*xstream);
+	xml->set_color(0x00,0xff,0xff);
 	std::cout << "loading "<<g3d<<std::endl;
 	std::auto_ptr<istream_t> istream = fs()->open(g3d);
 	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*istream));
+#endif
 }
 
 int main(int argc,char** args) {
@@ -362,7 +365,7 @@ int main(int argc,char** args) {
 		fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
 
 		load("/home/will/Games/megaglest-3.3.7.2");
-		
+				
 //###		terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);
 	

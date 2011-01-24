@@ -109,6 +109,11 @@ xml_parser_t::xml_parser_t(const char* t,const char* xml): // copies data into i
 	buf(strdup(xml)), // nearly RAII; if strdup() throws, title not freed
 	doc(NULL) {}
 	
+xml_parser_t::xml_parser_t(const char* t,istream_t& in):
+	title(strdup(t)),
+	buf(in.read_allz()),
+	doc(NULL) {}
+	
 void xml_parser_t::parse() {
 	if(doc) return;
 	const char *ch = buf;
@@ -341,6 +346,16 @@ float xml_parser_t::walker_t::value_float(const char* key) {
 std::string xml_parser_t::walker_t::str() const {
 	if(!ok()) panic("no token");
 	return tok->str();
+}
+
+const char* xml_parser_t::walker_t::error_str() const {
+	if(!ok()) panic("no token");
+	return tok->error;
+}
+
+bool xml_parser_t::walker_t::visited() const {
+	if(!ok()) panic("no token");
+	return tok->visit;
 }
 
 xml_parser_t::walker_t::walker_t(const token_t* t): tok(t) {}

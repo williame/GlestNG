@@ -15,7 +15,7 @@
 #include "fs.hpp"
 #include "error.hpp"
 
-#define c_error(X) data_error(X << " (" << errno << ": " << strerror(errno))
+#define c_error(X) data_error(X << " (" << errno << ": " << strerror(errno) << ')')
 
 class FILE_stream_t: public istream_t {
 public:
@@ -23,6 +23,7 @@ public:
 	~FILE_stream_t();
 	void read(void* dest,size_t bytes);
 	void write(const void* src,size_t bytes);
+	char* read_allz();
 	std::ostream& repr(std::ostream& out) const;
 private:
 	const std::string filename;
@@ -40,14 +41,40 @@ FILE_stream_t::~FILE_stream_t() {
 	fclose(f);
 }
 
+char* FILE_stream_t::read_allz() {
+	std::string ret;
+	bool done = false;
+	for(;;) {
+		char buf[1025];
+		const size_t bytes = fread(buf,1,sizeof(buf)-1,f);
+		if(bytes < 0)
+			c_error("could not read all from "<<filename);
+		if(!done) {
+			buf[bytes] = 0;
+			const size_t prev = ret.size();
+			ret += buf;
+			done = (prev+bytes != ret.size()); // there was a premature \0
+		}
+		if(bytes < sizeof(buf)-1)
+			break;
+	}
+	return strdup(ret.c_str());
+}
+
 void FILE_stream_t::read(void* dest,size_t bytes) {
-	if(bytes != fread(dest,1,bytes,f))
+	const size_t ret = fread(dest,1,bytes,f);
+	if(ret < 0)
 		c_error("could not read "<<bytes<<" from "<<filename);
+	if(bytes != ret)
+		data_error("could not read "<<bytes<<" from "<<filename<<" ("<<ret<<'@'<<ftell(f)<<')');
 }
 	
 void FILE_stream_t::write(const void* src,size_t bytes) {
-	if(bytes != fwrite(src,1,bytes,f))
+	const size_t ret = fwrite(src,1,bytes,f);
+	if(ret < 0)
 		c_error("could not write "<<bytes<<" to "<<filename);
+	if(bytes != ret)
+		data_error("could not write "<<bytes<<" to "<<filename<<" ("<<ret<<'@'<<ftell(f)<<')');
 }
 
 std::ostream& FILE_stream_t::repr(std::ostream& out) const {

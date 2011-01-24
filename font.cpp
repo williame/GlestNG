@@ -97,7 +97,7 @@ class font_mgr_t::impl_t: public font_mgr_t {
 public:
 	impl_t();
 	vec2_t measure(const char* msg);
-	void draw(int x,int y,const char* msg);
+	int draw(int x,int y,const char* msg);
 private:
 	const font_glyph_t* get_glyph(int code) const;
 	GLuint texture;
@@ -127,10 +127,11 @@ vec2_t font_mgr_t::impl_t::measure(const char* msg) {
 	return sz;
 }
 
-void font_mgr_t::impl_t::draw(int x,int y,const char* msg) {
-	glBindTexture(GL_TEXTURE_2D,0);
+int font_mgr_t::impl_t::draw(int x,int y,const char* msg) {
+	const int start = x;
 #if 0
 	// show guide
+	glBindTexture(GL_TEXTURE_2D,0);
 	glBegin(GL_LINES);
 	const vec2_t sz = measure(msg);
 	glVertex2f(x,y);
@@ -146,26 +147,27 @@ void font_mgr_t::impl_t::draw(int x,int y,const char* msg) {
 		if(!g) continue;
 		const float
 			tx0 = (float)g->x/bmp_sz.x,
-			ty1 = (float)g->y/bmp_sz.y,
+			ty0 = (float)g->y/bmp_sz.y,
 			tx1 = (float)(g->x+g->w)/bmp_sz.x,
-			ty0 = (float)(g->y+g->h)/bmp_sz.y;
+			ty1 = (float)(g->y+g->h)/bmp_sz.y;
 		const float
-			x1 = x+g->ofs_x,
-			y1 = y+font_meta.height-(g->h+g->ofs_y),
-			x2 = x1+g->w,
-			y2 = y1+g->h;
+			x0 = x+g->ofs_x,
+			y0 = y+g->ofs_y, //font_meta.height-(g->h-g->ofs_y),
+			x1 = x0+g->w,
+			y1 = y0+g->h;
 		glTexCoord2f(tx0,ty0);
-		glVertex2f(x1,y1);
+		glVertex2f(x0,y0);
 		glTexCoord2f(tx1,ty0);
-		glVertex2f(x2,y1);
+		glVertex2f(x1,y0);
 		glTexCoord2f(tx1,ty1);
-		glVertex2f(x2,y2);
+		glVertex2f(x1,y1);
 		glTexCoord2f(tx0,ty1);
-		glVertex2f(x1,y2);
+		glVertex2f(x0,y1);
 		x += g->advance;
 	}
 	glEnd();
 	glBindTexture(GL_TEXTURE_2D,0);
+	return x-start;
 }
 
 static int _cmp_int(const void *a, const void *b) {

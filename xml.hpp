@@ -11,9 +11,12 @@
 #include <ostream>
 #include <string>
 
+#include "fs.hpp"
+
 class xml_parser_t {
 public:
 	struct token_t;
+	xml_parser_t(const char* title,istream_t& in);
 	xml_parser_t(const char* title,const char* xml); // makes a copy
 	void parse();
 	~xml_parser_t();
@@ -39,6 +42,8 @@ public:
 		// query current node
 		type_t type() const;
 		std::string str() const;
+		const char* error_str() const;
+		bool visited() const;
 		friend class xml_parser_t;
 	private:
 		walker_t(const token_t* tok);

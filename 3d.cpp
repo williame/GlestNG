@@ -70,6 +70,24 @@ vec_t vec_t::rotate(float rad,const vec_t& axis1,const vec_t& axis2) const {
 	return q1;
 }
 
+vec_t vec_t::nearest(const ray_t& r) const {
+	return r.nearest(*this);
+}
+
+vec_t ray_t::nearest(const vec_t& pt) const {
+	const float b = nearest_inf(pt);
+	if(b <= 0) return o;
+	if(b >= 1) return o+d;
+	return o + d*b;
+}
+
+float ray_t::nearest_inf(const vec_t& pt) const {	
+	const vec_t w = pt-o;
+	const float c = w.dot(d);
+	if(c == 0) return 0;
+	return c/ddot;
+}
+
 bool sphere_t::intersects(const ray_t& r) const {
 	const vec_t dst = r.o - centre;
 	const float B = sqrd(dst.dot(r.d));
@@ -155,6 +173,16 @@ void bounds_t::bounds_fix() {
 	radius = sz.magnitude();
 }
 
+intersection_t cone_t::contains(const sphere_t& s) const {
+	const float i = nearest_inf(s.centre);
+	const float r = s.radius / d.magnitude(); 
+	if((i<-r) || (i>r)) return MISS;
+	if((i<r) || (i>(1-r))) return SOME;
+	if(r > od) return SOME;
+	//### ok head explodes, not finished
+	return MISS; 
+}
+
 bool triangle_t::intersection(const ray_t& r,vec_t& I) const {
     // http://softsurfer.com/Archive/algorithm_0105/algorithm_0105.htm#intersect_RayTriangle%28%29
     // get triangle edge vectors and plane normal
@@ -204,31 +232,44 @@ frustum_t::frustum_t(const vec_t& e,const matrix_t& vp): eye(e) {
 		col2(vp(0,2), vp(1,2), vp(2,2), vp(3,2)),
 		col3(vp(0,3), vp(1,3), vp(2,3), vp(3,3));
 	// Planes face inward
-	side[0] = (col2);    // near
-	side[1] = (col3-col2);  // far
-	side[2] = (col3+col0);  // left
-	side[3] = (col3-col0);  // right
-	side[4] = (col3-col1);  // top
-	side[5] = (col3+col1);  // bottom
-	for(int i=0; i<6; i++) {
+	side[0] = (col3-col2);  // far
+	side[1] = (col3+col0);  // left
+	side[2] = (col3-col0);  // right
+	side[3] = (col3-col1);  // top
+	side[4] = (col3+col1);  // bottom
+	side[5] = (col2);    // near
+	for(int i=0; i<6; i++)
 		side[i].normalise();
-		for(int j=0; j<3; j++)
-			sign[i][j] = side[i][j] > 0.0f;
+}
+
+intersection_t frustum_t::contains(const sphere_t& sphere) const {
+	for(int i=0; i<6; i++) {
+		const float d = side[i].dot(sphere.centre);
+		if(d < -sphere.radius)
+			return MISS;
+		if(fabs(d) < sphere.radius)
+			return SOME;
 	}
+	return ALL;
 }
 
 intersection_t frustum_t::contains(const aabb_t& box) const {
-	const vec_t* const dir[2] = {&box.a,&box.b};
-	for(int i=0; i<6; i++ ) {
-		vec_t P,Q;
-		// For each coordinate axis x, y, z...
-		for(int j = 0; j < 3; ++j) {
-			P[j] = dir[sign[i][j]]->operator[](j);
-			Q[j] = dir[!sign[i][j]]->operator[](j);
-		}
-		if(side[i].dot(P) < 0.0f)
-			return MISS;
+	intersection_t ret = ALL;
+	for(int i=0; i<6; i++) {
+		int c = 0;
+		for(int j=0; j<8; j++)
+			if(side[i].dot(box.corner(j)) >= 0)
+				c++;
+		if(c == 0) return MISS;
+		if(c != 8) ret = SOME;
 	}
-	return SOME; //not got ALL
+	return ret;
+}
+
+intersection_t frustum_t::contains(const bounds_t& bounds) const {
+	intersection_t ret = contains(static_cast<const sphere_t&>(bounds));
+	if(SOME == ret)
+		ret = contains(static_cast<const aabb_t&>(bounds));
+	return ret;
 }
 

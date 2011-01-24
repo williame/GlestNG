@@ -15,7 +15,7 @@ public:
 	static font_mgr_t* get_font_mgr();
 	virtual ~font_mgr_t() {}
 	virtual vec2_t measure(const char* msg) = 0;
-	virtual void draw(int x,int y,const char* msg) = 0;
+	virtual int draw(int x,int y,const char* msg) = 0;
 private:
 	class impl_t;
 	friend class impl_t;
