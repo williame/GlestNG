@@ -307,26 +307,27 @@ void load(const char* data_directory) {
 	// this is just some silly test code - find a random model
 	typedef fs_mgr_t::list_t list_t;
 	const list_t techtrees = fs()->list_dirs("techs");
-	const std::string techtree = std::string("techs")+'/'+techtrees[rand()%techtrees.size()];
+	const std::string techtree_ = techtrees[rand()%techtrees.size()];
+	const std::string techtree = std::string("techs")+'/'+techtree_;
 	const list_t factions = fs()->list_dirs(techtree+"/factions");
-	const std::string faction = techtree+"/factions/"+factions[rand()%factions.size()];
+	const std::string faction_ = factions[rand()%factions.size()];
+	const std::string faction = techtree+"/factions/"+faction_;
 	const list_t units = fs()->list_dirs(faction+"/units");
-	const std::string unit = units[rand()%units.size()];
-	const std::string unitp = faction+"/units/"+unit;
-	const std::string xml_name = unitp+"/"+unit+".xml";
-	const list_t models = fs()->list_files(unitp+"/models");
+	const std::string unit_ = units[rand()%units.size()];
+	const std::string unit = faction+"/units/"+unit_;
+	const std::string xml_name = unit+"/"+unit_+".xml";
+	const list_t models = fs()->list_files(unit+"/models");
 	std::string g3d;
 	for(list_t::const_iterator i=models.begin(); i!=models.end(); i++)
 		if(i->find(".g3d") == (i->size()-4)) {
-			g3d = unitp + "/models/" + *i;
+			g3d = unit + "/models/" + *i;
 			break;
 		}
-	if(!g3d.size()) data_error("no G3D models in "<<unitp<<"/models");
+	if(!g3d.size()) data_error("no G3D models in "<<unit<<"/models");
 	// and load it
 	std::cout << "loading "<<xml_name<<std::endl;
 	std::auto_ptr<istream_t> xstream = fs()->open(xml_name);
-	ui_xml_editor_t* xml = new ui_xml_editor_t(xml_name,*xstream);
-	xml->set_color(0x00,0xff,0xff);
+	new ui_xml_editor_t(techtree_+" : "+faction_+" : "+unit_,*xstream);
 	std::cout << "loading "<<g3d<<std::endl;
 	std::auto_ptr<istream_t> istream = fs()->open(g3d);
 	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*istream));
@@ -399,41 +400,40 @@ int main(int argc,char** args) {
 		
 		bool quit = false;
 		SDL_Event event;
+		SDL_EnableKeyRepeat(200,50);
 		const unsigned start = SDL_GetTicks();
-		unsigned last_event = start;
 		framerate.reset();
 		while(!quit) {
 			set_now(SDL_GetTicks()-start);
-			// only eat events 10 times a second
-			if((now()-last_event) > 100) {
-				bool moved = false;
-				while(!quit && SDL_PollEvent(&event)) {
-					switch (event.type) {
-					case SDL_MOUSEMOTION:
-						/*printf("Mouse moved by %d,%d to (%d,%d)\n", 
-						event.motion.xrel, event.motion.yrel,
-						event.motion.x, event.motion.y);*/
-						break;
-					case SDL_MOUSEBUTTONDOWN:
-						click(event.button.x,event.button.y);
-						break;
-					case SDL_KEYDOWN:
-						switch(event.key.keysym.sym) {
-						case SDLK_ESCAPE:
-							quit = true;
-							break;
-						case SDLK_LEFT:
-							moved = true;
-							break;
-						default:;
-						}
-						break;
-					case SDL_QUIT:
+			while(!quit && SDL_PollEvent(&event)) {
+				if(ui_mgr()->offer(event))
+					continue;
+				switch (event.type) {
+				case SDL_MOUSEMOTION:
+					/*printf("Mouse moved by %d,%d to (%d,%d)\n", 
+					event.motion.xrel, event.motion.yrel,
+					event.motion.x, event.motion.y);*/
+					break;
+				case SDL_MOUSEBUTTONDOWN:
+					click(event.button.x,event.button.y);
+					break;
+				case SDL_KEYDOWN:
+					switch(event.key.keysym.sym) {
+					case SDLK_ESCAPE:
 						quit = true;
 						break;
+					default:
+						std::cout << "Ignoring key " << 
+							(int)event.key.keysym.scancode << "," <<
+							event.key.keysym.sym << "," <<
+							event.key.keysym.mod << "," <<
+							event.key.keysym.unicode << std::endl;
 					}
+					break;
+				case SDL_QUIT:
+					quit = true;
+					break;
 				}
-				last_event = now();
 			}
 			framerate.tick(now());
 			tick();

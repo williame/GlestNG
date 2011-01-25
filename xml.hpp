@@ -21,12 +21,14 @@ public:
 	void parse();
 	~xml_parser_t();
 	enum type_t {
+		IGNORE,
 		OPEN,
 		CLOSE,
 		KEY,
 		VALUE,
 		DATA,
 		ERROR,
+		NUM_TYPES
 	};
 	class walker_t {
 	public:
@@ -41,18 +43,23 @@ public:
 		float value_float(const char* key = "value");
 		// query current node
 		type_t type() const;
+		size_t ofs() const;
+		size_t len() const;
 		std::string str() const;
 		const char* error_str() const;
 		bool visited() const;
 		friend class xml_parser_t;
 	private:
-		walker_t(const token_t* tok);
+		walker_t(xml_parser_t& parser,const token_t* tok);
+		xml_parser_t& parser;
 		const token_t* tok;
 		void get_key(const char* key);
 		void get_tag();
 	};
 	walker_t walker();
 	void describe_xml(std::ostream& out);
+	const char* get_title() const { return title; }
+	const char* get_buf() const { return buf; }
 private:
 	const char* const title;
 	const char* const buf;

@@ -342,6 +342,16 @@ float xml_parser_t::walker_t::value_float(const char* key) {
 		throw;
 	}
 }
+ 
+size_t xml_parser_t::walker_t::ofs() const {
+	if(!ok()) panic("no token");
+	return tok->start - parser.buf;
+}
+
+size_t xml_parser_t::walker_t::len() const {
+	if(!ok()) panic("no token");
+	return tok->len;
+}
 
 std::string xml_parser_t::walker_t::str() const {
 	if(!ok()) panic("no token");
@@ -358,11 +368,11 @@ bool xml_parser_t::walker_t::visited() const {
 	return tok->visit;
 }
 
-xml_parser_t::walker_t::walker_t(const token_t* t): tok(t) {}
+xml_parser_t::walker_t::walker_t(xml_parser_t& p,const token_t* t): parser(p), tok(t) {}
 
 xml_parser_t::walker_t xml_parser_t::walker() {
 	if(!doc) parse();
-	return walker_t(doc);
+	return walker_t(*this,doc);
 }
 
 static std::ostream& indent(std::ostream& out,int n) {
@@ -431,6 +441,7 @@ void xml_parser_t::describe_xml(std::ostream& out) {
 			out<<" <span id=\"E\">"<<(node.tok->error?node.tok->error:"")<<std::endl<<
 				html_escape(node.str(),node.tok->visit)<<"</span> "<<std::endl;
 			break;
+		default:;
 		}
 	}
 	out << "</pre></body></html>" << std::endl;

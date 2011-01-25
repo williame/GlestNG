@@ -75,6 +75,27 @@ void ui_component_t::set_visible(bool v) {
 	mgr.invalidate(r);
 }
 
+static void _draw_box(GLenum type,const rect_t& r) {
+	glBegin(type);
+		glVertex2i(r.tl.x,r.tl.y);
+		glVertex2i(r.br.x,r.tl.y);
+		glVertex2i(r.br.x,r.br.y);
+		glVertex2i(r.tl.x,r.br.y);
+	glEnd();
+}
+
+void ui_component_t::draw_box(const rect_t& r) { _draw_box(GL_LINE_LOOP,r); }
+void ui_component_t::draw_box(short x,short y,short w,short h) { _draw_box(GL_LINE_LOOP,rect_t(x,y,x+w,y+h)); }
+void ui_component_t::draw_filled_box(const rect_t& r) { _draw_box(GL_QUADS,r); }
+void ui_component_t::draw_filled_box(short x,short y,short w,short h) { _draw_box(GL_QUADS,rect_t(x,y,x+w,y+h)); }
+
+bool ui_component_t::offer_children(const SDL_Event& event) {
+	for(ui_component_t* child = first_child; child; child = child->next_peer)
+		if(child->visible && child->offer(event))
+			return true;
+	return false;
+}
+
 ui_label_t::ui_label_t(const std::string& str,ui_component_t* parent):
 	ui_component_t(parent), r(0xff), g(0xff), b(0xff) {
 	set_text(str);
@@ -151,6 +172,13 @@ rect_t ui_mgr_t::get_screen_bounds() const {
 
 void ui_mgr_t::invalidate(const rect_t& r) {
 	if(r.empty()) return;
+}
+
+bool ui_mgr_t::offer(const SDL_Event& event) {
+	for(pimpl_t::components_t::iterator i=pimpl->components.begin(); i!=pimpl->components.end(); i++)
+		if((*i)->visible && (*i)->offer(event))
+			return true;
+	return false;
 }
 
 void ui_mgr_t::register_component(ui_component_t* comp) {

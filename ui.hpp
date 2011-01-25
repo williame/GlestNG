@@ -12,6 +12,7 @@
 #include <inttypes.h>
 
 #include "2d.hpp"
+#include "graphics.hpp"
 
 class ui_mgr_t;
 
@@ -33,6 +34,12 @@ protected:
 	ui_component_t(ui_component_t* parent = NULL);                 
 	virtual ~ui_component_t();
 	ui_mgr_t& mgr;
+	void draw_box(const rect_t& r);
+	void draw_box(short x,short y,short w,short h);
+	void draw_filled_box(const rect_t& r);
+	void draw_filled_box(short x,short y,short w,short h);
+	virtual 	bool offer(const SDL_Event& event) { return false; }
+	bool offer_children(const SDL_Event& event);
 private:
 	friend class ui_mgr_t;
 	virtual void draw() = 0;
@@ -63,6 +70,7 @@ public:
 	void draw();
 	rect_t get_screen_bounds() const;
 	void invalidate(const rect_t& r);
+	bool offer(const SDL_Event& event);
 private:
 	friend class ui_component_t;
 	virtual void register_component(ui_component_t* comp);

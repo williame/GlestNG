@@ -96,7 +96,10 @@ static const size_t num_glyphs = (sizeof(font_glyph)/sizeof(font_glyph_t));
 class font_mgr_t::impl_t: public font_mgr_t {
 public:
 	impl_t();
+	vec2_t measure(char ch);
 	vec2_t measure(const char* msg);
+	vec2_t measure(const char* msg,int count);
+	int draw(int x,int y,char ch);
 	int draw(int x,int y,const char* msg);
 private:
 	const font_glyph_t* get_glyph(int code) const;
@@ -117,56 +120,59 @@ font_mgr_t::impl_t::impl_t() {
 	SDL_FreeSurface(bmp);
 }
 
+vec2_t font_mgr_t::impl_t::measure(char ch) {
+	vec2_t sz(0,font_meta.height);
+	const font_glyph_t* g = get_glyph(ch);
+	if(g) sz.x += g->advance;
+	return sz;
+}
+
 vec2_t font_mgr_t::impl_t::measure(const char* msg) {
 	vec2_t sz(0,font_meta.height);
-	for(; *msg; msg++) {
-		const font_glyph_t* g = get_glyph(*msg);
-		if(!g) continue;
-		sz.x += g->advance;
-	}
+	for(; *msg; msg++)
+		sz.x += measure(*msg).x;
 	return sz;
+}
+
+vec2_t font_mgr_t::impl_t::measure(const char* msg,int count) {
+	vec2_t sz(0,font_meta.height);
+	while(count-- > 0)
+		sz.x += measure(*msg++).x;
+	return sz;
+}
+
+int font_mgr_t::impl_t::draw(int x,int y,char ch) {
+	const font_glyph_t* g = get_glyph(ch);
+	if(!g) return 0;
+	glBindTexture(GL_TEXTURE_2D,texture);
+	const float
+		tx0 = (float)g->x/bmp_sz.x,
+		ty0 = (float)g->y/bmp_sz.y,
+		tx1 = (float)(g->x+g->w)/bmp_sz.x,
+		ty1 = (float)(g->y+g->h)/bmp_sz.y;
+	const float
+		x0 = x+g->ofs_x,
+		y0 = y+g->ofs_y, //font_meta.height-(g->h-g->ofs_y),
+		x1 = x0+g->w,
+		y1 = y0+g->h;
+	glBegin(GL_QUADS);
+	glTexCoord2f(tx0,ty0);
+	glVertex2f(x0,y0);
+	glTexCoord2f(tx1,ty0);
+	glVertex2f(x1,y0);
+	glTexCoord2f(tx1,ty1);
+	glVertex2f(x1,y1);
+	glTexCoord2f(tx0,ty1);
+	glVertex2f(x0,y1);
+	glEnd();
+	glBindTexture(GL_TEXTURE_2D,0);
+	return g->advance;
 }
 
 int font_mgr_t::impl_t::draw(int x,int y,const char* msg) {
 	const int start = x;
-#if 0
-	// show guide
-	glBindTexture(GL_TEXTURE_2D,0);
-	glBegin(GL_LINES);
-	const vec2_t sz = measure(msg);
-	glVertex2f(x,y);
-	glVertex2f(x+sz.x,y);
-	glVertex2f(x+sz.x,y);
-	glVertex2f(x+sz.x,y+sz.y);
-	glEnd();
-#endif
-	glBindTexture(GL_TEXTURE_2D,texture);
-	glBegin(GL_QUADS);
-	for(; *msg; msg++) {
-		const font_glyph_t* g = get_glyph(*msg);
-		if(!g) continue;
-		const float
-			tx0 = (float)g->x/bmp_sz.x,
-			ty0 = (float)g->y/bmp_sz.y,
-			tx1 = (float)(g->x+g->w)/bmp_sz.x,
-			ty1 = (float)(g->y+g->h)/bmp_sz.y;
-		const float
-			x0 = x+g->ofs_x,
-			y0 = y+g->ofs_y, //font_meta.height-(g->h-g->ofs_y),
-			x1 = x0+g->w,
-			y1 = y0+g->h;
-		glTexCoord2f(tx0,ty0);
-		glVertex2f(x0,y0);
-		glTexCoord2f(tx1,ty0);
-		glVertex2f(x1,y0);
-		glTexCoord2f(tx1,ty1);
-		glVertex2f(x1,y1);
-		glTexCoord2f(tx0,ty1);
-		glVertex2f(x0,y1);
-		x += g->advance;
-	}
-	glEnd();
-	glBindTexture(GL_TEXTURE_2D,0);
+	for(; *msg; msg++)
+		x += draw(x,y,*msg);
 	return x-start;
 }
 
