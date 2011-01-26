@@ -41,12 +41,14 @@ public:
 		h(font_mgr()->measure(' ').y), 
 		view_ofs(0,0),
 		ui(ui_),
-		body(title.c_str(),in), dirty(true) {
+		body(new xml_parser_t(title.c_str(),in)),
+		dirty(true) {
 		cursor.row = cursor.col = 0;
 	}
+	~pimpl_t() { delete body; }
 	void parse();
 	const lines_t& get_lines() { parse(); return lines; }
-	const char* get_title() const { return body.get_title(); }
+	const char* get_title() const { return body->get_title(); }
 	struct cursor_t {
 		size_t row;
 		size_t col;
@@ -64,13 +66,15 @@ public:
 	void nav_home();
 	void nav_end();
 	void insert(char ch);
+	void bksp();
+	void del();
 	const int em; // width of space
 	const int h; // line height
 	vec2_t view_ofs;
 private:
 	ui_xml_editor_t& ui;
 	void _append(line_t& line,int i,xml_parser_t::type_t type);
-	xml_parser_t body;
+	xml_parser_t* body;
 	lines_t lines;
 	bool dirty;
 	cursor_t cursor;
@@ -130,37 +134,77 @@ void ui_xml_editor_t::pimpl_t::nav_home() { cursor.col = 0; }
 void ui_xml_editor_t::pimpl_t::nav_end() { cursor.col = lines[cursor.row].s.size(); }
 
 void ui_xml_editor_t::pimpl_t::insert(char ch) {
-	size_t len = 1; // space for new char
+	size_t len = 0;
 	for(size_t i=0; i<lines.size(); i++)
-		len += lines[i].s.size();
-	std::auto_ptr<char> buf(new char[len]);
-	char* p = buf.get();
-	for(size_t i=0; i<cursor.row; i++) {
-		const line_t& line = lines[i];
-		for(size_t j=0; j<line.s.size(); j++)
-			*p++ = line.s[j];
-	}
-	{
-		const line_t& line = lines[cursor.row];
-		for(size_t j=0; j<cursor.col; j++)
-			if(j >= line.s.size())
-				*p++ = ' ';
-			else
-				*p++ = line.s[j];
-		*p++ = ch;
-		for(size_t j=cursor.col; j<line.s.size(); j++)
-			*p++ = line.s[j];
+		len += lines[i].s.size() + 1;
+	std::string buf;
+	buf.reserve(len+1);
+	for(size_t i=0; i<lines.size(); i++) {
+		if(buf.size()) buf += '\n';
+		if(i == cursor.row) {
+			const line_t& line = lines[cursor.row];
+			for(size_t j=0; j<cursor.col; j++)
+				if(j >= line.s.size())
+					buf += ' ';
+				else
+					buf += line.s[j];
+			buf += ch;
+			for(size_t j=cursor.col; j<line.s.size(); j++)
+				buf += line.s[j];
+		} else
+			buf.append(lines[i].s);
 	}		
-	for(size_t i=cursor.row+1; i<lines.size(); i++) {
-		const line_t& line = lines[i];
-		for(size_t j=0; j<line.s.size(); j++)
-			*p++ = line.s[j];
-	}
-	if(p-buf.get() != len)
-		panic("expecting "<<len<<" bytes, got "<<(p-buf.get()));
-	body = xml_parser_t(body->get_title(),buf.ptr());
+	std::string title(body->get_title());
+	delete body; body = NULL;
+	body = new xml_parser_t(title.c_str(),buf.c_str());
 	dirty = true;
-	cursor.col++;
+	parse();
+	if(ch == '\n') {
+		cursor.row++;
+		cursor.col = 0;
+	} else
+		cursor.col++;
+}
+
+void ui_xml_editor_t::pimpl_t::bksp() {
+	if(!cursor.row && !cursor.col) return;
+	size_t len = 0;
+	for(size_t i=0; i<lines.size(); i++)
+		len += lines[i].s.size() + 1;
+	std::string buf;
+	buf.reserve(len+1);
+	int lastline = 0, delline;
+	for(size_t i=0; i<lines.size(); i++) {
+		if(buf.size()) buf += '\n';
+		if(i == cursor.row) {
+			const line_t& line = lines[cursor.row];
+			if(cursor.col) {
+				for(size_t j=0; j<cursor.col-1; j++)
+					if(j >= line.s.size())
+						buf += ' ';
+					else
+						buf += line.s[j];
+			} else {
+				delline = lastline;
+				buf.resize(buf.size()-1);
+			}
+			for(size_t j=cursor.col; j<line.s.size(); j++)
+				buf += line.s[j];
+		} else
+			buf.append(lines[i].s);
+		lastline = lines[i].s.size();
+	}		
+	std::string title(body->get_title());
+	delete body; body = NULL;
+	body = new xml_parser_t(title.c_str(),buf.c_str());
+	dirty = true;
+	parse();
+	if(cursor.col)
+		cursor.col--;
+	else {
+		cursor.row--;
+		cursor.col = delline;
+	}
 }
 
 int ui_xml_editor_t::pimpl_t::char_from_ofs(int x,int row) {
@@ -186,7 +230,7 @@ int ui_xml_editor_t::pimpl_t::char_to_ofs(int col,int row) {
 }
 
 void ui_xml_editor_t::pimpl_t::_append(line_t& line,int i,xml_parser_t::type_t type) {
-	char ch = body.get_buf()[i];
+	char ch = body->get_buf()[i];
 	if(ch == '\n') {
 		line.s.erase(line.s.find_last_not_of(" \n\r\t")+1);
 		lines.push_back(line);
@@ -212,19 +256,20 @@ char ui_xml_editor_t::pimpl_t::char_at(const cursor_t& cursor) {
 void ui_xml_editor_t::pimpl_t::parse() {
 	if(!dirty) return;
 	try {
-		body.parse();
+		body->parse();
 	} catch(data_error_t* de) {
 		std::cerr << "Error parsing xml: "<<de<<std::endl;
 	}
+	lines.clear();
 	size_t i = 0;
 	line_t line;
-	for(xml_parser_t::walker_t node = body.walker(); node.ok(); node.next()) {
+	for(xml_parser_t::walker_t node = body->walker(); node.ok(); node.next()) {
 		for(; i<node.ofs(); i++)
 			_append(line,i,xml_parser_t::IGNORE);
 		for(; i<(node.ofs()+node.len()); i++)
 			_append(line,i,node.type());
 	}
-	for(; i<strlen(body.get_buf()); i++)
+	for(; i<strlen(body->get_buf()); i++)
 		_append(line,i,xml_parser_t::IGNORE);
 	line.s.erase(line.s.find_last_not_of(" \n\r\t")+1);
 	if(line.s.size())
@@ -257,11 +302,17 @@ bool ui_xml_editor_t::offer(const SDL_Event& event) {
 		case SDLK_PAGEDOWN: pimpl->nav_pgdn(); break;
 		case SDLK_HOME: pimpl->nav_home(); break;
 		case SDLK_END: pimpl->nav_end(); break;
-		default: {
-			const int code = event.key.keysym.unicode;
-			if((code>=' ') && (code<0xff))
-				pimpl->insert(code);
-			}
+		case SDLK_RETURN: pimpl->insert('\n'); break;
+		case SDLK_BACKSPACE: pimpl->bksp(); break;	
+		default: 
+			if(!(event.key.keysym.unicode&0xFF80)) {
+				const char ch = event.key.keysym.unicode & 0x7F;
+				if(!ch)
+					std::cerr << "is unicode not enabled?" << std::endl;
+				else
+					pimpl->insert(ch);
+			} else
+				std::cout << "ignoring non-ascii "<<event.key.keysym.unicode<<std::endl;
 		}
 		return true; // keys don't escape!
 	} break;

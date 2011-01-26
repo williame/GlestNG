@@ -114,6 +114,12 @@ void ui_label_t::draw() {
 
 struct ui_mgr_t::pimpl_t {
 	pimpl_t();
+	~pimpl_t() {
+		components_t tmp = components;
+		components.clear();
+		for(components_t::iterator i=tmp.begin(); i!=tmp.end(); i++)
+			delete *i;
+	}
 	typedef std::vector<ui_component_t*> components_t;
 	components_t components;
 	rect_t screen;

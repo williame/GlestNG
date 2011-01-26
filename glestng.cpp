@@ -365,8 +365,11 @@ int main(int argc,char** args) {
 		}
 		fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
 
+		std::auto_ptr<ui_mgr_t> ui_(ui_mgr());
+
 		load("/home/will/Games/megaglest-3.3.7.2");
-				
+		std::auto_ptr<fs_mgr_t> fs_(fs());
+		
 //###		terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);
 	
@@ -397,10 +400,10 @@ int main(int argc,char** args) {
 		glEnable(GL_BLEND);
 		glEnable(GL_TEXTURE_2D);
 		camera();
-		
 		bool quit = false;
 		SDL_Event event;
 		SDL_EnableKeyRepeat(200,20);
+		SDL_EnableUNICODE(true);
 		const unsigned start = SDL_GetTicks();
 		framerate.reset();
 		while(!quit) {

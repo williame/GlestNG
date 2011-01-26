@@ -136,9 +136,11 @@ fs_mgr_t::list_t fs_t::list_dirs(const std::string& path) {
 	fs_mgr_t::list_t dirs;
 	if(int n = scandir64(canocial(path).c_str(),&eps,_one,alphasort64)) {
 		if(-1 == n) c_error("list_dirs("<<path<<")");
-		for(int i=0; i<n; i++)
+		for(int i=0; i<n; i++) {
 			if((eps[i]->d_name[0] != '.') && is_dir(join(path,eps[i]->d_name)))
 				dirs.push_back(eps[i]->d_name);
+			free(eps[i]);
+		}
 		free(eps);
 	}
 	return dirs;
@@ -149,9 +151,11 @@ fs_mgr_t::list_t fs_t::list_files(const std::string& path) {
 	fs_mgr_t::list_t files;
 	if(int n = scandir64(canocial(path).c_str(),&eps,_one,alphasort64)) {
 		if(-1 == n) c_error("list_files("<<path<<")");
-		for(int i=0; i<n; i++)
+		for(int i=0; i<n; i++) {
 			if((eps[i]->d_name[0] != '.') && is_file(join(path,eps[i]->d_name)))
 				files.push_back(eps[i]->d_name);
+			free(eps[i]);
+		}
 		free(eps);
 	}
 	return files;

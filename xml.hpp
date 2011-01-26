@@ -61,8 +61,8 @@ public:
 	const char* get_title() const { return title; }
 	const char* get_buf() const { return buf; }
 private:
-	const char* const title;
-	const char* const buf;
+	const char* title;
+	const char* buf;
 	token_t *doc;
 };
 
