@@ -35,10 +35,11 @@ namespace {
 
 class ui_xml_editor_t::pimpl_t {
 public:
-	pimpl_t(const std::string& title,istream_t& in):
+	pimpl_t(ui_xml_editor_t& ui_,const std::string& title,istream_t& in):
 		em(font_mgr()->measure(' ').x),
 		h(font_mgr()->measure(' ').y), 
 		view_ofs(0,0),
+		ui(ui_),
 		body(title.c_str(),in), dirty(true) {
 		cursor.row = cursor.col = 0;
 	}
@@ -57,10 +58,15 @@ public:
 	void nav_right();
 	void nav_up();
 	void nav_down();
+	void nav_pgdn();
+	void nav_pgup();
+	void nav_home();
+	void nav_end();
 	const int em; // width of space
 	const int h; // line height
 	vec2_t view_ofs;
 private:
+	ui_xml_editor_t& ui;
 	void _append(line_t& line,int i,xml_parser_t::type_t type);
 	xml_parser_t body;
 	lines_t lines;
@@ -99,6 +105,19 @@ void ui_xml_editor_t::pimpl_t::nav_down() {
 			cursor.col = std::min<int>(char_from_ofs(ofs,cursor.row),lines[cursor.row].s.size());
 	}
 }
+
+void ui_xml_editor_t::pimpl_t::nav_pgdn() {
+	const short screenful = ui.get_rect().h()/h;
+	cursor.row = ((cursor.row / screenful)+1)*screenful;
+	if(cursor.row >= lines.size())
+		cursor.row = lines.size()-1;
+}
+
+void ui_xml_editor_t::pimpl_t::nav_pgup() {}
+
+void ui_xml_editor_t::pimpl_t::nav_home() { cursor.col = 0; }
+
+void ui_xml_editor_t::pimpl_t::nav_end() { cursor.col = lines[cursor.row].s.size(); }
 
 int ui_xml_editor_t::pimpl_t::char_from_ofs(int x,int row) {
 	if(row >= (int)lines.size()) return -1;
@@ -185,20 +204,15 @@ bool ui_xml_editor_t::offer(const SDL_Event& event) {
 		return true; // ignore them but eat them
 	case SDL_KEYDOWN: {
 		switch(event.key.keysym.sym) {
-		case SDLK_ESCAPE:
-			return false;
-		case SDLK_LEFT:
-			pimpl->nav_left();
-			break;
-		case SDLK_RIGHT:
-			pimpl->nav_right();
-			break;
-		case SDLK_UP:
-			pimpl->nav_up();
-			break;
-		case SDLK_DOWN:
-			pimpl->nav_down();
-			break;
+		case SDLK_ESCAPE: return false;
+		case SDLK_LEFT: pimpl->nav_left(); break;
+		case SDLK_RIGHT: pimpl->nav_right(); break;
+		case SDLK_UP: pimpl->nav_up(); break;
+		case SDLK_DOWN: pimpl->nav_down(); break;
+		case SDLK_PGUP: pimpl->nav_pgup(); break;
+		case SDLK_PGDN: pimpl->nav_pgdn(); break;
+		case SDLK_HOME: pimpl->nav_home(); break;
+		case SDLK_END: pimpl->nav_end(); break;
 		default:;
 		}
 		return true; // keys don't escape!
