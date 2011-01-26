@@ -400,7 +400,7 @@ int main(int argc,char** args) {
 		
 		bool quit = false;
 		SDL_Event event;
-		SDL_EnableKeyRepeat(200,50);
+		SDL_EnableKeyRepeat(200,20);
 		const unsigned start = SDL_GetTicks();
 		framerate.reset();
 		while(!quit) {

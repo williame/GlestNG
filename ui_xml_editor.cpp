@@ -38,6 +38,7 @@ public:
 	pimpl_t(const std::string& title,istream_t& in):
 		em(font_mgr()->measure(' ').x),
 		h(font_mgr()->measure(' ').y), 
+		view_ofs(0,0),
 		body(title.c_str(),in), dirty(true) {
 		cursor.row = cursor.col = 0;
 	}
@@ -58,6 +59,7 @@ public:
 	void nav_down();
 	const int em; // width of space
 	const int h; // line height
+	vec2_t view_ofs;
 private:
 	void _append(line_t& line,int i,xml_parser_t::type_t type);
 	xml_parser_t body;
@@ -159,8 +161,11 @@ void ui_xml_editor_t::pimpl_t::parse() {
 		for(; i<(node.ofs()+node.len()); i++)
 			_append(line,i,node.type());
 	}
+	for(; i<strlen(body.get_buf()); i++)
+		_append(line,i,xml_parser_t::IGNORE);
 	line.s.erase(line.s.find_last_not_of(" \n\r\t")+1);
-	lines.push_back(line);
+	if(line.s.size())
+		lines.push_back(line);
 	dirty = false;
 }
 
@@ -224,6 +229,7 @@ struct color_t {
 };
 
 void ui_xml_editor_t::draw() {
+	// title and background
 	rect_t r = get_rect();
 	font_mgr_t& f = *font_mgr();
 	const int h = pimpl->h;
@@ -238,20 +244,32 @@ void ui_xml_editor_t::draw() {
 	draw_filled_box(r);
 	COL[BORDER_COL].set();
 	draw_box(r);
-	int y = r.tl.y;
+	// get the lines and cursor
 	const lines_t& lines = pimpl->get_lines();
 	const pimpl_t::cursor_t cursor = pimpl->get_cursor();
-	const int cursor_x = r.tl.x+f.measure(lines[cursor.row].s.c_str(),cursor.col-1).x,
-		cursor_y = r.tl.y+cursor.row*h;
-	const rect_t caret(cursor_x, cursor_y,cursor_x+3,cursor_y+h);
+	vec2_t caret(pimpl->char_to_ofs(cursor.col,cursor.row),cursor.row*h);
+	// ensure cursor is visible
+	const vec2_t margin(3*pimpl->em,3*h);
+	vec2_t view_ofs = pimpl->view_ofs;
+	if(view_ofs.x > caret.x-margin.x) view_ofs.x = std::max(0,caret.x-margin.x);
+	if(caret.x+margin.x > view_ofs.x+r.w()) view_ofs.x = caret.x+margin.x-r.w();
+	if(view_ofs.y > caret.y-margin.y) view_ofs.y = std::max(0,caret.y-margin.y);
+	if(caret.y+margin.y > view_ofs.y+r.h()) view_ofs.y = ((caret.y+margin.y-r.h())/h)*h;
+	pimpl->view_ofs = view_ofs;
+	// and draw
 	COL[CURSOR_COL].set();
-	draw_filled_box(caret);
-	for(lines_t::const_iterator i=lines.begin(); i!=lines.end(); i++) {
+	caret += r.tl;
+	caret -= view_ofs;
+	draw_filled_box(rect_t(caret,caret+vec2_t(3,h)));
+	int y = r.tl.y;
+	for(size_t i = view_ofs.y/h; i<lines.size(); i++) {
 		if(y > r.br.y) break;
-		int x = r.tl.x;
-		for(size_t j=0; j<i->s.size(); j++) {
-			TEXT_COL[i->type[j]].set();
-			x += f.draw(x,y,i->s[j]);
+		const line_t& line = lines[i];
+		const int start = pimpl->char_from_ofs(view_ofs.x,i);
+		int x = r.tl.x - (view_ofs.x - pimpl->char_to_ofs(start,i));
+		for(size_t j=start; j<line.s.size(); j++) {
+			TEXT_COL[line.type[j]].set();
+			x += f.draw(x,y,line.s[j]);
 		}
 		y += h;
 	}

@@ -16,6 +16,8 @@ struct vec2_t {
 	short x, y;
 	inline vec2_t& operator+=(const vec2_t& a);
 	inline vec2_t operator+(const vec2_t& a) const;
+	inline vec2_t& operator-=(const vec2_t& a);
+	inline vec2_t operator-(const vec2_t& a) const;
 	inline static void normalise(vec2_t& tl,vec2_t& br);
 };
 
@@ -44,6 +46,18 @@ inline vec2_t& vec2_t::operator+=(const vec2_t& a) {
 inline vec2_t vec2_t::operator+(const vec2_t& a) const {
 	vec2_t ret = *this;
 	ret += a;
+	return ret;
+}
+
+inline vec2_t& vec2_t::operator-=(const vec2_t& a) {
+	x -= a.x;
+	y -= a.y;
+	return *this;
+}
+
+inline vec2_t vec2_t::operator-(const vec2_t& a) const {
+	vec2_t ret = *this;
+	ret -= a;
 	return ret;
 }
 
