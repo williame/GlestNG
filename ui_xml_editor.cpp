@@ -14,6 +14,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <memory>
 
 #include "font.hpp"
 #include "error.hpp"
@@ -62,6 +63,7 @@ public:
 	void nav_pgup();
 	void nav_home();
 	void nav_end();
+	void insert(char ch);
 	const int em; // width of space
 	const int h; // line height
 	vec2_t view_ofs;
@@ -113,11 +115,53 @@ void ui_xml_editor_t::pimpl_t::nav_pgdn() {
 		cursor.row = lines.size()-1;
 }
 
-void ui_xml_editor_t::pimpl_t::nav_pgup() {}
+void ui_xml_editor_t::pimpl_t::nav_pgup() {
+	const size_t screenful = ui.get_rect().h()/h;
+	if(cursor.row <= screenful)
+		cursor.row = 0;
+	else if(cursor.row % screenful)
+		cursor.row = (cursor.row/screenful)*screenful;
+	else
+		cursor.row -= screenful;
+}
 
 void ui_xml_editor_t::pimpl_t::nav_home() { cursor.col = 0; }
 
 void ui_xml_editor_t::pimpl_t::nav_end() { cursor.col = lines[cursor.row].s.size(); }
+
+void ui_xml_editor_t::pimpl_t::insert(char ch) {
+	size_t len = 1; // space for new char
+	for(size_t i=0; i<lines.size(); i++)
+		len += lines[i].s.size();
+	std::auto_ptr<char> buf(new char[len]);
+	char* p = buf.get();
+	for(size_t i=0; i<cursor.row; i++) {
+		const line_t& line = lines[i];
+		for(size_t j=0; j<line.s.size(); j++)
+			*p++ = line.s[j];
+	}
+	{
+		const line_t& line = lines[cursor.row];
+		for(size_t j=0; j<cursor.col; j++)
+			if(j >= line.s.size())
+				*p++ = ' ';
+			else
+				*p++ = line.s[j];
+		*p++ = ch;
+		for(size_t j=cursor.col; j<line.s.size(); j++)
+			*p++ = line.s[j];
+	}		
+	for(size_t i=cursor.row+1; i<lines.size(); i++) {
+		const line_t& line = lines[i];
+		for(size_t j=0; j<line.s.size(); j++)
+			*p++ = line.s[j];
+	}
+	if(p-buf.get() != len)
+		panic("expecting "<<len<<" bytes, got "<<(p-buf.get()));
+	body = xml_parser_t(body->get_title(),buf.ptr());
+	dirty = true;
+	cursor.col++;
+}
 
 int ui_xml_editor_t::pimpl_t::char_from_ofs(int x,int row) {
 	if(row >= (int)lines.size()) return -1;
@@ -190,7 +234,7 @@ void ui_xml_editor_t::pimpl_t::parse() {
 
 
 ui_xml_editor_t::ui_xml_editor_t(const std::string& title,istream_t& in,ui_component_t* parent):
-ui_component_t(parent), pimpl(new pimpl_t(title.c_str(),in)) {
+ui_component_t(parent), pimpl(new pimpl_t(*this,title.c_str(),in)) {
 	set_rect(rect_t(20,50,500,mgr.get_screen_bounds().br.y-30));
 }
 
@@ -209,11 +253,15 @@ bool ui_xml_editor_t::offer(const SDL_Event& event) {
 		case SDLK_RIGHT: pimpl->nav_right(); break;
 		case SDLK_UP: pimpl->nav_up(); break;
 		case SDLK_DOWN: pimpl->nav_down(); break;
-		case SDLK_PGUP: pimpl->nav_pgup(); break;
-		case SDLK_PGDN: pimpl->nav_pgdn(); break;
+		case SDLK_PAGEUP: pimpl->nav_pgup(); break;
+		case SDLK_PAGEDOWN: pimpl->nav_pgdn(); break;
 		case SDLK_HOME: pimpl->nav_home(); break;
 		case SDLK_END: pimpl->nav_end(); break;
-		default:;
+		default: {
+			const int code = event.key.keysym.unicode;
+			if((code>=' ') && (code<0xff))
+				pimpl->insert(code);
+			}
 		}
 		return true; // keys don't escape!
 	} break;
