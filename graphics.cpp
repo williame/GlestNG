@@ -127,20 +127,20 @@ SDL_Surface* graphics_t::load_surface(const char* path) {
 	if(!strcmp(h->ext(),"tga")) {
 		istream_t::ptr_t f(h->reader());
 		if(f->byte()) graphics_error("TGA contains an ID: "<<path);
-		const int8_t colourMapType = f->byte();
+		const int8_t colourMapType __attribute__((unused)) = f->byte();
 		const int8_t dataTypeCode = f->byte();
-		const int16_t colourMapOrigin = f->uint16();
-		const int16_t colourMapLength = f->uint16();
-		const int8_t colourMapDepth = f->byte();
-		const int16_t xOrigin = f->uint16();
-		const int16_t yOrigin = f->uint16();
+		const int16_t colourMapOrigin __attribute__((unused))= f->uint16();
+		const int16_t colourMapLength __attribute__((unused))= f->uint16();
+		const int8_t colourMapDepth __attribute__((unused))= f->byte();
+		const int16_t xOrigin __attribute__((unused)) = f->uint16();
+		const int16_t yOrigin __attribute__((unused)) = f->uint16();
 		const int16_t width = f->uint16();
 		const int16_t height = f->uint16();
 		const int8_t bitsPerPixel = f->byte();
 		if((bitsPerPixel!=8)&&(bitsPerPixel!=24)&&(bitsPerPixel!=32))
 			graphics_error("unsupported TGA depth: "<<bitsPerPixel<<", "<<path);
 		const int components = bitsPerPixel/8;
-		const int8_t imageDescriptor = f->byte();
+		const int8_t imageDescriptor __attribute__((unused)) = f->byte();
 		const size_t bytes = width*height*components;
 		enum type_t { UN_RGB=2, UN_BW=3 };
 		if(UN_RGB == dataTypeCode) {
