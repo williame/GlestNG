@@ -13,6 +13,28 @@
 #include "error.hpp"
 #include "3d.hpp"
 
+quat_t quat_t::slerp(const quat_t& d,float t) const {
+	if(t<=0) return *this;
+	if(t>=1) return d;
+	quat_t l(d);
+	float cosOmega = dot(d);
+	if(cosOmega<0) {
+		l = -l;
+		cosOmega = -cosOmega;
+	}
+	assert(cosOmega < 1.1f);
+	if(cosOmega > 0.9999f) // very close
+		return (*this*(1.0f-t))+(d*t);
+	else {
+		const float sinOmega = sqrt(1.0f - sqrd(cosOmega));
+		const float omega = atan2(sinOmega,cosOmega);
+		const float oneOverSinOmega = 1.0f / sinOmega;
+		const float k0 = sin((1.0f-t)*omega)*oneOverSinOmega;
+		const float k1 = sin(t*omega)*oneOverSinOmega;
+		return (*this*k0)+(l*k1);
+	}
+}
+
 vec_t& vec_t::normalise() {
 	const float d  = sqrt(x*x + y*y + z*z);
 	if(d > 0) {

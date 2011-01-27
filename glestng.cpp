@@ -293,8 +293,8 @@ void camera() {
 //	glPushMatrix();
 	glScalef(2,2,2);
 	matrix_t projection, modelview;
-	glGetDoublev(GL_MODELVIEW_MATRIX,projection.d);
-	glGetDoublev(GL_PROJECTION_MATRIX,modelview.d);
+	glGetFloatv(GL_MODELVIEW_MATRIX,projection.f);
+	glGetFloatv(GL_PROJECTION_MATRIX,modelview.f);
 	world()->set_frustum(vec_t(0,0,-3),projection*modelview);
 //	glPopMatrix();
 }

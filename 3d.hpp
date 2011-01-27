@@ -13,11 +13,22 @@
 #include <iostream>
 #include "error.hpp"
 
+struct quat_t;
+
 struct matrix_t {
-	double d[16];
+	float f[16];
 	inline matrix_t operator*(const matrix_t& o) const;
 	inline matrix_t& operator*=(const matrix_t& o);
-	inline double operator()(int r,int c) const { return d[r*4+c]; }
+	inline float operator()(int r,int c) const;
+};
+
+struct quat_t {
+	float x, y, z, w;
+	inline float dot(const quat_t& q) const;
+	inline quat_t operator-() const;
+	inline quat_t operator*(float f) const;
+	inline quat_t operator+(const quat_t& q) const;
+	quat_t slerp(const quat_t& d,float t) const;
 };
 
 struct ray_t;
@@ -137,27 +148,52 @@ inline float sqrd(float x) { return x*x; }
 
 inline matrix_t matrix_t::operator*(const matrix_t& o) const {
 	matrix_t m = {{
-		d[ 0] * o.d[ 0] + d[ 1] * o.d[ 4] + d[ 2] * o.d[ 8] + d[ 3] * o.d[12],
-		d[ 0] * o.d[ 1] + d[ 1] * o.d[ 5] + d[ 2] * o.d[ 9] + d[ 3] * o.d[13],
-		d[ 0] * o.d[ 2] + d[ 1] * o.d[ 6] + d[ 2] * o.d[10] + d[ 3] * o.d[14],
-		d[ 0] * o.d[ 3] + d[ 1] * o.d[ 7] + d[ 2] * o.d[11] + d[ 3] * o.d[15],
-		d[ 4] * o.d[ 0] + d[ 5] * o.d[ 4] + d[ 6] * o.d[ 8] + d[ 7] * o.d[12],
-		d[ 4] * o.d[ 1] + d[ 5] * o.d[ 5] + d[ 6] * o.d[ 9] + d[ 7] * o.d[13],
-		d[ 4] * o.d[ 2] + d[ 5] * o.d[ 6] + d[ 6] * o.d[10] + d[ 7] * o.d[14],
-		d[ 4] * o.d[ 3] + d[ 5] * o.d[ 7] + d[ 6] * o.d[11] + d[ 7] * o.d[15],
-		d[ 8] * o.d[ 0] + d[ 9] * o.d[ 4] + d[10] * o.d[ 8] + d[11] * o.d[12],
-		d[ 8] * o.d[ 1] + d[ 9] * o.d[ 5] + d[10] * o.d[ 9] + d[11] * o.d[13],
-		d[ 8] * o.d[ 2] + d[ 9] * o.d[ 6] + d[10] * o.d[10] + d[11] * o.d[14],
-		d[ 8] * o.d[ 3] + d[ 9] * o.d[ 7] + d[10] * o.d[11] + d[11] * o.d[15],
-		d[12] * o.d[ 0] + d[13] * o.d[ 4] + d[14] * o.d[ 8] + d[15] * o.d[12],
-		d[12] * o.d[ 1] + d[13] * o.d[ 5] + d[14] * o.d[ 9] + d[15] * o.d[13],
-		d[12] * o.d[ 2] + d[13] * o.d[ 6] + d[14] * o.d[10] + d[15] * o.d[14],
-		d[12] * o.d[ 3] + d[13] * o.d[ 7] + d[14] * o.d[11] + d[15] * o.d[15] }};
+		f[ 0] * o.f[ 0] + f[ 1] * o.f[ 4] + f[ 2] * o.f[ 8] + f[ 3] * o.f[12],
+		f[ 0] * o.f[ 1] + f[ 1] * o.f[ 5] + f[ 2] * o.f[ 9] + f[ 3] * o.f[13],
+		f[ 0] * o.f[ 2] + f[ 1] * o.f[ 6] + f[ 2] * o.f[10] + f[ 3] * o.f[14],
+		f[ 0] * o.f[ 3] + f[ 1] * o.f[ 7] + f[ 2] * o.f[11] + f[ 3] * o.f[15],
+		f[ 4] * o.f[ 0] + f[ 5] * o.f[ 4] + f[ 6] * o.f[ 8] + f[ 7] * o.f[12],
+		f[ 4] * o.f[ 1] + f[ 5] * o.f[ 5] + f[ 6] * o.f[ 9] + f[ 7] * o.f[13],
+		f[ 4] * o.f[ 2] + f[ 5] * o.f[ 6] + f[ 6] * o.f[10] + f[ 7] * o.f[14],
+		f[ 4] * o.f[ 3] + f[ 5] * o.f[ 7] + f[ 6] * o.f[11] + f[ 7] * o.f[15],
+		f[ 8] * o.f[ 0] + f[ 9] * o.f[ 4] + f[10] * o.f[ 8] + f[11] * o.f[12],
+		f[ 8] * o.f[ 1] + f[ 9] * o.f[ 5] + f[10] * o.f[ 9] + f[11] * o.f[13],
+		f[ 8] * o.f[ 2] + f[ 9] * o.f[ 6] + f[10] * o.f[10] + f[11] * o.f[14],
+		f[ 8] * o.f[ 3] + f[ 9] * o.f[ 7] + f[10] * o.f[11] + f[11] * o.f[15],
+		f[12] * o.f[ 0] + f[13] * o.f[ 4] + f[14] * o.f[ 8] + f[15] * o.f[12],
+		f[12] * o.f[ 1] + f[13] * o.f[ 5] + f[14] * o.f[ 9] + f[15] * o.f[13],
+		f[12] * o.f[ 2] + f[13] * o.f[ 6] + f[14] * o.f[10] + f[15] * o.f[14],
+		f[12] * o.f[ 3] + f[13] * o.f[ 7] + f[14] * o.f[11] + f[15] * o.f[15] }};
 	return m;
 }
 
 inline matrix_t& matrix_t::operator*=(const matrix_t& o) {
 	return *this = (*this*o);
+}
+
+inline float matrix_t::operator()(int r,int c) const {
+	assert(r>=0 && r<4);
+	assert(c>=0 && c<4);
+	return f[r*4+c]; 
+}
+
+inline quat_t quat_t::operator-() const {
+	quat_t ret = {-x,-y,-z,-w};
+	return ret;
+}
+
+inline quat_t quat_t::operator*(float f) const {
+	quat_t ret = {x*f,y*f,z*f,w*f};
+	return ret;
+}
+
+inline quat_t quat_t::operator+(const quat_t& q) const {
+	quat_t ret = {x+q.x,y+q.y,z+q.z,w+q.w};
+	return ret;
+}
+
+inline float quat_t::dot(const quat_t& q) const {
+	return x*q.x + y*q.y + z*q.z + w*q.w;
 }
 
 inline vec_t& vec_t::operator-=(const vec_t& v) {
@@ -175,9 +211,9 @@ inline vec_t vec_t::operator-(const vec_t& v) const {
 
 inline vec_t& vec_t::operator*=(const matrix_t& m) {
 	const float x = this->x, y = this->y, z = this->z;
-	this->x = x * m.d[0] + y * m.d[4] + z * m.d[8] + m.d[12];
-	this->y = x * m.d[1] + y * m.d[5] + z * m.d[9] + m.d[13];
-	this->z = x * m.d[2] + y * m.d[6] + z * m.d[10] + m.d[14];  	
+	this->x = x * m.f[0] + y * m.f[4] + z * m.f[8] + m.f[12];
+	this->y = x * m.f[1] + y * m.f[5] + z * m.f[9] + m.f[13];
+	this->z = x * m.f[2] + y * m.f[6] + z * m.f[10] + m.f[14];  	
 	return *this;
 }
 
