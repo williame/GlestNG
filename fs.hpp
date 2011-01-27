@@ -8,6 +8,12 @@
 #ifndef __FS_HPP__
 #define __FS_HPP__
 
+/** the idea behind this abstraction is that we can create a unionfs that
+  can load content out of zipfiles.  At the moment files are identified by
+  path, but with network games they will also be identified by ZIP CRCs
+  and multiple versions distinct by CRC will be supported.
+*/
+
 #include <ostream>
 #include <vector>
 #include <memory>
@@ -34,7 +40,7 @@ private:
 
 class fs_handle_t {
 public:
-	typedef std::auto_ptr<fs_handle_t> ptr_t;
+	typedef std::auto_ptr<fs_handle_t> ptr_t; // are you sure?
 	virtual ~fs_handle_t() {}
 	virtual istream_t::ptr_t reader() = 0;
 	virtual const char* path() const = 0;
