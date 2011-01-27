@@ -107,7 +107,7 @@ void model_g3d_t::mesh_t::draw(int frame) {
 		glBindBuffer(GL_ARRAY_BUFFER,(frame<(int)tex_coords.size()? tex_coords[frame]: tex_coords[0]));
 		glTexCoordPointer(2,GL_FLOAT,0,NULL);
 		glBindTexture(GL_TEXTURE_2D,textures[DIFFUSE]);
-		glColor4f(1,1,1,1);
+		//glColor4f(1,1,1,1);
 	}
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,indices);
 	glDrawElements(GL_TRIANGLES,index_count,GL_UNSIGNED_INT,NULL);

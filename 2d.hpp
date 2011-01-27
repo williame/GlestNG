@@ -35,6 +35,7 @@ struct rect_t {
 	inline vec2_t size() const { return vec2_t(w(),h()); }
 	inline bool empty() const { return (br.x<=tl.x) || (br.y<=tl.y); }
 	inline void normalise() { vec2_t::normalise(tl,br); }
+	inline bool contains(const vec2_t& pt) const;
 };
 
 inline vec2_t& vec2_t::operator+=(const vec2_t& a) {
@@ -72,6 +73,10 @@ inline void vec2_t::normalise(vec2_t& tl,vec2_t& br) {
 		br.y = tl.y;
 		tl.y = tmp;
 	}
+}
+
+inline bool rect_t::contains(const vec2_t& pt) const {
+	return (pt.x>=tl.x) && (pt.y>=tl.y) && (pt.x<br.x) && (pt.y<br.y);
 }
 
 inline std::ostream& operator<<(std::ostream& out,const vec2_t& v) {

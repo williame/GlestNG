@@ -157,6 +157,7 @@ tests_t objs;
 void spatial_test() {
 	size_t bad = 0;
 	enum { MIN_OBJS = 150, MAX_OBJS = 170, };
+	glDisable(GL_TEXTURE_2D);
 	for(int i=objs.size()-1; i>=0; i--) {
 		test_t* obj = objs[i];
 		if(obj->drawn != frame_count) {
@@ -168,6 +169,7 @@ void spatial_test() {
 			delete obj;
 		}
 	}
+	glEnable(GL_TEXTURE_2D);
 //	if(bad)
 //		std::cerr << "("<<bad<<" objects were not drawn)" << std::endl;
 	if(!objs.size() < MIN_OBJS) {
@@ -179,7 +181,7 @@ void spatial_test() {
 }
 
 void tick() {
-	spatial_test();
+	//spatial_test();
 	frame_count++;
 	const world_t::hits_t& visible = world()->visible();
 	visible_objects = visible.size();
@@ -367,7 +369,7 @@ int main(int argc,char** args) {
 
 		load();
 		
-		//terrain_t::gen_planet(5,500,3);
+		terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);
 	
 		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),

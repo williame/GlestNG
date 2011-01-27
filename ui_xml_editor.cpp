@@ -21,6 +21,7 @@
 #include "graphics.hpp"
 #include "xml.hpp"
 #include "ui_xml_editor.hpp"
+#include "world.hpp"
 
 namespace {
 	struct line_t {
@@ -68,6 +69,7 @@ public:
 	void insert(char ch);
 	void bksp();
 	void del();
+	void button_up(const vec2_t& pt);
 	const int em; // width of space
 	const int h; // line height
 	vec2_t view_ofs;
@@ -79,6 +81,14 @@ private:
 	bool dirty;
 	cursor_t cursor;
 };
+
+void ui_xml_editor_t::pimpl_t::button_up(const vec2_t& pt) {
+	assert(pt.y >= 0);
+	assert(pt.x >= 0);
+	cursor.row = pt.y / h;
+	cursor.row = std::min(cursor.row,lines.size()-1);
+	cursor.col = char_from_ofs(pt.x,cursor.row);
+}
 
 void ui_xml_editor_t::pimpl_t::nav_left() {
 	if(cursor.col)
@@ -291,6 +301,17 @@ bool ui_xml_editor_t::offer(const SDL_Event& event) {
 	switch(event.type) {
 	case SDL_KEYUP:
 		return true; // ignore them but eat them
+	case SDL_MOUSEMOTION:
+	case SDL_MOUSEBUTTONDOWN:
+		return get_rect().contains(vec2_t(event.button.x,event.button.y));
+	case SDL_MOUSEBUTTONUP:
+		if(get_rect().contains(vec2_t(event.button.x,event.button.y))) {
+			const int x = event.button.x - get_rect().tl.x + pimpl->view_ofs.x;
+			const int y = event.button.y - get_rect().tl.y + pimpl->view_ofs.y - pimpl->h;
+			pimpl->button_up(vec2_t(x,y));
+			return true;
+		}
+		return false;
 	case SDL_KEYDOWN: {
 		switch(event.key.keysym.sym) {
 		case SDLK_ESCAPE: return false;
@@ -335,9 +356,9 @@ struct color_t {
 	{0x80,0x80,0x80,0xff}, //IGNORE
 	{0x00,0x80,0xff,0xff}, //OPEN
 	{0x00,0x40,0x80,0xff}, //CLOSE
-	{0xff,0x40,0x40,0xff}, //KEY
+	{0x40,0xa0,0xa0,0xff}, //KEY
 	{0x00,0x20,0xff,0xff}, //VALUE
-	{0x00,0x20,0xff,0xff}, //DATA
+	{0xa0,0xa0,0xa0,0xff}, //DATA
 	{0xff,0x00,0x00,0xff}, //ERROR
 };
 
@@ -373,7 +394,7 @@ void ui_xml_editor_t::draw() {
 	COL[CURSOR_COL].set();
 	caret += r.tl;
 	caret -= view_ofs;
-	draw_filled_box(rect_t(caret,caret+vec2_t(3,h)));
+	draw_filled_box(rect_t(caret,caret+vec2_t((now()%700)>350?10:3,h)));
 	int y = r.tl.y;
 	for(size_t i = view_ofs.y/h; i<lines.size(); i++) {
 		if(y > r.br.y) break;
