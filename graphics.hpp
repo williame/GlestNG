@@ -16,6 +16,8 @@
 #include <GL/glew.h>
 #include <SDL.h>
 
+class fs_handle_t;
+
 class graphics_t {
 public:
 	class mgr_t {
@@ -31,11 +33,11 @@ public:
 	virtual ~graphics_t();
 	GLuint alloc_vbo();
 	void load_vbo(GLuint id,GLenum target,GLsizeiptr size,const GLvoid* data,GLenum usage);
-	GLuint alloc_texture(const char* path); // PREFERRED METHOD, SHARED
+	GLuint alloc_texture(fs_handle_t& file); // PREFERRED METHOD, SHARED
 	// raw stuff if you know what you're doing
 	GLuint alloc_texture();
 	void load_texture_2D(GLuint id,SDL_Surface* image);
-	SDL_Surface* load_surface(const char* path);
+	SDL_Surface* load_surface(fs_handle_t& file);
 private:
 	graphics_t();
 	struct pimpl_t;

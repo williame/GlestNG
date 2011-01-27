@@ -59,21 +59,21 @@ void graphics_t::load_vbo(GLuint buffer,GLenum target,GLsizeiptr size,const GLvo
 	//#### glCheckErrors
 }
 
-GLuint graphics_t::alloc_texture(const char* path) {
-	pimpl_t::textures_t::const_iterator i = pimpl->textures.find(path);
+GLuint graphics_t::alloc_texture(fs_handle_t& file) {
+	pimpl_t::textures_t::const_iterator i = pimpl->textures.find(file.path());
 	if(i != pimpl->textures.end())
 		return i->second;
-	SDL_Surface* surface = load_surface(path);
+	SDL_Surface* surface = load_surface(file);
 	GLuint texture = 0;
 	try {
 		texture = graphics()->alloc_texture();
 		load_texture_2D(texture,surface);
-		std::cout << "(loaded texture "<<path<<" "<<surface->w<<'x'<<surface->h<<")" << std::endl;
+		std::cout << "(loaded texture "<<file<<" "<<surface->w<<'x'<<surface->h<<")" << std::endl;
 		SDL_FreeSurface(surface); surface = NULL;
-		pimpl->textures[path] = texture;
+		pimpl->textures[file.path()] = texture;
 		return texture;
 	} catch(...) {
-		std::cerr << "Error loading: "<<path<<std::endl;
+		std::cerr << "Error loading: "<<file<<std::endl;
 		SDL_FreeSurface(surface);
 		glDeleteTextures(1,&texture);
 		throw;
@@ -120,13 +120,13 @@ void graphics_t::load_texture_2D(GLuint texture,SDL_Surface* image) {
 	glBindTexture(GL_TEXTURE_2D,0);
 }
 
-SDL_Surface* graphics_t::load_surface(const char* path) {
-	if(SDL_Surface* bmp = SDL_LoadBMP(path))
+SDL_Surface* graphics_t::load_surface(fs_handle_t& file) {
+	std::cout << "(loading texture "<<file<<")"<<std::endl;
+	if(SDL_Surface* bmp = SDL_LoadBMP(file.path()))
 		return bmp;
-	fs_handle_t::ptr_t h(fs()->get(path));
-	if(!strcmp(h->ext(),"tga")) {
-		istream_t::ptr_t f(h->reader());
-		if(f->byte()) graphics_error("TGA contains an ID: "<<path);
+	if(!strcmp(file.ext(),"tga")) {
+		istream_t::ptr_t f(file.reader());
+		if(f->byte()) graphics_error("TGA contains an ID: "<<file);
 		const int8_t colourMapType __attribute__((unused)) = f->byte();
 		const int8_t dataTypeCode = f->byte();
 		const int16_t colourMapOrigin __attribute__((unused))= f->uint16();
@@ -138,19 +138,19 @@ SDL_Surface* graphics_t::load_surface(const char* path) {
 		const int16_t height = f->uint16();
 		const int8_t bitsPerPixel = f->byte();
 		if((bitsPerPixel!=8)&&(bitsPerPixel!=24)&&(bitsPerPixel!=32))
-			graphics_error("unsupported TGA depth: "<<bitsPerPixel<<", "<<path);
+			graphics_error("unsupported TGA depth: "<<bitsPerPixel<<", "<<file);
 		const int components = bitsPerPixel/8;
 		const int8_t imageDescriptor __attribute__((unused)) = f->byte();
 		const size_t bytes = width*height*components;
 		enum type_t { UN_RGB=2, UN_BW=3 };
 		if(UN_RGB == dataTypeCode) {
 			SDL_Surface* tga = SDL_CreateRGBSurface(SDL_SWSURFACE,width,height,bitsPerPixel,0,0,0,0);
-			if(!tga) graphics_error("could not create surface for "<<path<<", "<<SDL_GetError());
+			if(!tga) graphics_error("could not create surface for "<<file<<", "<<SDL_GetError());
 			f->read(tga->pixels,bytes);
 			return tga;
 		} else
-			graphics_error("TGA type "<<dataTypeCode<<" not yet supported: "<<path);
+			graphics_error("TGA type "<<dataTypeCode<<" not yet supported: "<<file);
 	}
-	graphics_error("Unsupported type: "<<path << " ("<<h->ext()<<')');
+	graphics_error("Unsupported type: "<<file << " ("<<file.ext()<<')');
 }
 

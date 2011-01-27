@@ -108,9 +108,13 @@ struct fs_t::pimpl_t {
 	const std::string data_directory;
 };
 
+static bool _starts_with(const std::string& str,const std::string& sub) {
+	return (str.find(sub)==0);
+}
+
 std::string fs_t::canocial(const std::string& path) const {
 	//### tidy up and .. and check its not breaking root
-	if(path.find(pimpl->data_directory)==0)
+	if(_starts_with(path,pimpl->data_directory))
 		return path;
 	return pimpl->data_directory+'/'+path;
 }
@@ -142,9 +146,13 @@ static bool _is_dir(const char* path) {
 bool fs_t::is_dir(const std::string& path) const { return _is_dir(canocial(path).c_str()); }
 
 std::string fs_t::join(const std::string& path,const std::string& sub) const {
+	if(_starts_with(sub,pimpl->data_directory))
+		return canocial(sub);
+	const char* s = sub.c_str();
+	while((*s=='\\')||(*s=='/')) s++;
 	if(is_dir(path))
-		return canocial(path+'/'+sub);
-	return canocial(parent_directory(path)+'/'+sub);
+		return canocial(path+'/'+s);
+	return canocial(parent_directory(path)+'/'+s);
 }
 
 std::string fs_t::parent_directory(const std::string& path) const {

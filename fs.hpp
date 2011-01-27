@@ -67,6 +67,8 @@ public:
 	std::string join(const std::string& path,const std::string& sub) const;
 	std::string parent_directory(const std::string& path) const;
 	fs_handle_t* get(const std::string& path);
+	fs_handle_t* get(const istream_t& parent,const std::string& rel);
+	fs_handle_t* get(const std::string& parent,const std::string& rel);
 	typedef std::vector<std::string> list_t;
 	list_t list_dirs(const std::string& path);
 	list_t list_files(const std::string& path);
@@ -82,6 +84,10 @@ inline fs_t* fs() { return fs_t::fs(); }
 
 inline std::ostream& operator<<(std::ostream& out,const istream_t& repr) {
 	return repr.repr(out);
+}
+
+inline std::ostream& operator<<(std::ostream& out,const fs_handle_t& repr) {
+	return out << repr.path();
 }
 
 template<int N> std::string istream_t::fixed_str() {
@@ -105,6 +111,14 @@ inline float istream_t::float32() { return _r<float>(); }
 
 inline void istream_t::skip(size_t n) {
 	while(n--) byte();
+}
+
+inline fs_handle_t* fs_t::get(const istream_t& parent,const std::string& rel) {
+	return get(parent.path(),rel);
+}
+
+inline fs_handle_t* fs_t::get(const std::string& parent,const std::string& rel) {
+	return get(join(parent,rel));
 }
 
 #endif //__FS_HPP__

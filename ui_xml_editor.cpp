@@ -40,7 +40,7 @@ public:
 	pimpl_t(ui_xml_editor_t& ui_,const std::string& title,istream_t& in):
 		em(font_mgr()->measure(' ').x),
 		h(font_mgr()->measure(' ').y), 
-		view_ofs(0,0),
+		view_ofs(0,0), mouse_grab(false),
 		ui(ui_),
 		body(new xml_parser_t(title.c_str(),in)),
 		dirty(true) {
@@ -73,6 +73,7 @@ public:
 	const int em; // width of space
 	const int h; // line height
 	vec2_t view_ofs;
+	bool mouse_grab;
 private:
 	ui_xml_editor_t& ui;
 	void _append(line_t& line,int i,xml_parser_t::type_t type);
@@ -302,13 +303,17 @@ bool ui_xml_editor_t::offer(const SDL_Event& event) {
 	case SDL_KEYUP:
 		return true; // ignore them but eat them
 	case SDL_MOUSEMOTION:
+		return pimpl->mouse_grab;
 	case SDL_MOUSEBUTTONDOWN:
-		return get_rect().contains(vec2_t(event.button.x,event.button.y));
+		pimpl->mouse_grab = get_rect().contains(vec2_t(event.button.x,event.button.y));
+		return pimpl->mouse_grab;
 	case SDL_MOUSEBUTTONUP:
-		if(get_rect().contains(vec2_t(event.button.x,event.button.y))) {
-			const int x = event.button.x - get_rect().tl.x + pimpl->view_ofs.x;
-			const int y = event.button.y - get_rect().tl.y + pimpl->view_ofs.y - pimpl->h;
-			pimpl->button_up(vec2_t(x,y));
+		if(pimpl->mouse_grab) {
+			if(get_rect().contains(vec2_t(event.button.x,event.button.y))) {
+				const int x = event.button.x - get_rect().tl.x + pimpl->view_ofs.x;
+				const int y = event.button.y - get_rect().tl.y + pimpl->view_ofs.y - pimpl->h;
+				pimpl->button_up(vec2_t(x,y));
+			}
 			return true;
 		}
 		return false;
