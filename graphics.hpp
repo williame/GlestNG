@@ -8,39 +8,41 @@
 #ifndef __GRAPHICS_HPP__
 #define __GRAPHICS_HPP__
 
+#include <memory>
+
 #define USE_GL
 
 #define GLEW_STATIC
 #include <GL/glew.h>
 #include <SDL.h>
 
-#include <map>
-
-class art_mgr_t {
+class graphics_t {
 public:
-	static art_mgr_t* mgr();
-	GLuint attach_texture(const char* base,const char* filename);
-	void detach_texture(GLuint id);
-private:
-	struct pimpl_t;
-	pimpl_t* pimpl;
-	art_mgr_t();
-};
-
-inline art_mgr_t* art_mgr() { return art_mgr_t::mgr(); }
-
-class graphics_mgr_t {
-public:
-	static graphics_mgr_t* mgr();
+	class mgr_t {
+	public:
+		// can add functions and properties here that only the mgr should be able to do
+		virtual ~mgr_t();
+	private:
+		friend class graphics_t;
+		mgr_t() {}
+	};
+	static std::auto_ptr<mgr_t> create();
+	static graphics_t* graphics();
+	virtual ~graphics_t();
 	GLuint alloc_vbo();
 	void load_vbo(GLuint id,GLenum target,GLsizeiptr size,const GLvoid* data,GLenum usage);
+	GLuint alloc_texture(const char* path); // PREFERRED METHOD, SHARED
+	// raw stuff if you know what you're doing
 	GLuint alloc_texture();
 	void load_texture_2D(GLuint id,SDL_Surface* image);
+	SDL_Surface* load_surface(const char* path);
 private:
-	graphics_mgr_t();
+	graphics_t();
+	struct pimpl_t;
+	pimpl_t* pimpl;
 };
 
-inline graphics_mgr_t* graphics_mgr() { return graphics_mgr_t::mgr(); }
+inline graphics_t* graphics() { return graphics_t::graphics(); }
 
 #endif //__GRAPHICS_HPP__
 

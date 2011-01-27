@@ -5,24 +5,53 @@
  (c) William Edwards, 2011; all rights reserved
 */
 
+#include <iostream>
+#include <map>
+
 #include "error.hpp"
 #include "graphics.hpp"
+#include "fs.hpp"
 
-graphics_mgr_t* graphics_mgr_t::mgr() {
-	static graphics_mgr_t* singleton = NULL;
-	if(!singleton)
-		singleton = new graphics_mgr_t();
+struct graphics_t::pimpl_t {
+	typedef std::map<std::string,GLuint> textures_t;
+	textures_t textures;
+};
+
+static graphics_t* singleton = NULL;
+
+graphics_t::mgr_t::~mgr_t() {
+	delete singleton;
+}
+
+std::auto_ptr<graphics_t::mgr_t> graphics_t::create() {
+	if(singleton) panic("graphics singleton already exists");
+	singleton = new graphics_t();
+	return std::auto_ptr<mgr_t>(new mgr_t());
+}
+
+graphics_t* graphics_t::graphics() {
+#ifndef NDEBUG // else let the OS pick up the pieces
+	if(!singleton) panic("graphics singleton does not exist");
+#endif
 	return singleton;
 }
 
-GLuint graphics_mgr_t::alloc_vbo() {
+graphics_t::~graphics_t() {
+	if(this != singleton) panic("WTF this is not the graphics singleton");
+	singleton = NULL;
+	delete pimpl;
+}
+
+graphics_t::graphics_t(): pimpl(new pimpl_t()) {}
+
+GLuint graphics_t::alloc_vbo() {
 	GLuint buffer;
 	glGenBuffers(1,&buffer);
 	if(!buffer) graphics_error("could not get GL to allocate a VBO ID");
 	return buffer;
 }
 
-void graphics_mgr_t::load_vbo(GLuint buffer,GLenum target,GLsizeiptr size,const GLvoid* data,GLenum usage) {
+void graphics_t::load_vbo(GLuint buffer,GLenum target,GLsizeiptr size,const GLvoid* data,GLenum usage) {
 	if(!buffer) graphics_error("VBO handle not set");
 	glBindBuffer(target,buffer);
 	glBufferData(target,size,data,usage);
@@ -30,7 +59,29 @@ void graphics_mgr_t::load_vbo(GLuint buffer,GLenum target,GLsizeiptr size,const 
 	//#### glCheckErrors
 }
 
-GLuint graphics_mgr_t::alloc_texture() {
+GLuint graphics_t::alloc_texture(const char* path) {
+	pimpl_t::textures_t::const_iterator i = pimpl->textures.find(path);
+	if(i != pimpl->textures.end())
+		return i->second;
+	SDL_Surface* surface = load_surface(path);
+	GLuint texture = 0;
+	try {
+		texture = graphics()->alloc_texture();
+		load_texture_2D(texture,surface);
+		std::cout << "(loaded texture "<<path<<" "<<surface->w<<'x'<<surface->h<<")" << std::endl;
+		SDL_FreeSurface(surface); surface = NULL;
+		pimpl->textures[path] = texture;
+		return texture;
+	} catch(...) {
+		std::cerr << "Error loading: "<<path<<std::endl;
+		SDL_FreeSurface(surface);
+		glDeleteTextures(1,&texture);
+		throw;
+	}
+	return texture;
+}
+
+GLuint graphics_t::alloc_texture() {
 	GLuint texture;
 	glGenTextures(1,&texture);
 	if(!texture)
@@ -38,7 +89,7 @@ GLuint graphics_mgr_t::alloc_texture() {
 	return texture;
 }
 	
-void graphics_mgr_t::load_texture_2D(GLuint texture,SDL_Surface* image) {
+void graphics_t::load_texture_2D(GLuint texture,SDL_Surface* image) {
 	if(!texture)
 		graphics_error("texture handle not set");
 	if(image->w&(image->w-1))
@@ -69,5 +120,37 @@ void graphics_mgr_t::load_texture_2D(GLuint texture,SDL_Surface* image) {
 	glBindTexture(GL_TEXTURE_2D,0);
 }
 
-graphics_mgr_t::graphics_mgr_t() {}
+SDL_Surface* graphics_t::load_surface(const char* path) {
+	if(SDL_Surface* bmp = SDL_LoadBMP(path))
+		return bmp;
+	fs_handle_t::ptr_t h(fs()->get(path));
+	if(!strcmp(h->ext(),"tga")) {
+		istream_t::ptr_t f(h->reader());
+		if(f->byte()) graphics_error("TGA contains an ID: "<<path);
+		const int8_t colourMapType = f->byte();
+		const int8_t dataTypeCode = f->byte();
+		const int16_t colourMapOrigin = f->uint16();
+		const int16_t colourMapLength = f->uint16();
+		const int8_t colourMapDepth = f->byte();
+		const int16_t xOrigin = f->uint16();
+		const int16_t yOrigin = f->uint16();
+		const int16_t width = f->uint16();
+		const int16_t height = f->uint16();
+		const int8_t bitsPerPixel = f->byte();
+		if((bitsPerPixel!=8)&&(bitsPerPixel!=24)&&(bitsPerPixel!=32))
+			graphics_error("unsupported TGA depth: "<<bitsPerPixel<<", "<<path);
+		const int components = bitsPerPixel/8;
+		const int8_t imageDescriptor = f->byte();
+		const size_t bytes = width*height*components;
+		enum type_t { UN_RGB=2, UN_BW=3 };
+		if(UN_RGB == dataTypeCode) {
+			SDL_Surface* tga = SDL_CreateRGBSurface(SDL_SWSURFACE,width,height,bitsPerPixel,0,0,0,0);
+			if(!tga) graphics_error("could not create surface for "<<path<<", "<<SDL_GetError());
+			f->read(tga->pixels,bytes);
+			return tga;
+		} else
+			graphics_error("TGA type "<<dataTypeCode<<" not yet supported: "<<path);
+	}
+	graphics_error("Unsupported type: "<<path << " ("<<h->ext()<<')');
+}
 

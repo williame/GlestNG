@@ -23,14 +23,24 @@ struct model_g3d_t::mesh_t {
 		tex_coord_t(float x_,float y_): x(x_), y(y_) {}
 		float x, y;
 	};
+	enum texture_t {
+		DIFFUSE,
+		SPECULAR,
+		NORMAL,
+		REFLECTION,
+		COLORMASK,
+		TEXTURE_COUNT
+	};
+	GLuint textures[TEXTURE_COUNT];
 };
 
 model_g3d_t::mesh_t::mesh_t(std::string n,GLuint i):
-	name(n), index_count(i), indices(0)
-{}
+	name(n), index_count(i), indices(0) {
+	memset(textures,0,sizeof(textures));
+}
 
 model_g3d_t::mesh_t::~mesh_t() {
-	//### free VBOs
+	//### free VBOs and release (shared) textures
 }
 
 void model_g3d_t::mesh_t::draw(int frame) {
@@ -38,8 +48,19 @@ void model_g3d_t::mesh_t::draw(int frame) {
         glVertexPointer(3,GL_FLOAT,0,NULL);
         glBindBuffer(GL_ARRAY_BUFFER,normals[frame]);
         glNormalPointer(GL_FLOAT,0,NULL);
+        if(textures[DIFFUSE]) {
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		glBindBuffer(GL_ARRAY_BUFFER,tex_coords[frame]);
+		glTexCoordPointer(2,GL_FLOAT,0,NULL);
+		glBindTexture(GL_TEXTURE_2D,textures[DIFFUSE]);
+            	glColor4f(1,1,1,1);
+	}
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,indices);
         glDrawElements(GL_TRIANGLES,index_count,GL_UNSIGNED_INT,NULL);
+        if(textures[DIFFUSE]) {
+		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+		glBindTexture(GL_TEXTURE_2D,0);
+	}
 }
 
 model_g3d_t::model_g3d_t(istream_t& in) {
@@ -82,18 +103,18 @@ void model_g3d_t::load_v4(istream_t& in) {
         		in.skip(8*4);
         		const uint32_t properties = in.uint32(),
         			textures = in.uint32();
-		for(int t=0; t<5; t++)
-			if((1<<t)&textures) {
-				std::cout << in << "\n\t:skipping " << t << ": " << in.fixed_str<64>() << std::endl;
-			}
+        		for(int t=0; t<mesh_t::TEXTURE_COUNT; t++)
+			if((1<<t)&textures)
+				mesh->textures[t] = graphics()->alloc_texture(
+					fs()->join(in.path(),in.fixed_str<64>().c_str()).c_str());
 		fixed_array_t<vec_t> vec(vertex_count);
 		for(int pass=0; pass<2; pass++)
 			for(uint32_t f=0; f<frame_count; f++) {
 				vec.clear();
 				while(!vec.full())
 					vec.append(vec_t(in.float32(),in.float32(),in.float32()));
-				GLuint vbo = graphics_mgr()->alloc_vbo();
-				graphics_mgr()->load_vbo(vbo,
+				GLuint vbo = graphics()->alloc_vbo();
+				graphics()->load_vbo(vbo,
 					GL_ARRAY_BUFFER,
 					vertex_count*sizeof(vec_t),
 					vec.ptr(),
@@ -111,8 +132,8 @@ void model_g3d_t::load_v4(istream_t& in) {
 			for(uint32_t f=0; f<frame_count; f++) {
 				while(!tex.full())
 					tex.append(mesh_t::tex_coord_t(in.float32(),in.float32()));
-        				GLuint vbo = graphics_mgr()->alloc_vbo();
-        				graphics_mgr()->load_vbo(vbo,
+        				GLuint vbo = graphics()->alloc_vbo();
+        				graphics()->load_vbo(vbo,
 						GL_ARRAY_BUFFER,
 						vertex_count*sizeof(mesh_t::tex_coord_t),
 						tex.ptr(),
@@ -123,8 +144,8 @@ void model_g3d_t::load_v4(istream_t& in) {
         		fixed_array_t<face_t> faces(index_count/3);
         		while(!faces.full())
         			faces.append(face_t(in.uint32(),in.uint32(),in.uint32()));
-        		mesh->indices = graphics_mgr()->alloc_vbo();
-        		graphics_mgr()->load_vbo(mesh->indices,
+        		mesh->indices = graphics()->alloc_vbo();
+        		graphics()->load_vbo(mesh->indices,
         			GL_ELEMENT_ARRAY_BUFFER,
         			index_count*sizeof(face_t),
         			faces.ptr(),

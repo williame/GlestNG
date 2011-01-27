@@ -21,6 +21,7 @@ class FILE_stream_t: public istream_t {
 public:
 	FILE_stream_t(const char* filename,const char* mode);
 	~FILE_stream_t();
+	const char* path() const { return filename.c_str(); }
 	void read(void* dest,size_t bytes);
 	void write(const void* src,size_t bytes);
 	char* read_allz();
@@ -81,22 +82,48 @@ std::ostream& FILE_stream_t::repr(std::ostream& out) const {
 	return out << filename;
 }
 
-class fs_t: public fs_mgr_t {
+class fs_handle_impl_t: public fs_handle_t {
 public:
-	fs_t(const std::string& data_directory);
-	bool is_file(const std::string& path) const;
-	bool is_dir(const std::string& path) const;
-	std::string canocial(const std::string& path) const;
-	std::string join(const std::string& path,const std::string& sub) const;
-	std::auto_ptr<istream_t> open(const std::string& path);
-	list_t list_dirs(const std::string& path);
-	list_t list_files(const std::string& path);
+	fs_handle_impl_t(const char* path): p(strdup(path)) {}
+	~fs_handle_impl_t() { free(p); }
+	std::auto_ptr<istream_t> reader() { return std::auto_ptr<istream_t>(new FILE_stream_t(p,"r")); }
+	const char* path() const { return p; }
+	const char* name() const {
+		if(const char* n = strrchr(p,'/'))
+			return n+1; // skip the actual separator
+		return p; // consider whole path to be a single name
+	}
+	const char* ext() const {
+		if(const char* e = strrchr(name(),'.'))
+			return e+1;
+		return ""; // no extension
+	}
 private:
+	char* p;
+};
+
+
+struct fs_t::pimpl_t {
+	pimpl_t(const std::string& dd): data_directory(dd) {}
 	const std::string data_directory;
 };
 
-fs_t::fs_t(const std::string& d_d): data_directory(d_d)
-{}
+std::string fs_t::canocial(const std::string& path) const {
+	//### tidy up and .. and check its not breaking root
+	if(path.find(pimpl->data_directory)==0)
+		return path;
+	return pimpl->data_directory+'/'+path;
+}
+
+static fs_t* singleton = NULL;
+
+fs_t::fs_t(const std::string& data_directory): pimpl(new pimpl_t(data_directory)) {}
+
+fs_t::~fs_t() {
+	if(this != singleton) panic("WTF? fs is not singleton");
+	singleton = NULL;
+	delete pimpl;
+}
 
 static bool _is_file(const char* path) {
 	struct stat s;
@@ -114,26 +141,28 @@ static bool _is_dir(const char* path) {
 
 bool fs_t::is_dir(const std::string& path) const { return _is_dir(canocial(path).c_str()); }
 
-std::string fs_t::canocial(const std::string& path) const {
-	//### tidy up and .. and check its not breaking root
-	if(path.find(data_directory)==0)
-		return path;
-	return data_directory+'/'+path;
-}
-
 std::string fs_t::join(const std::string& path,const std::string& sub) const {
-	return canocial(path+'/'+sub);
+	if(is_dir(path))
+		return canocial(path+'/'+sub);
+	return canocial(parent_directory(path)+'/'+sub);
 }
 
-std::auto_ptr<istream_t> fs_t::open(const std::string& path) {
-	return std::auto_ptr<istream_t>(new FILE_stream_t(canocial(path).c_str(),"r"));
+std::string fs_t::parent_directory(const std::string& path) const {
+	const size_t ofs = path.find_last_of("/\\");
+	if(ofs == (size_t)std::string::npos)
+		data_error(path<<" has no parent directory");
+	return std::string(path,0,ofs);
+}
+
+fs_handle_t* fs_t::get(const std::string& path) {
+	return new fs_handle_impl_t(canocial(path).c_str());
 }
 
 static int _one(const struct dirent64 *d) { return 1; }
 
-fs_mgr_t::list_t fs_t::list_dirs(const std::string& path) {
+fs_t::list_t fs_t::list_dirs(const std::string& path) {
 	struct dirent64 **eps;
-	fs_mgr_t::list_t dirs;
+	fs_t::list_t dirs;
 	if(int n = scandir64(canocial(path).c_str(),&eps,_one,alphasort64)) {
 		if(-1 == n) c_error("list_dirs("<<path<<")");
 		for(int i=0; i<n; i++) {
@@ -146,9 +175,9 @@ fs_mgr_t::list_t fs_t::list_dirs(const std::string& path) {
 	return dirs;
 }
 
-fs_mgr_t::list_t fs_t::list_files(const std::string& path) {
+fs_t::list_t fs_t::list_files(const std::string& path) {
 	struct dirent64 **eps;
-	fs_mgr_t::list_t files;
+	fs_t::list_t files;
 	if(int n = scandir64(canocial(path).c_str(),&eps,_one,alphasort64)) {
 		if(-1 == n) c_error("list_files("<<path<<")");
 		for(int i=0; i<n; i++) {
@@ -161,15 +190,20 @@ fs_mgr_t::list_t fs_t::list_files(const std::string& path) {
 	return files;
 }
 
-static fs_mgr_t* _fs = NULL;
-
-void fs_mgr_t::create(const std::string& data_directory) {
-	if(_fs) panic("file system already created");
-	_fs = new fs_t(data_directory);
+fs_t::mgr_t::~mgr_t() {
+	delete singleton;
 }
 
-fs_mgr_t* fs_mgr_t::get_fs() {
-	if(!_fs) panic("file system not created");
-	return _fs;
+std::auto_ptr<fs_t::mgr_t> fs_t::create(const std::string& data_directory) {
+	if(singleton) panic("file system already created");
+	singleton = new fs_t(data_directory);
+	return std::auto_ptr<fs_t::mgr_t>(new mgr_t());
+}
+
+fs_t* fs_t::fs() {
+#ifndef NDEBUG
+	if(!singleton) panic("file system not created");
+#endif
+	return singleton;
 }
 

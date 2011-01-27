@@ -113,8 +113,8 @@ font_mgr_t::impl_t::impl_t() {
 		fprintf(stderr,"SDL_Load: %s\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
-	texture = graphics_mgr()->alloc_texture();
-	graphics_mgr()->load_texture_2D(texture,bmp);
+	texture = graphics()->alloc_texture();
+	graphics()->load_texture_2D(texture,bmp);
 	bmp_sz = vec2_t(bmp->w,bmp->h);
 	printf("loaded embedded bitmap font: %dx%d\n",bmp->w,bmp->h);
 	SDL_FreeSurface(bmp);

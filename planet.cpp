@@ -178,8 +178,8 @@ bool mesh_t::refine_intersection(const ray_t& r,vec_t& I) {
 }
 
 void mesh_t::init_gl() {
-	faces = graphics_mgr()->alloc_vbo();
-	graphics_mgr()->load_vbo(faces,
+	faces = graphics()->alloc_vbo();
+	graphics()->load_vbo(faces,
 		GL_ELEMENT_ARRAY_BUFFER,
 		((stop-start)+1)*sizeof(face_t),
 		planet.faces.ptr()+start,
@@ -497,20 +497,20 @@ GLuint planet_t::find_face(GLuint a,GLuint b,GLuint c) {
 
 #ifdef USE_GL
 void planet_t::init_gl() {
-	vbo.points = graphics_mgr()->alloc_vbo();
-	graphics_mgr()->load_vbo(vbo.points,
+	vbo.points = graphics()->alloc_vbo();
+	graphics()->load_vbo(vbo.points,
 		GL_ARRAY_BUFFER,
 		points.size()*sizeof(vec_t),
 		points.ptr(),
 		GL_STATIC_DRAW);
-	vbo.normals = graphics_mgr()->alloc_vbo();
-	graphics_mgr()->load_vbo(vbo.normals,
+	vbo.normals = graphics()->alloc_vbo();
+	graphics()->load_vbo(vbo.normals,
 		GL_ARRAY_BUFFER,
 		normals.size()*sizeof(vec_t),
 		normals.ptr(),
 		GL_STATIC_DRAW);
-	vbo.colours = graphics_mgr()->alloc_vbo();
-	graphics_mgr()->load_vbo(vbo.colours,
+	vbo.colours = graphics()->alloc_vbo();
+	graphics()->load_vbo(vbo.colours,
 		GL_ARRAY_BUFFER,
 		colours.size()*sizeof(rgb_t),
 		colours.ptr(),

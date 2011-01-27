@@ -15,6 +15,8 @@
 
 class istream_t {
 public:
+	typedef std::auto_ptr<istream_t> ptr_t;
+	virtual const char* path() const = 0;
 	virtual ~istream_t() {}
 	inline uint8_t byte();
 	inline uint16_t uint16();
@@ -30,23 +32,47 @@ private:
 	template<typename T> T _r();
 };
 
-class fs_mgr_t {
+class fs_handle_t {
 public:
-	static fs_mgr_t* get_fs();
-	static void create(const std::string& data_directory);
-	virtual ~fs_mgr_t() {}
-	virtual bool is_file(const std::string& path) const = 0;
-	virtual bool is_dir(const std::string& path) const = 0;
-	virtual std::string join(const std::string& path,const std::string& sub) const = 0;
-	virtual std::auto_ptr<istream_t> open(const std::string& path) = 0;
-	typedef std::vector<std::string> list_t;
-	virtual list_t list_dirs(const std::string& path) = 0;
-	virtual list_t list_files(const std::string& path) = 0;
+	typedef std::auto_ptr<fs_handle_t> ptr_t;
+	virtual ~fs_handle_t() {}
+	virtual istream_t::ptr_t reader() = 0;
+	virtual const char* path() const = 0;
+	virtual const char* name() const = 0;
+	virtual const char* ext() const = 0;
 protected:
-	fs_mgr_t() {}
+	fs_handle_t() {}
 };
 
-inline fs_mgr_t* fs() { return fs_mgr_t::get_fs(); }
+class fs_t {
+public:
+	class mgr_t {
+	public:
+		virtual ~mgr_t();
+	private:
+		friend class fs_t;
+		mgr_t() {}
+	};
+	static std::auto_ptr<mgr_t> create(const std::string& data_directory);
+	static fs_t* fs();
+	bool is_file(const std::string& path) const;
+	bool is_dir(const std::string& path) const;
+	std::string canocial(const std::string& path) const;
+	std::string join(const std::string& path,const std::string& sub) const;
+	std::string parent_directory(const std::string& path) const;
+	fs_handle_t* get(const std::string& path);
+	typedef std::vector<std::string> list_t;
+	list_t list_dirs(const std::string& path);
+	list_t list_files(const std::string& path);
+private:
+	fs_t(const std::string& data_directory);
+	~fs_t();
+	struct pimpl_t;
+	friend struct pimpl_t;
+	pimpl_t* pimpl;
+};
+
+inline fs_t* fs() { return fs_t::fs(); }
 
 inline std::ostream& operator<<(std::ostream& out,const istream_t& repr) {
 	return repr.repr(out);

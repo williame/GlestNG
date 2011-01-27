@@ -297,15 +297,9 @@ void camera() {
 //	glPopMatrix();
 }
 
-void load(const char* data_directory) {
-#if 0
-	fs_mgr_t::create(".");
-	std::auto_ptr<istream_t> istream = fs()->open("data/GlestLogo.g3d");
-	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*istream));
-#else
-	fs_mgr_t::create(data_directory);
+void load() {
 	// this is just some silly test code - find a random model
-	typedef fs_mgr_t::list_t list_t;
+	typedef fs_t::list_t list_t;
 	const list_t techtrees = fs()->list_dirs("techs");
 	const std::string techtree_ = techtrees[rand()%techtrees.size()];
 	const std::string techtree = std::string("techs")+'/'+techtree_;
@@ -326,12 +320,13 @@ void load(const char* data_directory) {
 	if(!g3d.size()) data_error("no G3D models in "<<unit<<"/models");
 	// and load it
 	std::cout << "loading "<<xml_name<<std::endl;
-	std::auto_ptr<istream_t> xstream = fs()->open(xml_name);
+	fs_handle_t::ptr_t xml_file(fs()->get(xml_name));
+	istream_t::ptr_t xstream(xml_file->reader());
 	new ui_xml_editor_t(techtree_+" : "+faction_+" : "+unit_,*xstream);
 	std::cout << "loading "<<g3d<<std::endl;
-	std::auto_ptr<istream_t> istream = fs()->open(g3d);
-	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*istream));
-#endif
+	fs_handle_t::ptr_t g3d_file(fs()->get(g3d));
+	istream_t::ptr_t gstream(g3d_file->reader());
+	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*gstream));
 }
 
 int main(int argc,char** args) {
@@ -365,12 +360,14 @@ int main(int argc,char** args) {
 		}
 		fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
 
+		// we have a GL context so we can go ahead and init all the singletons
+		std::auto_ptr<graphics_t::mgr_t> graphics_mgr(graphics_t::create());
+		std::auto_ptr<fs_t::mgr_t> fs_mgr(fs_t::create("/home/will/Games/megaglest-3.3.7.2"));
 		std::auto_ptr<ui_mgr_t> ui_(ui_mgr());
 
-		load("/home/will/Games/megaglest-3.3.7.2");
-		std::auto_ptr<fs_mgr_t> fs_(fs());
+		load();
 		
-//###		terrain_t::gen_planet(5,500,3);
+		//terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);
 	
 		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),
@@ -394,11 +391,13 @@ int main(int argc,char** args) {
 		glAlphaFunc(GL_GREATER,0.4);
 		glEnable(GL_COLOR_MATERIAL);
 		glEnable(GL_RESCALE_NORMAL);
-		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-		//glEnable(GL_NORMALIZE);
-		glFrontFace(GL_CW);
 		glEnable(GL_BLEND);
 		glEnable(GL_TEXTURE_2D);
+		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+		glColorMaterial(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE);
+		glEnable(GL_COLOR_MATERIAL);
+		//glEnable(GL_NORMALIZE);
+		glFrontFace(GL_CW);
 		camera();
 		bool quit = false;
 		SDL_Event event;
@@ -444,9 +443,10 @@ int main(int argc,char** args) {
 		return EXIT_SUCCESS;
 	} catch(data_error_t* de) {
 		std::cerr << "Oh! " << de << std::endl;
-		return EXIT_FAILURE;
+	} catch(graphics_error_t* ge) {
+		std::cerr << "Oh! " << ge << std::endl;
 	} catch(panic_t* panic) {
 		std::cerr << "Oh! " << panic << std::endl;
-		return EXIT_FAILURE;
 	}
+	return EXIT_FAILURE;
 }
