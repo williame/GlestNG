@@ -22,15 +22,12 @@ private:
 	unit_type_t& type;
 };
 
-class unit_type_t {
+class unit_type_t: public xml_loadable_t {
 public:
-	unit_type_t(const char* name,const char* xml);
-	void load_xml();
-	const std::string& get_name() const { return name; }
-	void describe_xml(std::ostream& out);
+	unit_type_t(const std::string& name);
+	~unit_type_t();
 private:
-	std::string name;
-	xml_parser_t xml;
+	void _load_xml(xml_parser_t::walker_t& xml);
 	float size, height;
 };
 

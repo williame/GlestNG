@@ -11,7 +11,7 @@
 #include <ostream>
 #include <string>
 
-#include "fs.hpp"
+class istream_t;
 
 class xml_parser_t {
 public:
@@ -64,6 +64,24 @@ private:
 	const char* title;
 	const char* buf;
 	token_t *doc;
+};
+
+class xml_loadable_t {
+public:
+	virtual ~xml_loadable_t();
+	const std::string name;
+	bool load_xml(const std::string& buf);
+	bool load_xml(istream_t& in);
+	bool load_xml(xml_parser_t* xml);
+	bool is_inited() const { return inited; }
+	void check_inited() const; // panics if not inited
+	xml_parser_t* get_xml() { return xml; }
+protected:
+	xml_loadable_t(const std::string& name);
+private:
+	virtual void _load_xml(xml_parser_t::walker_t& xml) = 0;
+	xml_parser_t* xml;
+	bool inited;
 };
 
 std::ostream& operator<<(std::ostream& out,xml_parser_t::type_t type);

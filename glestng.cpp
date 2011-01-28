@@ -23,6 +23,7 @@
 #include "utils.hpp"
 #include "ui.hpp"
 #include "ui_xml_editor.hpp"
+#include "unit.hpp"
 
 SDL_Surface* screen;
 
@@ -33,6 +34,7 @@ bool selection = false;
 vec_t selected_point;
 int visible_objects = 0;
 
+std::auto_ptr<unit_type_t> unit_type;
 std::auto_ptr<model_g3d_t> model;
 
 void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
@@ -324,7 +326,9 @@ void load() {
 	std::cout << "loading "<<xml_name<<std::endl;
 	fs_handle_t::ptr_t xml_file(fs()->get(xml_name));
 	istream_t::ptr_t xstream(xml_file->reader());
-	new ui_xml_editor_t(techtree_+" : "+faction_+" : "+unit_,*xstream);
+	unit_type = std::auto_ptr<unit_type_t>(new unit_type_t(unit));
+	unit_type->load_xml(*xstream);
+	new ui_xml_editor_t(*unit_type);
 	std::cout << "loading "<<g3d<<std::endl;
 	fs_handle_t::ptr_t g3d_file(fs()->get(g3d));
 	istream_t::ptr_t gstream(g3d_file->reader());

@@ -5,18 +5,22 @@
  (c) William Edwards, 2011; all rights reserved
 */
 
+#include <iostream>
+
 #include "unit.hpp"
 #include "xml.hpp"
 
-unit_type_t::unit_type_t(const char* n,const char* x): name(n), xml(n,x) {}
+unit_type_t::unit_type_t(const std::string& name):
+	xml_loadable_t(name)
+{}
 
-void unit_type_t::load_xml() {
-	xml_parser_t::walker_t xml = this->xml.walker();
+unit_type_t::~unit_type_t() {}
+
+void unit_type_t::_load_xml(xml_parser_t::walker_t& xml) {
+	//### release any existing assets
 	xml.check("unit");
 	height = xml.get_child("parameters").get_child("height").value_float();
 	size = xml.up().get_child("size").value_float();
+	//### go through the units
 }
 
-void unit_type_t::describe_xml(std::ostream& out) {
-	xml.describe_xml(out);
-}

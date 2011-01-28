@@ -37,19 +37,16 @@ namespace {
 
 class ui_xml_editor_t::pimpl_t {
 public:
-	pimpl_t(ui_xml_editor_t& ui_,const std::string& title,istream_t& in):
+	pimpl_t(ui_xml_editor_t& ui_,xml_loadable_t& target_):
 		em(font_mgr()->measure(' ').x),
 		h(font_mgr()->measure(' ').y), 
 		view_ofs(0,0), mouse_grab(false),
-		ui(ui_),
-		body(new xml_parser_t(title.c_str(),in)),
+		ui(ui_), target(target_),
 		dirty(true) {
 		cursor.row = cursor.col = 0;
 	}
-	~pimpl_t() { delete body; }
-	void parse();
+	const std::string& get_title() const { return target.name; }
 	const lines_t& get_lines() { parse(); return lines; }
-	const char* get_title() const { return body->get_title(); }
 	struct cursor_t {
 		size_t row;
 		size_t col;
@@ -76,8 +73,10 @@ public:
 	bool mouse_grab;
 private:
 	ui_xml_editor_t& ui;
-	void _append(line_t& line,int i,xml_parser_t::type_t type);
-	xml_parser_t* body;
+	xml_loadable_t& target;
+	void _append(const char ch,line_t& line,int i,xml_parser_t::type_t type);
+	void parse();
+	void reload(const std::string& buf);
 	lines_t lines;
 	bool dirty;
 	cursor_t cursor;
@@ -165,11 +164,7 @@ void ui_xml_editor_t::pimpl_t::insert(char ch) {
 		} else
 			buf.append(lines[i].s);
 	}		
-	std::string title(body->get_title());
-	delete body; body = NULL;
-	body = new xml_parser_t(title.c_str(),buf.c_str());
-	dirty = true;
-	parse();
+	reload(buf);
 	if(ch == '\n') {
 		cursor.row++;
 		cursor.col = 0;
@@ -205,11 +200,7 @@ void ui_xml_editor_t::pimpl_t::bksp() {
 			buf.append(lines[i].s);
 		lastline = lines[i].s.size();
 	}		
-	std::string title(body->get_title());
-	delete body; body = NULL;
-	body = new xml_parser_t(title.c_str(),buf.c_str());
-	dirty = true;
-	parse();
+	reload(buf);
 	if(cursor.col)
 		cursor.col--;
 	else {
@@ -240,8 +231,7 @@ int ui_xml_editor_t::pimpl_t::char_to_ofs(int col,int row) {
 	return font_mgr()->measure(line.s.c_str(),col).x;
 }
 
-void ui_xml_editor_t::pimpl_t::_append(line_t& line,int i,xml_parser_t::type_t type) {
-	char ch = body->get_buf()[i];
+void ui_xml_editor_t::pimpl_t::_append(const char ch,line_t& line,int i,xml_parser_t::type_t type) {
 	if(ch == '\n') {
 		line.s.erase(line.s.find_last_not_of(" \n\r\t")+1);
 		lines.push_back(line);
@@ -266,31 +256,33 @@ char ui_xml_editor_t::pimpl_t::char_at(const cursor_t& cursor) {
 
 void ui_xml_editor_t::pimpl_t::parse() {
 	if(!dirty) return;
-	try {
-		body->parse();
-	} catch(data_error_t* de) {
-		std::cerr << "Error parsing xml: "<<de<<std::endl;
-	}
 	lines.clear();
 	size_t i = 0;
 	line_t line;
-	for(xml_parser_t::walker_t node = body->walker(); node.ok(); node.next()) {
+	const char* ch = target.get_xml()->get_buf();
+	for(xml_parser_t::walker_t node = target.get_xml()->walker(); node.ok(); node.next()) {
 		for(; i<node.ofs(); i++)
-			_append(line,i,xml_parser_t::IGNORE);
+			_append(*ch++,line,i,xml_parser_t::IGNORE);
 		for(; i<(node.ofs()+node.len()); i++)
-			_append(line,i,node.type());
+			_append(*ch++,line,i,node.type());
 	}
-	for(; i<strlen(body->get_buf()); i++)
-		_append(line,i,xml_parser_t::IGNORE);
+	for(; *ch; i++)
+		_append(*ch++,line,i,xml_parser_t::IGNORE);
 	line.s.erase(line.s.find_last_not_of(" \n\r\t")+1);
 	if(line.s.size())
 		lines.push_back(line);
 	dirty = false;
 }
 
+void ui_xml_editor_t::pimpl_t::reload(const std::string& buf) {
+	if(!target.load_xml(buf))
+		std::cerr << target.name << " did not like XML" << std::endl;
+	dirty = true;
+	parse();
+}
 
-ui_xml_editor_t::ui_xml_editor_t(const std::string& title,istream_t& in,ui_component_t* parent):
-ui_component_t(parent), pimpl(new pimpl_t(*this,title.c_str(),in)) {
+ui_xml_editor_t::ui_xml_editor_t(xml_loadable_t& target,ui_component_t* parent):
+ui_component_t(parent), pimpl(new pimpl_t(*this,target)) {
 	set_rect(rect_t(20,50,500,mgr.get_screen_bounds().br.y-30));
 }
 
@@ -375,7 +367,7 @@ void ui_xml_editor_t::draw() {
 	COL[TITLE_BG_COL].set();
 	draw_filled_box(r.tl.x,r.tl.y,r.w(),h+2);
 	COL[TITLE_COL].set();
-	f.draw(r.tl.x+10,r.tl.y,pimpl->get_title());
+	f.draw(r.tl.x+10,r.tl.y,pimpl->get_title().c_str());
 	COL[BORDER_COL].set();
 	draw_box(r.tl.x,r.tl.y,r.w(),h+2);
 	r.tl.y += h + 2;

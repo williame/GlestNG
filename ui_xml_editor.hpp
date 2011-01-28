@@ -10,9 +10,11 @@
 
 #include "ui.hpp"
 
+class xml_loadable_t;
+
 class ui_xml_editor_t: public ui_component_t {
 public:
-	ui_xml_editor_t(const std::string& title,istream_t& in,ui_component_t* parent=NULL);
+	ui_xml_editor_t(xml_loadable_t& target,ui_component_t* parent=NULL);
 	~ui_xml_editor_t();
 	bool offer(const SDL_Event& event);
 private:

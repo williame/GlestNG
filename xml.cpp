@@ -5,14 +5,16 @@
  (c) William Edwards, 2011; all rights reserved
 */
 
+#include <stdarg.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 #include <math.h>
 #include <iostream>
 
-#include "error.hpp"
 #include "xml.hpp"
+#include "fs.hpp"
+#include "error.hpp"
 
 std::ostream& operator<<(std::ostream& out,xml_parser_t::type_t type) {
 	switch(type) {
@@ -59,6 +61,7 @@ struct xml_parser_t::token_t {
 	size_t len;
 	mutable bool visit;
 	mutable char* error;
+	bool set_error(const char* fmt,...) const;
 	token_t *parent, *first_child, *next_peer;
 	std::string str() const {
 		std::string ret;
@@ -95,6 +98,21 @@ struct xml_parser_t::token_t {
 		return true;
 	}
 };
+
+bool xml_parser_t::token_t::set_error(const char* fmt,...) const {
+	va_list args;
+	va_start(args,fmt);
+	// had problems finding vsnprintf
+	const size_t len = __builtin_vsnprintf(NULL,0,fmt,args);
+	if(char* e = (char*)malloc(len+1)) {
+		free(error);
+		error = e;
+		va_start(args,fmt);
+		__builtin_vsnprintf(error,len+1,fmt,args);
+		return true;
+	}
+	return false;
+}
 
 static const char* eat_whitespace(const char* ch) { while(*ch && *ch <= ' ') ch++; return ch; }
 static const char* eat_name(const char* ch) { while((*ch>' ')&&!strchr("/>=",*ch)) ch++; return ch; }
@@ -254,6 +272,7 @@ xml_parser_t::~xml_parser_t() {
 
 xml_parser_t::type_t xml_parser_t::walker_t::type() const {
 	if(!ok()) panic("no token");
+	if(tok->error) return ERROR;
 	return tok->type;
 }
 
@@ -304,6 +323,7 @@ xml_parser_t::walker_t& xml_parser_t::walker_t::get_child(const char* tag) {
 			tok->visit = true;
 			return *this;
 		}
+	tok->set_error("has no child tag called %s",tag);
 	data_error(tok->str()<<" tag has no child tag called "<<tag);
 }
 
@@ -445,6 +465,40 @@ void xml_parser_t::describe_xml(std::ostream& out) {
 		}
 	}
 	out << "</pre></body></html>" << std::endl;
+}
+
+xml_loadable_t::xml_loadable_t(const std::string& n):
+	name(n), xml(NULL), inited(false)
+{}
+
+xml_loadable_t::~xml_loadable_t() { delete xml; }
+
+void xml_loadable_t::check_inited() const {
+	if(!is_inited())
+		panic("unit "<<name<<" is not initialised");
+}
+
+bool xml_loadable_t::load_xml(const std::string& s) {
+	return load_xml(new xml_parser_t(name.c_str(),s.c_str()));
+}
+
+bool xml_loadable_t::load_xml(istream_t& in) {
+	return load_xml(new xml_parser_t(name.c_str(),in));
+}
+
+bool xml_loadable_t::load_xml(xml_parser_t* parser) {
+	inited = false;
+	delete xml;
+	xml = parser;
+	try {
+		xml_parser_t::walker_t walker = xml->walker();
+		_load_xml(walker); // subclasses
+		inited = true;
+		return true;
+	} catch(data_error_t* de) {
+		std::cerr<<"error parsing "<<name<<": "<<de<<std::endl;
+		return false;
+	}
 }
 
 
