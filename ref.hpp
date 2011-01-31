@@ -9,6 +9,7 @@
 #define __REF_HPP__
 
 #include <string>
+#include <vector>
 
 #include "error.hpp"
 #include "fs.hpp"
@@ -22,15 +23,12 @@ class mgr_t;
 
 class class_t {
 public:
+	virtual ~class_t();
 	mgr_t& mgr;
 	const class_type_t type;
 	const std::string name;
 protected:
 	class_t(mgr_t& mgr,class_type_t type,const std::string& name);
-private:
-	friend class ref_t;
-	friend class mgr_t;
-	virtual ~class_t();
 };
 
 class techtree_t;
@@ -43,10 +41,14 @@ public:
 	mgr_t& mgr;
 	const class_type_t type;
 	const std::string name;
+	faction_t* faction();
 private:
 	friend class mgr_t;
 	ref_t(mgr_t& mgr,class_type_t type,const std::string& name);
+	class_t* get();
 };
+
+typedef std::vector<ref_t*> refs_t;
 
 class mgr_t: public fs_handle_t {
 public:
@@ -56,6 +58,7 @@ protected:
 	mgr_t(fs_t& fs);
 private:
 	friend class ref_t;
+	virtual techtree_t& techtree();
 	struct pimpl_t;
 	pimpl_t* pimpl;
 };

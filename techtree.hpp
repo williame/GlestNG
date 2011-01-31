@@ -14,12 +14,15 @@
 #include "xml.hpp"
 #include "ref.hpp"
 
+class faction_t;
+
 class techtree_t: public mgr_t, public xml_loadable_t {
 public:
 	techtree_t(fs_t& fs,const std::string& name);
 	~techtree_t();
 	const std::string path;
 	const strings_t& get_factions() const { return factions; }
+	faction_t* get_faction(const std::string& name);
 	const strings_t& get_armour_types() const { return armour_types; }
 	const strings_t& get_attack_types() const { return attack_types; }
 	size_t attack_ID(const std::string& s) const;
@@ -28,8 +31,10 @@ public:
 	float damage_multiplier(size_t armour,size_t attack) const;
 private:
 	void reset();
+	virtual techtree_t& techtree() { return *this; }
 	void _load_xml(xml_parser_t::walker_t& xml);
 	std::string description;
+	refs_t faction_refs;
 	strings_t factions, armour_types, attack_types;
 	std::vector<float> damage_multipliers;
 };

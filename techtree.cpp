@@ -12,12 +12,13 @@
 
 techtree_t::techtree_t(fs_t& fs,const std::string& name):
 	mgr_t(fs), xml_loadable_t(name),
-	path(fs.canocial(std::string("techs")+"/"+name)),
-	damage_multipliers(NULL) {
+	path(fs.canocial(std::string("techs")+"/"+name)) {
 	const strings_t subdirs = fs.list_dirs(path+"/factions");
 	for(strings_t::const_iterator i=subdirs.begin(); i!=subdirs.end(); i++)
-		if(fs.exists(path+"/factions/"+*i+"/"+*i+".xml"))
+		if(fs.exists(path+"/factions/"+*i+"/"+*i+".xml")) {
 			factions.push_back(*i);
+			faction_refs.push_back(ref(FACTION,*i));
+		}
 	if(!factions.size())
 		data_error("techtree "<<name<<" contains no factions");
 	fs_file_t::ptr_t f(fs.get(path+"/"+name+".xml"));
@@ -27,6 +28,8 @@ techtree_t::techtree_t(fs_t& fs,const std::string& name):
 
 techtree_t::~techtree_t() {
 	reset();
+	for(refs_t::iterator i=faction_refs.begin(); i!=faction_refs.end(); i++)
+		delete *i;
 }
 
 void techtree_t::reset() {
@@ -74,18 +77,22 @@ float techtree_t::damage_multiplier(size_t armour,size_t attack) const {
 	return damage_multipliers[armour*attack_types.size()+attack];
 }
 
-static size_t _index_of(const strings_t& c,const std::string& s) {
+static size_t _index_of(const strings_t& c,const std::string& s,const char* ctx) {
 	const size_t i = std::distance(c.begin(),std::find(c.begin(),c.end(),s));
-	if(i == c.size()) data_error("could not find "<<s);
+	if(i == c.size()) data_error("could not find "<<ctx<<" "<<s);
 	return i;
 }
 
 size_t techtree_t::attack_ID(const std::string& s) const {
-	return _index_of(attack_types,s);
+	return _index_of(attack_types,s,"attack");
 }
 
 size_t techtree_t::armour_ID(const std::string& s) const {
-	return _index_of(armour_types,s);
+	return _index_of(armour_types,s,"armour");
+}
+
+faction_t* techtree_t::get_faction(const std::string& name) {
+	return faction_refs[_index_of(factions,name,"faction")]->faction();
 }
 
 techtrees_t::techtrees_t(fs_t& fs): fs_handle_t(fs) {
@@ -94,4 +101,5 @@ techtrees_t::techtrees_t(fs_t& fs): fs_handle_t(fs) {
 		if(fs.exists(std::string("techs")+"/"+*i+"/"+*i+".xml"))
 			techtrees.push_back(*i);
 }
+
 

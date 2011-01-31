@@ -45,6 +45,7 @@ OBJ_GLEST_NG_CPP = \
 	utils.opp \
 	fs.opp \
 	ref.opp \
+	faction.opp \
 	techtree.opp
 
 OBJ_GLEST_NG_C = 

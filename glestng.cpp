@@ -25,6 +25,7 @@
 #include "ui_xml_editor.hpp"
 #include "unit.hpp"
 #include "techtree.hpp"
+#include "faction.hpp"
 
 SDL_Surface* screen;
 
@@ -329,10 +330,10 @@ void load(fs_t& fs) {
 	for(strings_t::const_iterator i=factions.begin(); i!=factions.end(); i++)
 		std::cout << "faction "<<*i<<std::endl;
 	const std::string faction_ = factions[rand()%factions.size()];
-	const std::string faction = techtree->path+"/factions/"+faction_;
-	const strings_t units = fs.list_dirs(faction+"/units");
+	faction_t* faction = techtree->get_faction(faction_);
+	const strings_t units = fs.list_dirs(faction->path+"/units");
 	const std::string unit_ = units[rand()%units.size()];
-	const std::string unit = faction+"/units/"+unit_;
+	const std::string unit = faction->path+"/units/"+unit_;
 	const std::string xml_name = unit+"/"+unit_+".xml";
 	const strings_t models = fs.list_files(unit+"/models");
 	std::string g3d;
