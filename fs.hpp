@@ -70,10 +70,13 @@ protected:
 	fs_file_t(fs_t& fs): fs_handle_t(fs) {}
 };
 
+typedef std::vector<std::string> strings_t;
+
 class fs_t {
 public:
 	static fs_t* create(const std::string& data_directory);
 	virtual ~fs_t();
+	bool exists(const std::string& path) const;
 	bool is_file(const std::string& path) const;
 	bool is_dir(const std::string& path) const;
 	std::string canocial(const std::string& path) const;
@@ -82,9 +85,8 @@ public:
 	fs_file_t* get(const std::string& path);
 	fs_file_t* get(const istream_t& parent,const std::string& rel);
 	fs_file_t* get(const std::string& parent,const std::string& rel);
-	typedef std::vector<std::string> list_t;
-	list_t list_dirs(const std::string& path);
-	list_t list_files(const std::string& path);
+	strings_t list_dirs(const std::string& path);
+	strings_t list_files(const std::string& path);
 private:
 	fs_t(const std::string& data_directory);
 	struct pimpl_t;

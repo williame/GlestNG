@@ -24,6 +24,7 @@
 #include "ui.hpp"
 #include "ui_xml_editor.hpp"
 #include "unit.hpp"
+#include "techtree.hpp"
 
 SDL_Surface* screen;
 
@@ -318,20 +319,24 @@ void camera() {
 
 void load(fs_t& fs) {
 	// this is just some silly test code - find a random model
-	typedef fs_t::list_t list_t;
-	const list_t techtrees = fs.list_dirs("techs");
-	const std::string techtree_ = techtrees[rand()%techtrees.size()];
-	const std::string techtree = std::string("techs")+'/'+techtree_;
-	const list_t factions = fs.list_dirs(techtree+"/factions");
+	std::auto_ptr<techtrees_t> techtrees(new techtrees_t(fs));
+	const strings_t techtrees_ = techtrees->get_techtrees();
+	for(strings_t::const_iterator i=techtrees_.begin(); i!=techtrees_.end(); i++)
+		std::cout << "techtree "<<*i<<std::endl;
+	const std::string techtree_ = techtrees_[rand()%techtrees_.size()];
+	std::auto_ptr<techtree_t> techtree(new techtree_t(fs,techtree_));
+	const strings_t factions = techtree->get_factions();
+	for(strings_t::const_iterator i=factions.begin(); i!=factions.end(); i++)
+		std::cout << "faction "<<*i<<std::endl;
 	const std::string faction_ = factions[rand()%factions.size()];
-	const std::string faction = techtree+"/factions/"+faction_;
-	const list_t units = fs.list_dirs(faction+"/units");
+	const std::string faction = techtree->path+"/factions/"+faction_;
+	const strings_t units = fs.list_dirs(faction+"/units");
 	const std::string unit_ = units[rand()%units.size()];
 	const std::string unit = faction+"/units/"+unit_;
 	const std::string xml_name = unit+"/"+unit_+".xml";
-	const list_t models = fs.list_files(unit+"/models");
+	const strings_t models = fs.list_files(unit+"/models");
 	std::string g3d;
-	for(list_t::const_iterator i=models.begin(); i!=models.end(); i++)
+	for(strings_t::const_iterator i=models.begin(); i!=models.end(); i++)
 		if(i->find(".g3d") == (i->size()-4)) {
 			g3d = unit + "/models/" + *i;
 			break;

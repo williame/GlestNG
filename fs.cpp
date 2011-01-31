@@ -120,18 +120,32 @@ std::string fs_t::canocial(const std::string& path) const {
 	return pimpl->data_directory+'/'+path;
 }
 
+static bool _stat(const char* path,struct stat& s) {
+	if(stat(path,&s)) {
+		if((ENOENT != errno)&&(ENOTDIR != errno))
+			c_error("stat("<<path<<")");
+		return false;
+	}
+	return true;
+}
+
+static bool _exists(const char* path) {
+	struct stat s;
+	return _stat(path,s);
+}
+
+bool fs_t::exists(const std::string& path) const { return _exists(canocial(path).c_str()); }
+
 static bool _is_file(const char* path) {
 	struct stat s;
-	if(stat(path,&s)) c_error("is_file("<<path<<")");
-	return S_ISREG(s.st_mode);
+	return _stat(path,s) && S_ISREG(s.st_mode);
 }
 
 bool fs_t::is_file(const std::string& path) const { return _is_file(canocial(path).c_str()); }
 
 static bool _is_dir(const char* path) {
 	struct stat s;
-	if(stat(path,&s)) c_error("is_dir("<<path<<")");
-	return S_ISDIR(s.st_mode);
+	return _stat(path,s) && S_ISDIR(s.st_mode);
 }
 
 bool fs_t::is_dir(const std::string& path) const { return _is_dir(canocial(path).c_str()); }
@@ -159,9 +173,9 @@ fs_file_t* fs_t::get(const std::string& path) {
 
 static int _one(const struct dirent64 *d) { return 1; }
 
-fs_t::list_t fs_t::list_dirs(const std::string& path) {
+strings_t fs_t::list_dirs(const std::string& path) {
 	struct dirent64 **eps;
-	fs_t::list_t dirs;
+	strings_t dirs;
 	if(int n = scandir64(canocial(path).c_str(),&eps,_one,alphasort64)) {
 		if(-1 == n) c_error("list_dirs("<<path<<")");
 		for(int i=0; i<n; i++) {
@@ -174,9 +188,9 @@ fs_t::list_t fs_t::list_dirs(const std::string& path) {
 	return dirs;
 }
 
-fs_t::list_t fs_t::list_files(const std::string& path) {
+strings_t fs_t::list_files(const std::string& path) {
 	struct dirent64 **eps;
-	fs_t::list_t files;
+	strings_t files;
 	if(int n = scandir64(canocial(path).c_str(),&eps,_one,alphasort64)) {
 		if(-1 == n) c_error("list_files("<<path<<")");
 		for(int i=0; i<n; i++) {

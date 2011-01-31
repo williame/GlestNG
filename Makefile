@@ -44,7 +44,8 @@ OBJ_GLEST_NG_CPP = \
 	g3d.opp \
 	utils.opp \
 	fs.opp \
-	ref.opp
+	ref.opp \
+	techtree.opp
 
 OBJ_GLEST_NG_C = 
 		

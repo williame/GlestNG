@@ -57,8 +57,6 @@ ref_t::~ref_t() {
 	mgr.pimpl->detach(*this);
 }
 
-mgr_t* mgr_t::create(fs_t& fs) { return new mgr_t(fs); }
-
 mgr_t::~mgr_t() { delete pimpl; }
 
 mgr_t::mgr_t(fs_t& fs): fs_handle_t(fs), pimpl(new pimpl_t()) {}

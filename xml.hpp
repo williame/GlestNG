@@ -38,9 +38,12 @@ public:
 		// navigation API; preferred way of extracting things
 		void check(const char* tag);
 		walker_t& get_child(const char* tag);
+		bool get_child(const char* tag,size_t i);
 		walker_t& up();
 		// extract attributes
 		float value_float(const char* key = "value");
+		std::string value_string(const char* key = "value");
+		std::string get_data_as_string();
 		// query current node
 		type_t type() const;
 		size_t ofs() const;

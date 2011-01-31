@@ -64,10 +64,7 @@ struct xml_parser_t::token_t {
 	bool set_error(const char* fmt,...) const;
 	token_t *parent, *first_child, *next_peer;
 	std::string str() const {
-		std::string ret;
-		for(size_t i=0; i<len; i++)
-			ret += start[i];
-		return ret;
+		return std::string(start,len);
 	}
 	std::string repr() const {
 		std::stringstream ret("XML_Token<",std::ios_base::out|std::ios_base::ate);
@@ -316,15 +313,20 @@ void xml_parser_t::walker_t::get_key(const char* key) {
 }
 
 xml_parser_t::walker_t& xml_parser_t::walker_t::get_child(const char* tag) {
-	get_tag();
-	for(token_t* child = tok->first_child; child; child = child->next_peer)
-		if((OPEN == child->type) && child->equals(tag)) {
-			tok = child;
-			tok->visit = true;
-			return *this;
-		}
+	if(get_child(tag,0)) return *this;
 	tok->set_error("has no child tag called %s",tag);
 	data_error(tok->str()<<" tag has no child tag called "<<tag);
+}
+
+bool xml_parser_t::walker_t::get_child(const char* tag,size_t i) {
+	get_tag();
+	for(token_t* child = tok->first_child; child; child = child->next_peer)
+		if((OPEN == child->type) && child->equals(tag) && (!i--)) {
+			tok = child;
+			tok->visit = true;
+			return true;
+		}
+	return false;
 }
 
 xml_parser_t::walker_t& xml_parser_t::walker_t::up() {
@@ -361,6 +363,30 @@ float xml_parser_t::walker_t::value_float(const char* key) {
 		tok->error = strdup(de->str().c_str());
 		throw;
 	}
+}
+
+std::string xml_parser_t::walker_t::value_string(const char* key) {
+	get_key(key);
+	if(!tok->first_child || (VALUE != tok->first_child->type))
+		panic("expecting key "<<tok->path()<<" to have a value child");
+	tok = tok->first_child;
+	tok->visit = true;
+	std::string str = tok->str();
+	tok = tok->parent;
+	return str;
+}
+
+std::string xml_parser_t::walker_t::get_data_as_string() {
+	get_tag();
+	if(!tok->first_child || (DATA != tok->first_child->type))
+		panic("expecting tag "<<tok->path()<<" to have data");
+	tok = tok->first_child;
+	if(!tok->next_peer || (CLOSE != tok->next_peer->type))
+		panic("cannot cope that tag "<<tok->parent->path()<<" has nested tags when extracting data");
+	tok->visit = true;
+	std::string str = tok->str();
+	tok = tok->parent;
+	return str;
 }
  
 size_t xml_parser_t::walker_t::ofs() const {

@@ -14,9 +14,8 @@
 #include "fs.hpp"
 
 enum class_type_t {
-	TECHTREE,
 	FACTION,
-	UNIT,
+	UNIT_TYPE,
 };
 
 class mgr_t;
@@ -51,12 +50,12 @@ private:
 
 class mgr_t: public fs_handle_t {
 public:
-	static mgr_t* create(fs_t& fs);
-	virtual ~mgr_t();
-	ref_t* ref(class_type_t type,const std::string& name);
+	~mgr_t();
+	virtual ref_t* ref(class_type_t type,const std::string& name);
+protected:
+	mgr_t(fs_t& fs);
 private:
 	friend class ref_t;
-	mgr_t(fs_t& fs);
 	struct pimpl_t;
 	pimpl_t* pimpl;
 };
