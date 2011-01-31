@@ -157,10 +157,10 @@ void ui_mgr_t::draw() {
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 	glLoadIdentity();
+	gluOrtho2D(0,pimpl->screen.w(),pimpl->screen.h(),0); // flip Y
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	glLoadIdentity();
-	gluOrtho2D(0,pimpl->screen.w(),pimpl->screen.h(),0); // flip Y
 	for(pimpl_t::components_t::iterator comp=pimpl->components.begin(); comp!=pimpl->components.end(); comp++)
 		pimpl->draw(*comp);
 	glPopMatrix();

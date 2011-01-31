@@ -19,7 +19,7 @@
 
 class FILE_stream_t: public istream_t {
 public:
-	FILE_stream_t(const char* filename,const char* mode);
+	FILE_stream_t(fs_file_t& file,const char* filename,const char* mode);
 	~FILE_stream_t();
 	const char* path() const { return filename.c_str(); }
 	void read(void* dest,size_t bytes);
@@ -31,7 +31,8 @@ private:
 	FILE* const f;
 };
 
-FILE_stream_t::FILE_stream_t(const char* filename_,const char* mode):
+FILE_stream_t::FILE_stream_t(fs_file_t& file,const char* filename_,const char* mode):
+	istream_t(file),
 	filename(filename_),
 	f(fopen(filename_,mode))
 {
@@ -82,11 +83,11 @@ std::ostream& FILE_stream_t::repr(std::ostream& out) const {
 	return out << filename;
 }
 
-class fs_handle_impl_t: public fs_handle_t {
+class fs_handle_impl_t: public fs_file_t {
 public:
-	fs_handle_impl_t(const char* path): p(strdup(path)) {}
+	fs_handle_impl_t(fs_t& fs,const char* path): fs_file_t(fs), p(strdup(path)) {}
 	~fs_handle_impl_t() { free(p); }
-	std::auto_ptr<istream_t> reader() { return std::auto_ptr<istream_t>(new FILE_stream_t(p,"r")); }
+	std::auto_ptr<istream_t> reader() { return std::auto_ptr<istream_t>(new FILE_stream_t(*this,p,"r")); }
 	const char* path() const { return p; }
 	const char* name() const {
 		if(const char* n = strrchr(p,'/'))
@@ -117,16 +118,6 @@ std::string fs_t::canocial(const std::string& path) const {
 	if(_starts_with(path,pimpl->data_directory))
 		return path;
 	return pimpl->data_directory+'/'+path;
-}
-
-static fs_t* singleton = NULL;
-
-fs_t::fs_t(const std::string& data_directory): pimpl(new pimpl_t(data_directory)) {}
-
-fs_t::~fs_t() {
-	if(this != singleton) panic("WTF? fs is not singleton");
-	singleton = NULL;
-	delete pimpl;
 }
 
 static bool _is_file(const char* path) {
@@ -162,8 +153,8 @@ std::string fs_t::parent_directory(const std::string& path) const {
 	return std::string(path,0,ofs);
 }
 
-fs_handle_t* fs_t::get(const std::string& path) {
-	return new fs_handle_impl_t(canocial(path).c_str());
+fs_file_t* fs_t::get(const std::string& path) {
+	return new fs_handle_impl_t(*this,canocial(path).c_str());
 }
 
 static int _one(const struct dirent64 *d) { return 1; }
@@ -198,20 +189,11 @@ fs_t::list_t fs_t::list_files(const std::string& path) {
 	return files;
 }
 
-fs_t::mgr_t::~mgr_t() {
-	delete singleton;
-}
+fs_t::fs_t(const std::string& data_directory): pimpl(new pimpl_t(data_directory)) {}
 
-std::auto_ptr<fs_t::mgr_t> fs_t::create(const std::string& data_directory) {
-	if(singleton) panic("file system already created");
-	singleton = new fs_t(data_directory);
-	return std::auto_ptr<fs_t::mgr_t>(new mgr_t());
-}
+fs_t::~fs_t() { delete pimpl; }
 
-fs_t* fs_t::fs() {
-#ifndef NDEBUG
-	if(!singleton) panic("file system not created");
-#endif
-	return singleton;
+fs_t* fs_t::create(const std::string& data_directory) {
+	return new fs_t(data_directory);
 }
 

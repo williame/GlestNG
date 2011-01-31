@@ -90,19 +90,6 @@ void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
 	glPopMatrix();
 }
 
-void ui() {
-	if(selection) {
-		glColor3f(1,0,0);
-		caret(selected_point,0.03,0,0,0);
-	}
-	static char fps[128];
-	snprintf(fps,sizeof(fps),"%u fps, %d visible objects",(unsigned)framerate.per_second(now()),visible_objects);
-	static ui_label_t* label = new ui_label_t("this is a test");
-	label->set_pos(vec2_t(10,10));
-	label->set_text(fps);
-	ui_mgr()->draw();
-}
-
 struct test_t: public object_t {
 	enum { MIN_AGE = 60*5, MAX_AGE = 60*8, };
 	static const float SZ, MARGIN, SPEED;
@@ -132,8 +119,8 @@ struct test_t: public object_t {
 	}
 	void draw(float) {
 		drawn = frame_count;
-		glColor3ub(r,g,b);
-		caret(get_pos(),SZ,rx,ry,rz);
+		//glColor3ub(r,g,b);
+		//caret(get_pos(),SZ,rx,ry,rz);
 	}
 	void draw_bad() {
 		drawn = frame_count;
@@ -156,16 +143,42 @@ bounds_t test_t::legal(vec_t(-1.0+MARGIN,-1.0+MARGIN,-1.0+MARGIN),
 typedef std::vector<test_t*> tests_t;
 tests_t objs;
 
+void ui() {
+	if(selection) {
+		glColor3f(1,0,0);
+		caret(selected_point,0.03,0,0,0);
+	}
+	static char fps[128];
+	snprintf(fps,sizeof(fps),"%u fps, %d visible objects (of %u)",(unsigned)framerate.per_second(now()),visible_objects,(unsigned)objs.size());
+	static ui_label_t* label = new ui_label_t("this is a test");
+	//label->set_pos(vec2_t(10,10));
+	label->set_text(fps);
+	ui_mgr()->draw();
+}
+
 void spatial_test() {
 	size_t bad = 0;
 	enum { MIN_OBJS = 150, MAX_OBJS = 170, };
 	glDisable(GL_TEXTURE_2D);
 	for(int i=objs.size()-1; i>=0; i--) {
 		test_t* obj = objs[i];
-		if(obj->drawn != frame_count) {
-			obj->draw_bad();
-			bad++;
+		glColor3ub(0xff,0,0);
+		if(obj->is_visible()) {
+			if(!world()->is_visible(obj->pos_bounds()))
+				std::cerr << *obj << " thinks it is visible but it isn't" << std::endl;
+			else if(obj->drawn != frame_count)
+				std::cerr << *obj << " thinks it is visible but wasn't drawn" << std::endl;
+			else
+				glColor3ub(0,0xff,0);
+		} else {
+			if(world()->is_visible(obj->pos_bounds()))
+				std::cerr << *obj << " thinks it is invisible but it is" << std::endl;
+			else if(obj->drawn == frame_count)
+				std::cerr << *obj << " is invisible but was drawn" << std::endl;
+			else
+				glColor3ub(0,0,0xff);
 		}
+		caret(obj->get_pos(),obj->SZ,obj->rx,obj->ry,obj->rz);
 		if(!obj->tick()) {
 			objs.erase(objs.begin()+i);
 			delete obj;
@@ -183,7 +196,7 @@ void spatial_test() {
 }
 
 void tick() {
-	//spatial_test();
+	spatial_test();
 	frame_count++;
 	const world_t::hits_t& visible = world()->visible();
 	visible_objects = visible.size();
@@ -281,19 +294,21 @@ struct v4_t {
 	float v[4];
 };
 
+float zoom = 60;
+
 void camera() {
+	std::cout << "zoom="<<zoom<<std::endl;
 	glViewport(0,0,screen->w,screen->h);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	const float wh = (float)screen->w/(float)screen->h;
 //	glOrtho(-wh,wh,-1,1,-1,1);
-	gluPerspective(45.0,wh,1,10);
+	gluPerspective(zoom,wh,1,10);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	glTranslatef(0,0,-3);
 //	glRotatef(90,0,1,0);
 //	glPushMatrix();
-	glScalef(2,2,2);
 	matrix_t projection, modelview;
 	glGetFloatv(GL_MODELVIEW_MATRIX,projection.f);
 	glGetFloatv(GL_PROJECTION_MATRIX,modelview.f);
@@ -301,20 +316,20 @@ void camera() {
 //	glPopMatrix();
 }
 
-void load() {
+void load(fs_t& fs) {
 	// this is just some silly test code - find a random model
 	typedef fs_t::list_t list_t;
-	const list_t techtrees = fs()->list_dirs("techs");
+	const list_t techtrees = fs.list_dirs("techs");
 	const std::string techtree_ = techtrees[rand()%techtrees.size()];
 	const std::string techtree = std::string("techs")+'/'+techtree_;
-	const list_t factions = fs()->list_dirs(techtree+"/factions");
+	const list_t factions = fs.list_dirs(techtree+"/factions");
 	const std::string faction_ = factions[rand()%factions.size()];
 	const std::string faction = techtree+"/factions/"+faction_;
-	const list_t units = fs()->list_dirs(faction+"/units");
+	const list_t units = fs.list_dirs(faction+"/units");
 	const std::string unit_ = units[rand()%units.size()];
 	const std::string unit = faction+"/units/"+unit_;
 	const std::string xml_name = unit+"/"+unit_+".xml";
-	const list_t models = fs()->list_files(unit+"/models");
+	const list_t models = fs.list_files(unit+"/models");
 	std::string g3d;
 	for(list_t::const_iterator i=models.begin(); i!=models.end(); i++)
 		if(i->find(".g3d") == (i->size()-4)) {
@@ -324,13 +339,13 @@ void load() {
 	if(!g3d.size()) data_error("no G3D models in "<<unit<<"/models");
 	// and load it
 	std::cout << "loading "<<xml_name<<std::endl;
-	fs_handle_t::ptr_t xml_file(fs()->get(xml_name));
+	fs_file_t::ptr_t xml_file(fs.get(xml_name));
 	istream_t::ptr_t xstream(xml_file->reader());
 	unit_type = std::auto_ptr<unit_type_t>(new unit_type_t(unit));
 	unit_type->load_xml(*xstream);
-	new ui_xml_editor_t(*unit_type);
+	//new ui_xml_editor_t(*unit_type);
 	std::cout << "loading "<<g3d<<std::endl;
-	fs_handle_t::ptr_t g3d_file(fs()->get(g3d));
+	fs_file_t::ptr_t g3d_file(fs.get(g3d));
 	istream_t::ptr_t gstream(g3d_file->reader());
 	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*gstream));
 }
@@ -368,12 +383,12 @@ int main(int argc,char** args) {
 
 		// we have a GL context so we can go ahead and init all the singletons
 		std::auto_ptr<graphics_t::mgr_t> graphics_mgr(graphics_t::create());
-		std::auto_ptr<fs_t::mgr_t> fs_mgr(fs_t::create("/home/will/Games/megaglest-3.3.7.2"));
+		std::auto_ptr<fs_t> fs(fs_t::create("/home/will/Games/megaglest-3.3.7.2"));
 		std::auto_ptr<ui_mgr_t> ui_(ui_mgr());
 
-		load();
+		load(*fs);
 		
-		terrain_t::gen_planet(5,500,3);
+		//terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);
 	
 		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),
@@ -403,7 +418,7 @@ int main(int argc,char** args) {
 		glColorMaterial(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE);
 		glEnable(GL_COLOR_MATERIAL);
 		//glEnable(GL_NORMALIZE);
-		glFrontFace(GL_CW);
+		//glFrontFace(GL_CW);
 		camera();
 		bool quit = false;
 		SDL_Event event;
@@ -427,6 +442,14 @@ int main(int argc,char** args) {
 					break;
 				case SDL_KEYDOWN:
 					switch(event.key.keysym.sym) {
+					case SDLK_PLUS:
+						zoom += 1;
+						camera();
+						break;
+					case SDLK_MINUS:
+						zoom -= 1;
+						camera();
+						break;
 					case SDLK_ESCAPE:
 						quit = true;
 						break;

@@ -291,6 +291,8 @@ ui_xml_editor_t::~ui_xml_editor_t() {
 }
 
 bool ui_xml_editor_t::offer(const SDL_Event& event) {
+	if(offer_children(event))
+		return true;
 	switch(event.type) {
 	case SDL_KEYUP:
 		return true; // ignore them but eat them
@@ -304,7 +306,8 @@ bool ui_xml_editor_t::offer(const SDL_Event& event) {
 			if(get_rect().contains(vec2_t(event.button.x,event.button.y))) {
 				const int x = event.button.x - get_rect().tl.x + pimpl->view_ofs.x;
 				const int y = event.button.y - get_rect().tl.y + pimpl->view_ofs.y - pimpl->h;
-				pimpl->button_up(vec2_t(x,y));
+				if(y >= 0) // not on title
+					pimpl->button_up(vec2_t(x,y));
 			}
 			return true;
 		}

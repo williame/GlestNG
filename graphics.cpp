@@ -59,7 +59,7 @@ void graphics_t::load_vbo(GLuint buffer,GLenum target,GLsizeiptr size,const GLvo
 	//#### glCheckErrors
 }
 
-GLuint graphics_t::alloc_texture(fs_handle_t& file) {
+GLuint graphics_t::alloc_texture(fs_file_t& file) {
 	pimpl_t::textures_t::const_iterator i = pimpl->textures.find(file.path());
 	if(i != pimpl->textures.end())
 		return i->second;
@@ -120,7 +120,7 @@ void graphics_t::load_texture_2D(GLuint texture,SDL_Surface* image) {
 	glBindTexture(GL_TEXTURE_2D,0);
 }
 
-SDL_Surface* graphics_t::load_surface(fs_handle_t& file) {
+SDL_Surface* graphics_t::load_surface(fs_file_t& file) {
 	std::cout << "(loading texture "<<file<<")"<<std::endl;
 	if(SDL_Surface* bmp = SDL_LoadBMP(file.path()))
 		return bmp;

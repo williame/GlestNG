@@ -40,6 +40,7 @@ public:
 	void move(const vec_t& relative) { set_pos(pos+relative); }
 	void set_pos(const vec_t& absolute);
 	const type_t type;
+	bool is_visible() const { return visible; }
 protected:
 	object_t(type_t type);
 private:
@@ -48,6 +49,7 @@ private:
 	spatial_index_t* spatial_index;
 	vec_t pos;
 	uint8_t straddles;
+	bool visible;
 };
 
 class world_t { // *the* spatial index of what is where in the world
@@ -73,12 +75,14 @@ public:
 	void intersection(const frustum_t& f,unsigned type,hits_t& hits,sort_by_t sort_by = SORT_BY_TYPE_THEN_DISTANCE);
 	void dump(std::ostream& out) const;
 	void set_frustum(const vec_t& eye,const matrix_t& m);
+	intersection_t is_visible(const bounds_t& bounds) const;
 	void clear_frustum();
 	const hits_t& visible() const;
 	bool has_frustum() const;
 	const frustum_t& frustum() const;
 private:
 	friend class spatial_index_t;
+	friend class object_t;
 	world_t();
 	struct pimpl_t;
 	pimpl_t* pimpl;
@@ -125,8 +129,12 @@ inline std::ostream& operator<<(std::ostream& out,const world_t::hit_t& hit) {
 	return out;
 }
 
+inline std::ostream& operator<<(std::ostream& out,const object_t& obj) {
+	return out << "object_t<" << obj.type << "," << obj.pos_bounds() << ">";
+}
+
 inline std::ostream& operator<<(std::ostream& out,const object_t* obj) {
-	return out << "object_t<" << obj->type << "," << obj->pos_bounds() << ">";
+	return out << *obj;
 }
 
 #endif //__WORLD_HPP__

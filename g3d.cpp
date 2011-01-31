@@ -145,7 +145,7 @@ void model_g3d_t::load_v3(istream_t& in) {
 		const uint32_t vertex_count = in.uint32();
 		const uint32_t index_count = in.uint32();
 		const uint32_t properties = in.uint32();
-		const std::string texture = fs()->join(in.path(),in.fixed_str<64>());
+		const std::string texture = in.file().rel(in.fixed_str<64>());
 		if(normal_count != frame_count) 
 			data_error(in << " has "<<normal_count<<" normals but "<<frame_count<<" frames");
 		if(index_count%3) data_error(in << " bad number of indices: " << index_count);
@@ -155,15 +155,15 @@ void model_g3d_t::load_v3(istream_t& in) {
 		meshes.push_back(mesh);
 		const bool has_textures = (0==(properties&1)); 
 		if(has_textures) {
-			fs_handle_t::ptr_t file(fs()->get(in,texture));
+			fs_file_t::ptr_t file(in.fs().get(texture));
 			mesh->textures[mesh_t::DIFFUSE] = graphics()->alloc_texture(*file);
 			if(texture.size()>4) {
 				std::string norm(texture,0,texture.size()-4);
 				norm += "_normal";
 				norm += texture.c_str()+texture.size()-4;
 				try {
-					if(fs()->is_file(norm)) {
-						fs_handle_t::ptr_t nfile(fs()->get(in,norm));
+					if(in.fs().is_file(norm)) {
+						fs_file_t::ptr_t nfile(in.fs().get(in,norm));
 						mesh->textures[mesh_t::NORMAL] = graphics()->alloc_texture(*nfile);
 					}
 				} catch(data_error_t* de) {
@@ -202,7 +202,7 @@ void model_g3d_t::load_v4(istream_t& in) {
 			textures = in.uint32();
 		for(int t=0; t<mesh_t::TEXTURE_COUNT; t++)
 			if((1<<t)&textures) {
-				fs_handle_t::ptr_t file(fs()->get(in,in.fixed_str<64>()));
+				fs_file_t::ptr_t file(in.fs().get(in,in.fixed_str<64>()));
 				mesh->textures[t] = graphics()->alloc_texture(*file);
 			}
 		mesh->load_vn(in,frame_count,vertex_count);

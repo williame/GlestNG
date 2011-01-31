@@ -84,9 +84,9 @@ struct xml_parser_t::token_t {
 		return ret;
 	}
 	bool equals(const char* s) const {
-		const char* me = start;
-		while(*s)
-			if(*s++!=*me++)
+		if(strlen(s) != len) return false;
+		for(size_t i=0; i<len; i++)
+			if(s[i] != start[i])
 				return false;
 		return true;
 	}
