@@ -12,7 +12,7 @@
 
 struct idx_t {
 	idx_t(class_type_t t,const std::string& n,class_t* c = NULL):
-		type(t), name(n), cls(c), refs(1) {}
+		type(t), name(n), cls(c), refs(0) {}
 	const class_type_t type;
 	const std::string name;
 	class_t* cls;

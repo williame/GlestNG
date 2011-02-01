@@ -394,7 +394,7 @@ int main(int argc,char** args) {
 
 		load(*fs);
 		
-		//terrain_t::gen_planet(5,500,3);
+		terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);
 	
 		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),
@@ -475,6 +475,8 @@ int main(int argc,char** args) {
 			framerate.tick(now());
 			tick();
 		}
+		for(tests_t::iterator i=objs.begin(); i!=objs.end(); i++)
+			delete *i;
 		return EXIT_SUCCESS;
 	} catch(data_error_t* de) {
 		std::cerr << "Oh! " << de << std::endl;

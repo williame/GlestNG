@@ -13,6 +13,8 @@
 #include "error.hpp"
 #include "3d.hpp"
 
+#define ANG2RAD 3.14159265358979323846/180.0
+
 quat_t quat_t::slerp(const quat_t& d,float t) const {
 	if(t<=0) return *this;
 	if(t>=1) return d;
@@ -149,6 +151,20 @@ intersection_t aabb_t::intersects(const aabb_t& o) const {
 	return SOME;
 }
 
+vec_t aabb_t::n(const vec_t& normal) const {
+	return vec_t(
+		normal.x < 0? a.x: b.x,
+		normal.y < 0? a.y: b.y,
+		normal.z < 0? a.z: b.z);
+}
+
+vec_t aabb_t::p(const vec_t& normal) const {
+	return vec_t(
+		normal.x > 0? a.x: b.x,
+		normal.y > 0? a.y: b.y,
+		normal.z > 0? a.z: b.z);
+}
+
 static const vec_t
 	BOUNDS_MIN = vec_t(FLT_MAX,FLT_MAX,FLT_MAX),
 	BOUNDS_MAX = vec_t(-FLT_MAX,-FLT_MAX,-FLT_MAX);
@@ -236,62 +252,85 @@ bool triangle_t::intersection(const ray_t& r,vec_t& I) const {
     return true; // I is in T
 }
 
-void plane_t::normalise() {
-	const float n = sqrt(sqrd(a)+sqrd(b)+sqrd(c)+sqrd(d));
-	if(n) {
-		a /= n;
-		b /= n;
-		c /= n;
-		d /= n;
-	}
+plane_t::plane_t(float a,float b,float c,float d) {
+	normal = vec_t(a,b,c);
+	const float l = normal.magnitude();
+	normal /= l;
+	this->d = d/l;
 }
 
-frustum_t::frustum_t(const vec_t& e,const matrix_t& vp): eye(e) {
-	// http://www.crownandcutlass.com/features/technicaldetails/frustum.html
-	const plane_t
-		col0(vp(0,0), vp(1,0), vp(2,0), vp(3,0)),
-		col1(vp(0,1), vp(1,1), vp(2,1), vp(3,1)),
-		col2(vp(0,2), vp(1,2), vp(2,2), vp(3,2)),
-		col3(vp(0,3), vp(1,3), vp(2,3), vp(3,3));
-	// Planes face inward
-	side[0] = (col3-col2);  // far
-	side[1] = (col3+col0);  // left
-	side[2] = (col3-col0);  // right
-	side[3] = (col3-col1);  // top
-	side[4] = (col3+col1);  // bottom
-	side[5] = (col2);    // near
-	for(int i=0; i<6; i++)
-		side[i].normalise();
+float plane_t::distance(const vec_t& pt) const {
+	return (d + normal.dot(pt));
+}
+
+static float _mat(const matrix_t& m,int row,int col) {
+	const float hmm = m(row-1,col-1);
+	const float ret = m.f[col*4+row-5]; // this is NOT the same as m(row,col)
+	if(hmm != ret) panic("wtf? ("<<row<<","<<col<<") "<<hmm<<", "<<ret);
+	return ret;
+}
+
+frustum_t::frustum_t(const vec_t& e,const matrix_t& m): eye(e) {
+	pl[0] = plane_t( // near
+				 _mat(m,3,1) + _mat(m,4,1),
+				 _mat(m,3,2) + _mat(m,4,2),
+				 _mat(m,3,3) + _mat(m,4,3),
+				 _mat(m,3,4) + _mat(m,4,4));
+	pl[1] = plane_t( // far
+				-_mat(m,3,1) + _mat(m,4,1),
+				-_mat(m,3,2) + _mat(m,4,2),
+				-_mat(m,3,3) + _mat(m,4,3),
+				-_mat(m,3,4) + _mat(m,4,4));
+	pl[2] = plane_t( // bottom
+				 _mat(m,2,1) + _mat(m,4,1),
+				 _mat(m,2,2) + _mat(m,4,2),
+				 _mat(m,2,3) + _mat(m,4,3),
+				 _mat(m,2,4) + _mat(m,4,4));
+	pl[3] = plane_t(  // top
+				-_mat(m,2,1) + _mat(m,4,1),
+				-_mat(m,2,2) + _mat(m,4,2),
+				-_mat(m,2,3) + _mat(m,4,3),
+				-_mat(m,2,4) + _mat(m,4,4));
+	pl[4] = plane_t(  // left
+				 _mat(m,1,1) + _mat(m,4,1),
+				 _mat(m,1,2) + _mat(m,4,2),
+				 _mat(m,1,3) + _mat(m,4,3),
+				 _mat(m,1,4) + _mat(m,4,4));
+	pl[5] = plane_t( // right
+				-_mat(m,1,1) + _mat(m,4,1),
+				-_mat(m,1,2) + _mat(m,4,2),
+				-_mat(m,1,3) + _mat(m,4,3),
+				-_mat(m,1,4) + _mat(m,4,4));
 }
 
 intersection_t frustum_t::contains(const sphere_t& sphere) const {
+	intersection_t result = ALL;
+	const float radius_sqrd = sphere.radius;
 	for(int i=0; i<6; i++) {
-		const float d = side[i].dot(sphere.centre);
-		if(d < -sphere.radius)
+		const float d = pl[i].distance(sphere.centre);
+		if (d < -radius_sqrd)
 			return MISS;
-		if(fabs(d) < sphere.radius)
-			return SOME;
+		else if (d < radius_sqrd)
+			result = SOME;
 	}
-	return ALL;
+	return result;
 }
 
 intersection_t frustum_t::contains(const aabb_t& box) const {
-	intersection_t ret = ALL;
-	for(int i=0; i<6; i++) {
-		int c = 0;
-		for(int j=0; j<8; j++)
-			if(side[i].dot(box.corner(j)) >= 0)
-				c++;
-		if(c == 0) return MISS;
-		if(c != 8) ret = SOME;
+	intersection_t result = ALL;
+	for(int i=0; i < 6; i++) {
+		if (pl[i].distance(box.p(pl[i].normal)) < 0)
+			return MISS;
+		else if (pl[i].distance(box.n(pl[i].normal)) < 0)
+			result = SOME;
 	}
-	return ret;
+	return result;
 }
 
 intersection_t frustum_t::contains(const bounds_t& bounds) const {
 	intersection_t ret = contains(static_cast<const sphere_t&>(bounds));
-	if(SOME == ret)
-		ret = contains(static_cast<const aabb_t&>(bounds));
+	//if(SOME == ret)
+	//	ret = contains(static_cast<const aabb_t&>(bounds));
 	return ret;
 }
 

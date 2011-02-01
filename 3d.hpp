@@ -96,6 +96,8 @@ struct aabb_t { //axis-aligned bounding box
 	bool intersects(const ray_t& r) const;
 	intersection_t intersects(const aabb_t& o) const;
 	inline vec_t corner(int corner) const;
+	vec_t n(const vec_t& normal) const;
+	vec_t p(const vec_t& normal) const;
 };
 
 struct bounds_t: public sphere_t, public aabb_t {
@@ -125,23 +127,20 @@ struct triangle_t {
 
 struct plane_t {
 	plane_t() {}
-	plane_t(float a_,float b_,float c_,float d_): a(a_), b(b_), c(c_), d(d_) {}
-	float a, b, c, d;
-	inline plane_t operator+(const plane_t& o) const;
-	inline plane_t operator-(const plane_t& o) const;
-	inline float dot(const vec_t& v) const;
-	inline float operator[](int i) const;
-	void normalise();
+	plane_t(float a,float b,float c,float d); 
+	float distance(const vec_t& pt) const;
+	vec_t normal;
+	float d;
 };
 
 struct frustum_t {
 	frustum_t() {}
-	frustum_t(const vec_t& eye,const matrix_t& proj_modelview);
+	frustum_t(const vec_t& e,const matrix_t& m);
 	intersection_t contains(const sphere_t& sphere) const;
 	intersection_t contains(const aabb_t& box) const;
 	intersection_t contains(const bounds_t& bounds) const;
+	plane_t pl[6];
 	vec_t eye;
-	plane_t side[6];
 };
 
 inline float sqrd(float x) { return x*x; }
@@ -174,7 +173,7 @@ inline matrix_t& matrix_t::operator*=(const matrix_t& o) {
 inline float matrix_t::operator()(int r,int c) const {
 	assert(r>=0 && r<4);
 	assert(c>=0 && c<4);
-	return f[r*4+c]; 
+	return f[c*4+r]; // crazy swap
 }
 
 inline quat_t quat_t::operator-() const {
@@ -331,28 +330,6 @@ inline bounds_t bounds_t::operator+(const vec_t& pos) const {
 	ret.b += pos;
 	ret.centre += pos;
 	return ret;
-}
-
-inline plane_t plane_t::operator+(const plane_t& o) const {
-	return plane_t(a+o.a,b+o.b,c+o.c,d+o.d);
-}
-
-inline plane_t plane_t::operator-(const plane_t& o) const {
-	return plane_t(a-o.a,b-o.b,c-o.c,d-o.d);
-}
-
-inline float plane_t::dot(const vec_t& v) const {
-	return a*v.x+b*v.y+c*v.z+d;
-}
-
-inline float plane_t::operator[](int i) const {
-	switch(i) {
-	case 0: return a;
-	case 1: return b;
-	case 2: return c;
-	case 3: return d;
-	default: panic("bad index "<<i);
-	}
 }
 
 inline std::ostream& operator<<(std::ostream& out,const vec_t& v) {
