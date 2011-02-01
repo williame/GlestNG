@@ -33,12 +33,14 @@ class object_t: public bounds_t {
 public:
 	virtual ~object_t();
 	bool in_world() const { return spatial_index; }
+	void bounds_reset();
+	void bounds_include(const vec_t& v);
+	void bounds_fix();
 	virtual void draw(float d) = 0; // distance from camera
 	virtual bool refine_intersection(const ray_t& r,vec_t& I) = 0;
-	bounds_t pos_bounds() const { return *this+pos; }
-	vec_t get_pos() const { return pos; }
 	void move(const vec_t& relative) { set_pos(pos+relative); }
 	void set_pos(const vec_t& absolute);
+	vec_t get_pos() const { return pos; }
 	const type_t type;
 	bool is_visible() const { return visible; }
 protected:
@@ -48,8 +50,10 @@ private:
 	friend class world_t;
 	spatial_index_t* spatial_index;
 	vec_t pos;
+	bounds_t bounds;
 	uint8_t straddles;
 	bool visible;
+	void _do_set_pos(const vec_t& pos);
 };
 
 class world_t { // *the* spatial index of what is where in the world
@@ -130,7 +134,7 @@ inline std::ostream& operator<<(std::ostream& out,const world_t::hit_t& hit) {
 }
 
 inline std::ostream& operator<<(std::ostream& out,const object_t& obj) {
-	return out << "object_t<" << obj.type << "," << obj.pos_bounds() << ">";
+	return out << "object_t<" << obj.type << "," << static_cast<const aabb_t&>(obj) << "," << obj.get_pos() << ">";
 }
 
 inline std::ostream& operator<<(std::ostream& out,const object_t* obj) {

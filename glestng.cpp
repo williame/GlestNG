@@ -102,10 +102,10 @@ struct test_t: public object_t {
 		dir(randf(),randf(),randf()),
 		drawn(frame_count)
 	{
-		set_pos(vec_t(randf()-MARGIN,randf()-MARGIN,randf()-MARGIN));
 		bounds_include(vec_t(-SZ,-SZ,-SZ));
 		bounds_include(vec_t(SZ,SZ,SZ));
 		bounds_fix();
+		set_pos(vec_t(randf()-MARGIN,randf()-MARGIN,randf()-MARGIN));
 		world()->add(this);
 		dir.normalise();
 		dir *= SPEED;
@@ -166,14 +166,14 @@ void spatial_test() {
 		test_t* obj = objs[i];
 		glColor3ub(0xff,0,0);
 		if(obj->is_visible()) {
-			if(!world()->is_visible(obj->pos_bounds()))
+			if(!world()->is_visible(*obj))
 				std::cerr << *obj << " thinks it is visible but it isn't" << std::endl;
 			else if(obj->drawn != frame_count)
 				std::cerr << *obj << " thinks it is visible but wasn't drawn" << std::endl;
 			else
 				glColor3ub(0,0xff,0);
 		} else {
-			if(world()->is_visible(obj->pos_bounds()))
+			if(world()->is_visible(*obj))
 				std::cerr << *obj << " thinks it is invisible but it is" << std::endl;
 			else if(obj->drawn == frame_count)
 				std::cerr << *obj << " is invisible but was drawn" << std::endl;

@@ -96,6 +96,7 @@ struct aabb_t { //axis-aligned bounding box
 	bool intersects(const ray_t& r) const;
 	intersection_t intersects(const aabb_t& o) const;
 	inline vec_t corner(int corner) const;
+	bool contains(const vec_t& p) const;
 	vec_t n(const vec_t& normal) const;
 	vec_t p(const vec_t& normal) const;
 };
@@ -103,11 +104,11 @@ struct aabb_t { //axis-aligned bounding box
 struct bounds_t: public sphere_t, public aabb_t {
 	bounds_t();
 	bounds_t(const vec_t& a,const vec_t& b);
-	void bounds_reset();
-	void bounds_include(const vec_t& v);
+	virtual void bounds_reset();
+	virtual void bounds_include(const vec_t& v);
+	virtual void bounds_fix();
 	bool intersects(const ray_t& r) const;
 	intersection_t intersects(const bounds_t& a) const;
-	void bounds_fix();
 	inline bounds_t operator+(const vec_t& pos) const;
 };
 

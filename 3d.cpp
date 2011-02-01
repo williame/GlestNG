@@ -151,6 +151,10 @@ intersection_t aabb_t::intersects(const aabb_t& o) const {
 	return SOME;
 }
 
+bool aabb_t::contains(const vec_t& p) const {
+	return ((p.x>=a.x) && (p.x<b.x) && (p.y>=a.y) && (p.y<b.y) && (p.z>=a.z) && (p.z<b.z));
+}
+
 vec_t aabb_t::n(const vec_t& normal) const {
 	return vec_t(
 		normal.x < 0? a.x: b.x,
