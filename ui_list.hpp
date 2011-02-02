@@ -17,7 +17,8 @@ public:
 		LIST,
 		MENU,
 	};
-	ui_list_t(style_t style,const strings_t& list,ui_component_t* parent=NULL);
+	ui_list_t(style_t style,const std::string& title,const strings_t& list,ui_component_t* parent=NULL);
+	vec2_t preferred_size() const;
 	~ui_list_t();
 	bool offer(const SDL_Event& event);
 private:

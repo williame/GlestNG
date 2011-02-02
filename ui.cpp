@@ -84,16 +84,71 @@ static void _draw_box(GLenum type,const rect_t& r) {
 	glEnd();
 }
 
-void ui_component_t::draw_box(const rect_t& r) { _draw_box(GL_LINE_LOOP,r); }
-void ui_component_t::draw_box(short x,short y,short w,short h) { _draw_box(GL_LINE_LOOP,rect_t(x,y,x+w,y+h)); }
-void ui_component_t::draw_filled_box(const rect_t& r) { _draw_box(GL_QUADS,r); }
-void ui_component_t::draw_filled_box(short x,short y,short w,short h) { _draw_box(GL_QUADS,rect_t(x,y,x+w,y+h)); }
+void ui_component_t::draw_box(const rect_t& r) const { _draw_box(GL_LINE_LOOP,r); }
+void ui_component_t::draw_box(short x,short y,short w,short h) const { _draw_box(GL_LINE_LOOP,rect_t(x,y,x+w,y+h)); }
+void ui_component_t::draw_filled_box(const rect_t& r) const { _draw_box(GL_QUADS,r); }
+void ui_component_t::draw_filled_box(short x,short y,short w,short h) const { _draw_box(GL_QUADS,rect_t(x,y,x+w,y+h)); }
+
+void ui_component_t::draw_corner(const rect_t& r,bool left,bool top,bool filled) const {
+	const vec2_t start(left? r.tl.x: r.br.x, top? r.br.y: r.tl.y);
+	const vec2_t stop(!left? r.tl.x: r.br.x, !top? r.br.y: r.tl.y);
+	glBegin(filled? GL_POLYGON: GL_LINE_STRIP);
+	glVertex2s(start.x,start.y);
+	glVertex2s(stop.x,stop.y);
+	if(filled)
+		glVertex2s(stop.x,start.y);
+	glEnd();
+}
+
+void ui_component_t::draw_line(const vec2_t& a,const vec2_t& b) const {
+	glBegin(GL_LINES);
+	glVertex2s(a.x,a.y);
+	glVertex2s(b.x,b.y);
+	glEnd();
+}
+
+void ui_component_t::draw_hline(const vec2_t& p,short l) const {
+	draw_line(p,vec2_t(p.x+l,p.y));
+}
+
+void ui_component_t::draw_vline(const vec2_t& p,short h) const {
+	draw_line(p,vec2_t(p.x,p.y+h));
+}
+
+void ui_component_t::draw_cornered_box(const rect_t& r,const vec2_t& corner,bool filled) const {
+	draw_corner(rect_t(r.tl,r.tl+corner),true,true,filled);
+	draw_corner(rect_t(r.br.x-corner.x,r.tl.y,r.br.x,r.tl.y+corner.y),false,true,filled);
+	draw_corner(rect_t(r.br-corner,r.br),false,false,filled);
+	draw_corner(rect_t(r.tl.x,r.br.y-corner.y,r.tl.x+corner.x,r.br.y),true,false,filled);
+	if(filled) {
+		draw_filled_box(rect_t(r.tl.x+corner.x,r.tl.y,r.br.x-corner.x,r.tl.y+corner.y));
+		draw_filled_box(r.inner(vec2_t(0,corner.y)));
+		draw_filled_box(rect_t(r.tl.x+corner.x,r.br.y-corner.y,r.br.x-corner.x,r.br.y));
+	} else {
+		draw_vline(vec2_t(r.tl.x,r.tl.y+corner.y),r.h()-corner.y*2);
+		draw_vline(vec2_t(r.br.x,r.tl.y+corner.y),r.h()-corner.y*2);
+		draw_hline(vec2_t(r.tl.x+corner.x,r.tl.y),r.w()-corner.x*2);
+		draw_hline(vec2_t(r.tl.x+corner.x,r.br.y),r.w()-corner.x*2);
+	}
+}
 
 bool ui_component_t::offer_children(const SDL_Event& event) {
 	for(ui_component_t* child = first_child; child; child = child->next_peer)
 		if(child->visible && child->offer(event))
 			return true;
 	return false;
+}
+
+rect_t ui_component_t::clip() const {
+	return clip(get_rect());
+}
+
+rect_t ui_component_t::clip(const rect_t& r) const {
+	static rect_t old(0,0,0,0);
+	rect_t o = old;
+	old = r;
+	glScissor(r.tl.x-1,mgr.get_screen_bounds().br.y-r.tl.y-r.h()-1,r.w()+2,r.h()+2); // flip Y
+	return o;
 }
 
 ui_label_t::ui_label_t(const std::string& str,ui_component_t* parent):
@@ -135,8 +190,7 @@ ui_mgr_t::pimpl_t::pimpl_t() {
 
 void ui_mgr_t::pimpl_t::draw(ui_component_t* comp) {
 	if(!comp->is_visible()) return;
-	const rect_t r = comp->get_rect();
-	glScissor(r.tl.x,screen.br.y-r.tl.y-r.h(),r.w(),r.h()); // flip Y
+	comp->clip();
 	comp->draw();
 	if(comp->first_child)
 		draw(comp->first_child);

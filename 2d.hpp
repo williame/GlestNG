@@ -33,6 +33,10 @@ struct rect_t {
 	inline short w() const { return br.x-tl.x; }
 	inline short h() const { return br.y-tl.y; }
 	inline vec2_t size() const { return vec2_t(w(),h()); }
+	inline rect_t inner(const vec2_t& margin) const { return rect_t(tl+margin,br-margin); }
+	inline rect_t inner(short x,short y) const { return inner(vec2_t(x,y)); }
+	inline void move(const vec2_t& rel) { tl+=rel; br+=rel; }
+	inline void move(short x,short y) { move(vec2_t(x,y)); }
 	inline bool empty() const { return (br.x<=tl.x) || (br.y<=tl.y); }
 	inline void normalise() { vec2_t::normalise(tl,br); }
 	inline bool contains(const vec2_t& pt) const;

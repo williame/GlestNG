@@ -34,12 +34,19 @@ protected:
 	ui_component_t(ui_component_t* parent = NULL);                 
 	virtual ~ui_component_t();
 	ui_mgr_t& mgr;
-	void draw_box(const rect_t& r);
-	void draw_box(short x,short y,short w,short h);
-	void draw_filled_box(const rect_t& r);
-	void draw_filled_box(short x,short y,short w,short h);
+	void draw_box(const rect_t& r) const;
+	void draw_box(short x,short y,short w,short h) const;
+	void draw_filled_box(const rect_t& r) const;
+	void draw_filled_box(short x,short y,short w,short h) const;
+	void draw_corner(const rect_t& r,bool left,bool top,bool filled) const;
+	void draw_line(const vec2_t& a,const vec2_t& b) const;
+	void draw_hline(const vec2_t& p,short l) const;
+	void draw_vline(const vec2_t& p,short h) const;
+	void draw_cornered_box(const rect_t& r,const vec2_t& corner,bool filled) const;
 	virtual 	bool offer(const SDL_Event& event) { return false; }
 	bool offer_children(const SDL_Event& event);
+	rect_t clip() const;
+	rect_t clip(const rect_t& c) const;
 private:
 	friend class ui_mgr_t;
 	virtual void draw() = 0;

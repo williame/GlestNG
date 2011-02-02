@@ -355,8 +355,8 @@ void load(fs_t& fs) {
 	fs_file_t::ptr_t g3d_file(fs.get(g3d));
 	istream_t::ptr_t gstream(g3d_file->reader());
 	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*gstream));
-	ui_list_t* factions_menu = new ui_list_t(ui_list_t::MENU,factions);
-	factions_menu->set_rect(rect_t(10,50,200,300));
+	ui_list_t* factions_menu = new ui_list_t(ui_list_t::MENU,"factions",factions);
+	factions_menu->set_rect(rect_t(vec2_t(10,50),vec2_t(10,50)+factions_menu->preferred_size()));
 }
 
 int main(int argc,char** args) {
