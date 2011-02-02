@@ -10,7 +10,7 @@
 
 #include "techtree.hpp"
 
-class faction_t: public class_t, public xml_loadable_t, public fs_handle_t {
+class faction_t: public class_t, public xml_loadable_t {
 public:
 	faction_t(techtree_t& techtree,const std::string& name);
 	const std::string path;

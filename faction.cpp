@@ -9,7 +9,6 @@
 
 faction_t::faction_t(techtree_t& techtree,const  std::string& name):
 	class_t(techtree,FACTION,name), xml_loadable_t(name),
-	fs_handle_t(techtree.fs()),
 	path(techtree.fs().canocial(techtree.path+"/factions/"+name)) {
 	{
 		const strings_t subdirs = fs().list_dirs(path+"/units");

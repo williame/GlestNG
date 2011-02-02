@@ -43,6 +43,7 @@ public:
 		// extract attributes
 		float value_float(const char* key = "value");
 		std::string value_string(const char* key = "value");
+		int value_int(const char* key = "value");
 		std::string get_data_as_string();
 		// query current node
 		type_t type() const;

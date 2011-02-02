@@ -13,14 +13,25 @@
 techtree_t::techtree_t(fs_t& fs,const std::string& name):
 	mgr_t(fs), xml_loadable_t(name),
 	path(fs.canocial(std::string("techs")+"/"+name)) {
-	const strings_t subdirs = fs.list_dirs(path+"/factions");
-	for(strings_t::const_iterator i=subdirs.begin(); i!=subdirs.end(); i++)
-		if(fs.exists(path+"/factions/"+*i+"/"+*i+".xml")) {
-			factions.push_back(*i);
-			faction_refs.push_back(ref(FACTION,*i));
-		}
-	if(!factions.size())
-		data_error("techtree "<<name<<" contains no factions");
+	{
+		const strings_t subdirs = fs.list_dirs(path+"/factions");
+		for(strings_t::const_iterator i=subdirs.begin(); i!=subdirs.end(); i++)
+			if(fs.exists(path+"/factions/"+*i+"/"+*i+".xml")) {
+				factions.push_back(*i);
+				faction_refs.push_back(ref(FACTION,*i));
+			}
+		if(!factions.size())
+			data_error("techtree "<<name<<" contains no factions");
+	}{
+		const strings_t subdirs = fs.list_dirs(path+"/resources");
+		for(strings_t::const_iterator i=subdirs.begin(); i!=subdirs.end(); i++)
+			if(fs.exists(path+"/resources/"+*i+"/"+*i+".xml")) {
+				resources.push_back(*i);
+				resource_refs.push_back(ref(RESOURCE,*i));
+			}
+		if(!resources.size())
+			data_error("techtree "<<name<<" contains no resources");
+	}
 	fs_file_t::ptr_t f(fs.get(path+"/"+name+".xml"));
 	istream_t::ptr_t in(f->reader());
 	load_xml(*in);
@@ -29,6 +40,8 @@ techtree_t::techtree_t(fs_t& fs,const std::string& name):
 techtree_t::~techtree_t() {
 	reset();
 	for(refs_t::iterator i=faction_refs.begin(); i!=faction_refs.end(); i++)
+		delete *i;
+	for(refs_t::iterator i=resource_refs.begin(); i!=resource_refs.end(); i++)
 		delete *i;
 }
 
@@ -93,6 +106,10 @@ size_t techtree_t::armour_ID(const std::string& s) const {
 
 faction_t* techtree_t::get_faction(const std::string& name) {
 	return faction_refs[_index_of(factions,name,"faction")]->faction();
+}
+
+resource_t* techtree_t::get_resource(const std::string& name) {
+	return resource_refs[_index_of(resources,name,"resource")]->resource();
 }
 
 techtrees_t::techtrees_t(fs_t& fs): fs_handle_t(fs) {

@@ -9,10 +9,11 @@
 
 #include "ref.hpp"
 #include "faction.hpp"
+#include "resource.hpp"
 
 struct idx_t {
-	idx_t(class_type_t t,const std::string& n,class_t* c = NULL):
-		type(t), name(n), cls(c), refs(0) {}
+	idx_t(class_type_t t,const std::string& n):
+		type(t), name(n), cls(NULL), refs(0) {}
 	const class_type_t type;
 	const std::string name;
 	class_t* cls;
@@ -32,16 +33,9 @@ struct mgr_t::pimpl_t {
 
 idx_t& mgr_t::pimpl_t::get(const ref_t& ref) {
 	classes_t::iterator i = classes.find(ref.name);
-	if(i == classes.end()) {
-		class_t* cls = NULL;
-		switch(ref.type) {
-		case FACTION:
-			cls = new faction_t(mgr.techtree(),ref.name);
-			break;
-		default: data_error(ref.type<<" "<<ref.name<<" is not supported yet");
-		}
-		return classes.insert(classes_t::value_type(ref.name,idx_t(ref.type,ref.name,cls))).first->second;
-	} else if(ref.type != i->second.type)
+	if(i == classes.end())
+		return classes.insert(classes_t::value_type(ref.name,idx_t(ref.type,ref.name))).first->second;
+	else if(ref.type != i->second.type)
 		data_error("trying to reference "<<ref.name<<" which is a "<<i->second.type<<" when "<<ref.type<<" was expected");
 	return i->second;
 }
@@ -55,7 +49,7 @@ void mgr_t::pimpl_t::detach(const ref_t& ref) {
 }
 
 class_t::class_t(mgr_t& m,class_type_t t,const std::string& n):
-mgr(m), type(t), name(n) {}
+fs_handle_t(m.fs()), mgr(m), type(t), name(n) {}
 
 class_t::~class_t() {}
 
@@ -69,12 +63,32 @@ ref_t::~ref_t() {
 }
 
 class_t* ref_t::get() {
-	return mgr.pimpl->get(*this).cls;
+	class_t* cls = mgr.pimpl->get(*this).cls;
+	if(!cls) { // lazy construction
+		switch(type) {
+		case FACTION:
+			cls = new faction_t(mgr.techtree(),name);
+			break;
+		case RESOURCE:
+			cls = new resource_t(mgr.techtree(),name);
+			break;
+		default: panic(this<<" is not supported yet");
+		}
+		if(!cls) panic(this<<" was not created");
+		if(cls->type != type) panic(cls<<" is not "<<this);
+		mgr.pimpl->get(*this).cls = cls;
+	}
+	return cls;
 }
 
 faction_t* ref_t::faction() {
 	if(type != FACTION) data_error(this<<" is not a faction");
 	return static_cast<faction_t*>(get());
+}
+
+resource_t* ref_t::resource() {
+	if(type != RESOURCE) data_error(this<<" is not a resource");
+	return static_cast<resource_t*>(get());
 }
 
 mgr_t::~mgr_t() { delete pimpl; }

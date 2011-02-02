@@ -346,9 +346,9 @@ void xml_parser_t::walker_t::check(const char* tag) {
 
 float xml_parser_t::walker_t::value_float(const char* key) {
 	get_key(key);
+	if(!tok->first_child || (VALUE != tok->first_child->type))
+		data_error("expecting key "<<tok->path()<<" to have a value child");
 	try {
-		if(!tok->first_child || (VALUE != tok->first_child->type))
-			panic("expecting key "<<tok->path()<<" to have a value child");
 		tok = tok->first_child;
 		errno = 0;
 		char* endptr;
@@ -360,7 +360,7 @@ float xml_parser_t::walker_t::value_float(const char* key) {
 		tok = tok->parent;
 		return val;
 	} catch(data_error_t* de) {
-		tok->error = strdup(de->str().c_str());
+		tok->set_error(de->str().c_str());
 		throw;
 	}
 }
@@ -368,12 +368,32 @@ float xml_parser_t::walker_t::value_float(const char* key) {
 std::string xml_parser_t::walker_t::value_string(const char* key) {
 	get_key(key);
 	if(!tok->first_child || (VALUE != tok->first_child->type))
-		panic("expecting key "<<tok->path()<<" to have a value child");
+		data_error("expecting key "<<tok->path()<<" to have a value child");
 	tok = tok->first_child;
 	tok->visit = true;
 	std::string str = tok->str();
 	tok = tok->parent;
 	return str;
+}
+
+int xml_parser_t::walker_t::value_int(const char* key) {
+	get_key(key);
+	if(!tok->first_child || (VALUE != tok->first_child->type))
+		data_error("expecting key "<<tok->path()<<" to have a value child");
+	try {
+		tok = tok->first_child;
+		errno = 0;
+		char* endptr;
+		const int i = strtol(tok->start,&endptr,10);
+		if(errno) data_error("could not convert "<<tok->path()<<" to int: "<<tok->str()<<" ("<<errno<<": "<<strerror(errno));
+		if(endptr != (tok->start+tok->len)) data_error(tok->path()<<" is not an int: "<<tok->str());
+		tok->visit = true;
+		tok = tok->parent;
+		return i;
+	} catch(data_error_t* de) {
+		tok->set_error(de->str().c_str());
+		throw;
+	}
 }
 
 std::string xml_parser_t::walker_t::get_data_as_string() {
