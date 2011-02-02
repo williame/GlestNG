@@ -40,6 +40,13 @@ int visible_objects = 0;
 std::auto_ptr<unit_type_t> unit_type;
 std::auto_ptr<model_g3d_t> model;
 
+ui_list_t* factions_menu = NULL; // ui controls are owned by the ui manager
+
+struct faction_handler_t: public ui_list_t::handler_t {
+	void on_selected(ui_list_t* lst,size_t idx) {
+	}
+} faction_handler;
+
 void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
 	glPushMatrix();		
 	glTranslatef(pos.x,pos.y,pos.z);
@@ -160,7 +167,6 @@ void ui() {
 }
 
 void spatial_test() {
-	size_t bad = 0;
 	enum { MIN_OBJS = 150, MAX_OBJS = 170, };
 	glDisable(GL_TEXTURE_2D);
 	for(int i=objs.size()-1; i>=0; i--) {
@@ -355,8 +361,9 @@ void load(fs_t& fs) {
 	fs_file_t::ptr_t g3d_file(fs.get(g3d));
 	istream_t::ptr_t gstream(g3d_file->reader());
 	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*gstream));
-	ui_list_t* factions_menu = new ui_list_t(ui_list_t::MENU,"factions",factions);
+	factions_menu = new ui_list_t(ui_list_t::CANCEL_BUTTON,"factions",factions);
 	factions_menu->set_rect(rect_t(vec2_t(10,50),vec2_t(10,50)+factions_menu->preferred_size()));
+	factions_menu->set_handler(&faction_handler);
 }
 
 int main(int argc,char** args) {
@@ -461,6 +468,12 @@ int main(int argc,char** args) {
 						break;
 					case SDLK_ESCAPE:
 						quit = true;
+						break;
+					case SDLK_m: // MODDING MODE
+						if(factions_menu->is_enabled())
+							factions_menu->disable();
+						else
+							factions_menu->enable();
 						break;
 					default:
 						std::cout << "Ignoring key " << 

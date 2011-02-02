@@ -18,6 +18,8 @@ struct vec2_t {
 	inline vec2_t operator+(const vec2_t& a) const;
 	inline vec2_t& operator-=(const vec2_t& a);
 	inline vec2_t operator-(const vec2_t& a) const;
+	inline vec2_t operator-() const;
+	inline int distance_sqrd(const vec2_t& v) const;
 	inline static void normalise(vec2_t& tl,vec2_t& br);
 };
 
@@ -40,7 +42,12 @@ struct rect_t {
 	inline bool empty() const { return (br.x<=tl.x) || (br.y<=tl.y); }
 	inline void normalise() { vec2_t::normalise(tl,br); }
 	inline bool contains(const vec2_t& pt) const;
+	inline vec2_t centre() const { return vec2_t(tl.x+w()/2,tl.y+h()/2); }
 };
+
+inline vec2_t vec2_t::operator-() const {
+	return vec2_t(-x,-y);
+}
 
 inline vec2_t& vec2_t::operator+=(const vec2_t& a) {
 	x += a.x;
@@ -64,6 +71,10 @@ inline vec2_t vec2_t::operator-(const vec2_t& a) const {
 	vec2_t ret = *this;
 	ret -= a;
 	return ret;
+}
+
+inline int vec2_t::distance_sqrd(const vec2_t& v) const {
+	return (x-v.x)*(x-v.x) + (y-v.y)*(y-v.y);
 }
 
 inline void vec2_t::normalise(vec2_t& tl,vec2_t& br) {

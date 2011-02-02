@@ -10,6 +10,7 @@
 
 #include <string>
 #include <inttypes.h>
+#include <ostream>
 
 #include "2d.hpp"
 #include "graphics.hpp"
@@ -30,20 +31,22 @@ public:
 	void show() { set_visible(true); }
 	void hide() { set_visible(false); }
 	void invalidate();
+	virtual void destroy(); // triggers the (eventual) deletion of this; don't deference after calling!
 protected:
 	ui_component_t(ui_component_t* parent = NULL);                 
 	virtual ~ui_component_t();
+	virtual void reshaped() {}
 	ui_mgr_t& mgr;
 	void draw_box(const rect_t& r) const;
 	void draw_box(short x,short y,short w,short h) const;
 	void draw_filled_box(const rect_t& r) const;
 	void draw_filled_box(short x,short y,short w,short h) const;
 	void draw_corner(const rect_t& r,bool left,bool top,bool filled) const;
+	void draw_cornered_box(const rect_t& r,const vec2_t& corner,bool filled) const;
+	void draw_circle(const rect_t& r,bool filled) const; 
 	void draw_line(const vec2_t& a,const vec2_t& b) const;
 	void draw_hline(const vec2_t& p,short l) const;
 	void draw_vline(const vec2_t& p,short h) const;
-	void draw_cornered_box(const rect_t& r,const vec2_t& corner,bool filled) const;
-	virtual 	bool offer(const SDL_Event& event) { return false; }
 	bool offer_children(const SDL_Event& event);
 	rect_t clip() const;
 	rect_t clip(const rect_t& c) const;
@@ -52,6 +55,7 @@ private:
 	virtual void draw() = 0;
 	void add_child(ui_component_t* child);
 	void remove_child(ui_component_t* child);
+	virtual 	bool offer(const SDL_Event& event) { return false; }
 	rect_t r;
 	bool visible;
 	ui_component_t *parent, *first_child, *next_peer;
@@ -86,6 +90,14 @@ private:
 	pimpl_t* pimpl;
 	ui_mgr_t();
 };
+
+inline std::ostream& operator<<(std::ostream& out,const ui_component_t& comp) {
+	return out << "ui<" << comp.get_rect() << '>';
+}
+
+inline std::ostream& operator<<(std::ostream& out,const ui_component_t* comp) {
+	return out << *comp;
+}
 
 inline ui_mgr_t* ui_mgr() { return ui_mgr_t::get_ui_mgr(); }
 

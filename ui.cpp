@@ -8,6 +8,8 @@
 #include <vector>
 #include <assert.h>
 #include <iostream>
+#include <algorithm>
+#include <math.h>
 
 #include "ui.hpp"
 #include "font.hpp"
@@ -51,6 +53,10 @@ void ui_component_t::remove_child(ui_component_t* child) {
 	}
 }
 
+void ui_component_t::destroy() {
+	delete this;
+}
+
 void ui_component_t::invalidate() {
 	if(visible)
 		mgr.invalidate(r);
@@ -60,6 +66,7 @@ void ui_component_t::set_rect(const rect_t& r_) {
 	invalidate();
 	r = r_;
 	invalidate();
+	reshaped();
 }
 
 void ui_component_t::set_pos(const vec2_t& pt) {
@@ -67,6 +74,7 @@ void ui_component_t::set_pos(const vec2_t& pt) {
 	r.br = pt+r.size();
 	r.tl = pt;
 	invalidate();
+	reshaped();
 }
 
 void ui_component_t::set_visible(bool v) {
@@ -89,14 +97,38 @@ void ui_component_t::draw_box(short x,short y,short w,short h) const { _draw_box
 void ui_component_t::draw_filled_box(const rect_t& r) const { _draw_box(GL_QUADS,r); }
 void ui_component_t::draw_filled_box(short x,short y,short w,short h) const { _draw_box(GL_QUADS,rect_t(x,y,x+w,y+h)); }
 
+static void _draw_arc(float r,float cx,float cy,int quadrant,int quadrants,bool open) {
+	const int num_segments = 4*4,
+		start = quadrant * (num_segments/4),
+		stop = (quadrant+quadrants) * (num_segments/4) + (open?1:0);
+	const float theta = 2.0 * 3.1415926 / float(num_segments); 
+	const float c = cos(theta);//precalculate the sine and cosine
+	const float s = sin(theta);
+	float x = r, y = 0;
+	for(int i = 0; i < stop; i++) {
+		if(i>=start)
+			glVertex2f(x + cx, y + cy);//output vertex 
+		//apply the rotation matrix
+		const float t = x;
+		x = c * x - s * y;
+		y = s * t + c * y;
+	}
+}
+
 void ui_component_t::draw_corner(const rect_t& r,bool left,bool top,bool filled) const {
-	const vec2_t start(left? r.tl.x: r.br.x, top? r.br.y: r.tl.y);
-	const vec2_t stop(!left? r.tl.x: r.br.x, !top? r.br.y: r.tl.y);
+	const float cx = (left?r.br.x:r.tl.x),
+		cy = (top?r.br.y:r.tl.y);
+	const int quadrant = (!left&&!top? 0: left&&!top? 1: left&&top? 2: 3);
 	glBegin(filled? GL_POLYGON: GL_LINE_STRIP);
-	glVertex2s(start.x,start.y);
-	glVertex2s(stop.x,stop.y);
+	_draw_arc(std::min(r.h(),r.w()),cx,cy,quadrant,1,true); 
 	if(filled)
-		glVertex2s(stop.x,start.y);
+		glVertex2f(cx,cy);
+	glEnd();
+}
+
+void ui_component_t::draw_circle(const rect_t& r,bool filled) const {
+	glBegin(filled? GL_POLYGON: GL_LINE_LOOP);
+	_draw_arc(std::min(r.h(),r.w())/2,r.tl.x+r.w()/2,r.tl.y+r.h()/2,0,4,false);
 	glEnd();
 }
 

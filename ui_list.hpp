@@ -13,15 +13,30 @@
 
 class ui_list_t: public ui_component_t {
 public:
-	enum style_t {
-		LIST,
-		MENU,
+	enum { // flags
+		CANCEL_BUTTON = 0x01,
 	};
-	ui_list_t(style_t style,const std::string& title,const strings_t& list,ui_component_t* parent=NULL);
-	vec2_t preferred_size() const;
+	ui_list_t(unsigned flags,const std::string& title,const strings_t& list,ui_component_t* parent=NULL);
 	~ui_list_t();
-	bool offer(const SDL_Event& event);
+	struct handler_t {
+		virtual void on_selected(ui_list_t* lst,size_t idx) = 0;
+		virtual void on_cancelled(ui_list_t* lst) {}
+	};
+	handler_t* set_handler(handler_t* handler);
+	vec2_t preferred_size() const;
+	bool is_enabled() const;
+	void enable();
+	void disable();
+	void destroy();
+	const strings_t& get_list() const;
+	bool has_selection() const;
+	size_t get_selection() const;
+	void set_selection(size_t idx);
+	void clear_selection();
+protected:
+	void reshaped();
 private:
+	bool offer(const SDL_Event& event);
 	void draw();
 	struct pimpl_t;
 	pimpl_t* pimpl;
