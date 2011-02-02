@@ -210,9 +210,18 @@ bool bounds_t::intersects(const ray_t& r) const {
 }
 
 void bounds_t::bounds_fix() {
+	if(a.x > b.x) panic(this<<" is infinite");
 	const vec_t sz = (b-a)/2.0f;
 	centre = a+sz;
 	radius = sz.magnitude();
+}
+
+bounds_t bounds_t::centred(const vec_t& p) const {
+	if(a.x > b.x) panic(this<<" is infinite");
+	bounds_t ret(p-(centre-a),p+(b-centre));
+	ret.bounds_fix();
+	if(!ret.contains(p)) panic(this<<" is not anchored in the right place");
+	return ret;
 }
 
 intersection_t cone_t::contains(const sphere_t& s) const {

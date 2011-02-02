@@ -232,7 +232,7 @@ void spatial_index_t::remove(object_t* obj) {
 bool spatial_index_t::moves(const object_t* obj,const vec_t& absolute) const {
 	assert(obj->spatial_index == this);
 	assert(obj->straddles);
-	const bounds_t bounds = (bounds_t)*obj+absolute; //#######
+	const bounds_t bounds = obj->centred(absolute);
 	if(__builtin_popcount(obj->straddles)>1) {
 		if(ALL != bounds.intersects(*this)) return true;
 		for(int i=0; i<8; i++)
@@ -523,12 +523,8 @@ void object_t::bounds_fix() {
 }
 
 void object_t::_do_set_pos(const vec_t& p) {
-	if(bounds.a.x > bounds.b.x) panic("bounds are not fixed");
 	pos = p;
-	a = pos+bounds.a;
-	b = pos+bounds.b;
-	bounds_t::bounds_fix();
-	//if(!contains(pos)) panic(this<<" is not anchored in the right place");
+	static_cast<bounds_t&>(*this) = bounds.centred(pos);
 }
 
 void object_t::set_pos(const vec_t& absolute) {

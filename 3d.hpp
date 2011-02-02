@@ -110,6 +110,7 @@ struct bounds_t: public sphere_t, public aabb_t {
 	bool intersects(const ray_t& r) const;
 	intersection_t intersects(const bounds_t& a) const;
 	inline bounds_t operator+(const vec_t& pos) const;
+	bounds_t centred(const vec_t& p) const;
 };
 
 struct cone_t: public ray_t { // with a radius at both extents
