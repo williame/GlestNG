@@ -50,6 +50,37 @@ private:
 	int radius_sqrd;
 };
 
+struct fader_t {
+	fader_t(float a_,unsigned d): a(a_), duration(d), end(0), on(true) {}
+	const float a;
+	const unsigned duration;
+	unsigned end;
+	bool on;
+	void set(bool on);
+	bool calc(float& a) const;
+};
+
+void fader_t::set(bool on) {
+	if(on == this->on) return;
+	this->on = on;
+	if(end < now())
+		end = now()+duration;
+	else 
+		end = now()+duration - (end-now());
+}
+
+bool fader_t::calc(float& alpha) const {
+	if(end > now()) {
+		float f = ((float)(end-now())/duration);
+		if(on) f = 1.0 - f;
+		f = (1.0-a) + (a*f);
+		alpha *= f;
+		return true;
+	}
+	alpha *= on? 1.0: a;
+	return on;
+}
+
 struct ui_list_t::pimpl_t: public cancel_button_t::handler_t {
 	static int line_height() {
 		static int h = font_mgr()->measure(" ").y;
@@ -62,7 +93,7 @@ struct ui_list_t::pimpl_t: public cancel_button_t::handler_t {
 		line_spacing(line_height()+6),
 		margin(3,3),
 		corner(line_height()/2,line_height()/2),
-		enabled(true), hidden(false), destroyed(false), fade_time(0),
+		enabled(0.5,2000), visible(1.0,2000), destroyed(false),
 		selected(NO_SELECTION),
 		cancel(NULL) {
 		w = font_mgr()->measure(title).x;
@@ -79,16 +110,17 @@ struct ui_list_t::pimpl_t: public cancel_button_t::handler_t {
 	const int h, line_spacing;
 	const vec2_t margin, corner;
 	int w;
-	bool enabled, hidden, destroyed;
-	unsigned fade_time;
+	fader_t enabled, visible;
+	bool destroyed;
 	size_t selected;
 	cancel_button_t* cancel;
 	void on_cancel(cancel_button_t*) {
-		if(handler) handler->on_cancelled(ui);
-		ui->hide();
+		if(handler)
+			handler->on_cancelled(ui);
+		else
+			ui->hide();
 	}
 	static const size_t NO_SELECTION = ~(size_t)0;
-	static const int FADE_TIME = 500; // millisecs for animation
 };
 
 ui_list_t::ui_list_t(unsigned flags,const std::string& title,const strings_t& list,ui_component_t* parent):
@@ -98,9 +130,9 @@ ui_list_t::ui_list_t(unsigned flags,const std::string& title,const strings_t& li
 ui_list_t::~ui_list_t() { delete pimpl; }
 
 bool ui_list_t::offer(const SDL_Event& event) {
-	if(!pimpl->enabled) return false;
-	if(pimpl->hidden) return false;
+	if(!pimpl->visible.on) return false;
 	if(offer_children(event)) return true;
+	if(!pimpl->enabled.on) return false;
 	if(event.type == SDL_MOUSEBUTTONDOWN) {
 		rect_t r(get_rect().inner(pimpl->margin));
 		vec2_t m(event.button.x,event.button.y);
@@ -113,7 +145,7 @@ bool ui_list_t::offer(const SDL_Event& event) {
 		}
 		pimpl->selected = m.y / pimpl->line_spacing;
 		if(pimpl->handler)
-			pimpl->handler->on_selected(this,pimpl->selected);
+			pimpl->handler->on_selected(this,pimpl->selected,vec2_t(event.button.x,event.button.y));
 		return true;
 	}
 	return false;
@@ -177,46 +209,34 @@ struct colour_t {
 	{0x00,0x40,0xa0,0xff}, //TEXT_COL
 }, TITLE_COL = {0xff,0xff,0xff,0xff};
 
-bool ui_list_t::is_enabled() const {
-	return pimpl->enabled;
-}
-
 void ui_list_t::set_visible(bool visible) {
 	if(visible) {
-		if(!pimpl->hidden)
+		if(is_visible())
 			return;
-		if(pimpl->fade_time < now())
-			pimpl->fade_time = now()+pimpl->FADE_TIME;
-		else 
-			pimpl->fade_time = now()+pimpl->FADE_TIME - (pimpl->fade_time-now());
-		pimpl->hidden = false;
-		if(pimpl->cancel)
+		if(!ui_component_t::is_visible())
+			ui_component_t::set_visible(true);
+		pimpl->visible.set(true);
+		if(is_enabled() && pimpl->cancel)
 			pimpl->cancel->show();
-	} else if(!pimpl->hidden) {
-		if(pimpl->fade_time < now())
-			pimpl->fade_time = now()+pimpl->FADE_TIME;
-		else 
-			pimpl->fade_time = now()+pimpl->FADE_TIME - (pimpl->fade_time-now());
-		pimpl->hidden = true;
+	} else if(is_visible()) {
+		pimpl->visible.set(false);
 		if(pimpl->cancel)
 			pimpl->cancel->hide();
 	}
 }
 
 bool ui_list_t::is_visible() const {
-	return !pimpl->hidden;
+	return pimpl->visible.on;
+}
+
+bool ui_list_t::is_enabled() const {
+	return pimpl->enabled.on;
 }
 
 void ui_list_t::disable() {
 	if(!is_enabled())
 		return;
-	pimpl->enabled = false;
-	if(pimpl->hidden)
-		return;
-	if(pimpl->fade_time < now())
-		pimpl->fade_time = now()+pimpl->FADE_TIME;
-	else 
-		pimpl->fade_time = now()+pimpl->FADE_TIME - (pimpl->fade_time-now());
+	pimpl->enabled.set(false);
 	if(pimpl->cancel)
 		pimpl->cancel->hide();
 }
@@ -224,42 +244,31 @@ void ui_list_t::disable() {
 void ui_list_t::enable() {
 	if(is_enabled())
 		return;
-	pimpl->enabled = true;
-	if(pimpl->hidden)
+	pimpl->enabled.set(true);
+	if(!is_visible())
 		return;
-	if(pimpl->fade_time < now()) {
-		pimpl->fade_time = now()+pimpl->FADE_TIME;
-		show();
-	} else 
-		pimpl->fade_time = now()+pimpl->FADE_TIME - (pimpl->fade_time-now());
 	if(pimpl->cancel)
 		pimpl->cancel->show();
 }
 
 void ui_list_t::destroy() {
 	pimpl->destroyed = true;
-	if(is_enabled())
-		disable();
+	if(is_visible())
+		hide();
 	else
 		ui_component_t::destroy();
 }
 
 void ui_list_t::draw() {
 	float alpha = 1.0;
-	if(pimpl->fade_time > now()) {
-		alpha = (float)(pimpl->fade_time-now())/pimpl->FADE_TIME;
-		if(!pimpl->hidden)
-			alpha *= 0.5;
-		if(pimpl->enabled)
-			alpha = 1.0 - alpha;
-	} else if(pimpl->hidden) {
+	if(!pimpl->visible.calc(alpha)) {
 		if(pimpl->destroyed)
 			ui_component_t::destroy();
 		else
 			ui_component_t::set_visible(false);
 		return;
-	} else if(!pimpl->enabled)
-		alpha *= 0.5;
+	}
+	pimpl->enabled.calc(alpha);
 	const vec2_t& corner = pimpl->corner;
 	const rect_t outer = get_rect();
 	COL[BG_COL].set(alpha);

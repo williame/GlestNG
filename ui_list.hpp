@@ -19,7 +19,7 @@ public:
 	ui_list_t(unsigned flags,const std::string& title,const strings_t& list,ui_component_t* parent=NULL);
 	~ui_list_t();
 	struct handler_t {
-		virtual void on_selected(ui_list_t* lst,size_t idx) = 0;
+		virtual void on_selected(ui_list_t* lst,size_t idx,const vec2_t& pt) = 0;
 		virtual void on_cancelled(ui_list_t* lst) {}
 	};
 	handler_t* set_handler(handler_t* handler);

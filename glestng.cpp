@@ -37,14 +37,42 @@ bool selection = false;
 vec_t selected_point;
 int visible_objects = 0;
 
+std::auto_ptr<techtree_t> techtree;
 std::auto_ptr<unit_type_t> unit_type;
 std::auto_ptr<model_g3d_t> model;
 
 ui_list_t* factions_menu = NULL; // ui controls are owned by the ui manager
 
 struct faction_handler_t: public ui_list_t::handler_t {
-	void on_selected(ui_list_t* lst,size_t idx) {
-		lst->hide();
+	faction_handler_t(): context(NULL), faction(NULL) {}
+	ui_list_t* context;
+	faction_t* faction;
+	void on_selected(ui_list_t* lst,size_t idx,const vec2_t& pt) {
+		if(lst == factions_menu) {
+			factions_menu->disable();
+			faction = techtree->get_faction(lst->get_list()[idx]);
+			std::cout << "faction: " << faction << std::endl;
+			if(context) context->destroy(); context = NULL;
+			strings_t options;
+			options.push_back("edit faction xml");
+			options.push_back("select unit");
+			options.push_back("select resource");
+			context = new ui_list_t(ui_list_t::CANCEL_BUTTON,"",options,factions_menu);
+			context->set_rect(rect_t(pt,pt+context->preferred_size()));
+			context->set_handler(this);
+		} else if(lst == context) {
+			std::cout << "choice: " << lst->get_list()[idx] << std::endl;
+			context->destroy(); context = NULL;
+			factions_menu->enable();
+		}
+	}
+	void on_cancelled(ui_list_t* lst) {
+		if(lst == factions_menu) {
+			factions_menu->hide();
+		} else if(lst == context) {
+			factions_menu->enable();
+			factions_menu->show();
+		}
 	}
 } faction_handler;
 
@@ -333,7 +361,7 @@ void load(fs_t& fs) {
 	for(strings_t::const_iterator i=techtrees_.begin(); i!=techtrees_.end(); i++)
 		std::cout << "techtree "<<*i<<std::endl;
 	const std::string techtree_ = techtrees_[rand()%techtrees_.size()];
-	std::auto_ptr<techtree_t> techtree(new techtree_t(fs,techtree_));
+	techtree.reset(new techtree_t(fs,techtree_));
 	const strings_t factions = techtree->get_factions();
 	for(strings_t::const_iterator i=factions.begin(); i!=factions.end(); i++)
 		std::cout << "faction "<<*i<<std::endl;
@@ -471,10 +499,10 @@ int main(int argc,char** args) {
 						quit = true;
 						break;
 					case SDLK_m: // MODDING MODE
-						if(factions_menu->is_enabled())
-							factions_menu->disable();
+						if(factions_menu->is_visible())
+							factions_menu->hide();
 						else
-							factions_menu->enable();
+							factions_menu->show();
 						break;
 					default:
 						std::cout << "Ignoring key " << 

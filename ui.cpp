@@ -29,6 +29,12 @@ ui_component_t::~ui_component_t() {
 		parent->remove_child(this);
 	else
 		mgr.deregister_component(this);
+	for(ui_component_t* child = first_child; child; ) {
+		ui_component_t* t = child;
+		child = child->next_peer;
+		delete t;
+	}
+		
 }
 
 void ui_component_t::add_child(ui_component_t* child) {
@@ -221,11 +227,12 @@ ui_mgr_t::pimpl_t::pimpl_t() {
 }
 
 void ui_mgr_t::pimpl_t::draw(ui_component_t* comp) {
-	if(!comp->is_visible()) return;
-	comp->clip();
-	comp->draw();
-	if(comp->first_child)
-		draw(comp->first_child);
+	if(comp->visible) { // not calling overriden function
+		comp->clip();
+		comp->draw();
+		if(comp->first_child)
+			draw(comp->first_child);
+	}
 	if(comp->next_peer)
 		draw(comp->next_peer);
 }

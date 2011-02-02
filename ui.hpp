@@ -27,7 +27,6 @@ public:
 	vec2_t get_pos() const { return r.tl; }
 	virtual void set_visible(bool visible);
 	virtual bool is_visible() const { return visible; }
-	bool is_shown() const;
 	void show() { set_visible(true); }
 	void hide() { set_visible(false); }
 	void invalidate();
