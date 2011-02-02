@@ -8,6 +8,9 @@
 #ifndef __FONT_HPP__
 #define __FONT_HPP__
 
+#include <string>
+#include <string.h>
+
 #include "2d.hpp"
 
 class font_mgr_t {
@@ -15,10 +18,12 @@ public:
 	static font_mgr_t* get_font_mgr();
 	virtual ~font_mgr_t() {}
 	virtual vec2_t measure(char ch) = 0;
-	virtual vec2_t measure(const char* msg) = 0;
+	inline vec2_t measure(const char* msg) { return measure(msg,strlen(msg)); }
+	inline vec2_t measure(const std::string& s) { return measure(s.c_str(),s.size()); }
 	virtual vec2_t measure(const char* msg,int count) = 0;
 	virtual int draw(int x,int y,char ch) = 0;
 	virtual int draw(int x,int y,const char* msg) = 0;
+	int draw(int x,int y,const std::string& s) { return draw(x,y,s.c_str()); }
 private:
 	class impl_t;
 	friend class impl_t;

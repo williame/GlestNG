@@ -127,13 +127,6 @@ vec2_t font_mgr_t::impl_t::measure(char ch) {
 	return sz;
 }
 
-vec2_t font_mgr_t::impl_t::measure(const char* msg) {
-	vec2_t sz(0,font_meta.height);
-	for(; *msg; msg++)
-		sz.x += measure(*msg).x;
-	return sz;
-}
-
 vec2_t font_mgr_t::impl_t::measure(const char* msg,int count) {
 	vec2_t sz(0,font_meta.height);
 	while(count-- > 0)

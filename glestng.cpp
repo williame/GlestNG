@@ -23,6 +23,7 @@
 #include "utils.hpp"
 #include "ui.hpp"
 #include "ui_xml_editor.hpp"
+#include "ui_list.hpp"
 #include "unit.hpp"
 #include "techtree.hpp"
 #include "faction.hpp"
@@ -354,6 +355,8 @@ void load(fs_t& fs) {
 	fs_file_t::ptr_t g3d_file(fs.get(g3d));
 	istream_t::ptr_t gstream(g3d_file->reader());
 	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*gstream));
+	ui_list_t* factions_menu = new ui_list_t(ui_list_t::MENU,factions);
+	factions_menu->set_rect(rect_t(10,50,200,300));
 }
 
 int main(int argc,char** args) {
