@@ -25,8 +25,8 @@ public:
 	void set_rect(const rect_t& r);
 	void set_pos(const vec2_t& pt);
 	vec2_t get_pos() const { return r.tl; }
-	void set_visible(bool visible);
-	bool is_visible() const { return visible; }
+	virtual void set_visible(bool visible);
+	virtual bool is_visible() const { return visible; }
 	bool is_shown() const;
 	void show() { set_visible(true); }
 	void hide() { set_visible(false); }

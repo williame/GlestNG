@@ -44,6 +44,7 @@ ui_list_t* factions_menu = NULL; // ui controls are owned by the ui manager
 
 struct faction_handler_t: public ui_list_t::handler_t {
 	void on_selected(ui_list_t* lst,size_t idx) {
+		lst->hide();
 	}
 } faction_handler;
 

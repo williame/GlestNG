@@ -25,6 +25,8 @@ public:
 	handler_t* set_handler(handler_t* handler);
 	vec2_t preferred_size() const;
 	bool is_enabled() const;
+	void set_visible(bool visible);
+	bool is_visible() const;
 	void enable();
 	void disable();
 	void destroy();
