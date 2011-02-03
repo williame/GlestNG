@@ -51,7 +51,7 @@ private:
 };
 
 struct fader_t {
-	fader_t(float a_,unsigned d): a(a_), duration(d), end(0), on(true) {}
+	fader_t(float a_,unsigned d,bool o): a(a_), duration(d), end(0), on(o) {}
 	const float a;
 	const unsigned duration;
 	unsigned end;
@@ -93,7 +93,7 @@ struct ui_list_t::pimpl_t: public cancel_button_t::handler_t {
 		line_spacing(line_height()+6),
 		margin(3,3),
 		corner(line_height()/2,line_height()/2),
-		enabled(0.5,2000), visible(1.0,2000), destroyed(false),
+		enabled(0.5,2000,true), visible(1.0,2000,false), destroyed(false),
 		selected(NO_SELECTION),
 		cancel(NULL) {
 		w = font_mgr()->measure(title).x;
@@ -101,6 +101,7 @@ struct ui_list_t::pimpl_t: public cancel_button_t::handler_t {
 			w = std::max<int>(w,font_mgr()->measure(list[i]).x);
 		if(CANCEL_BUTTON&flags)
 			cancel = new cancel_button_t(*this,ui);
+		visible.set(true);
 	}
 	ui_list_t* ui;
 	ui_list_t::handler_t* handler;

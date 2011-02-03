@@ -57,7 +57,7 @@ struct faction_handler_t: public ui_list_t::handler_t {
 			options.push_back("edit faction xml");
 			options.push_back("select unit");
 			options.push_back("select resource");
-			context = new ui_list_t(ui_list_t::CANCEL_BUTTON,"",options,factions_menu);
+			context = new ui_list_t(ui_list_t::CANCEL_BUTTON,faction->class_t::name,options,factions_menu);
 			context->set_rect(rect_t(pt,pt+context->preferred_size()));
 			context->set_handler(this);
 		} else if(lst == context) {
@@ -72,6 +72,7 @@ struct faction_handler_t: public ui_list_t::handler_t {
 		} else if(lst == context) {
 			factions_menu->enable();
 			factions_menu->show();
+			context->destroy(); context = NULL;
 		}
 	}
 } faction_handler;
