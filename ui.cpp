@@ -15,13 +15,42 @@
 #include "font.hpp"
 #include "graphics.hpp"
 
-ui_component_t::ui_component_t(ui_component_t* p):
-	mgr(*ui_mgr()), r(0,0,0,0), visible(true),
+unsigned now(); // world.hpp
+
+bool ui_fader_t::is_transitioning() const {
+	return (end > now());
+}
+
+void ui_fader_t::set(bool on) {
+	if(on == this->on) return;
+	this->on = on;
+	if(is_transitioning())
+		end = now()+duration - (end-now());
+	else 
+		end = now()+duration;
+}
+
+bool ui_fader_t::calc(float& alpha) const {
+	if(is_transitioning()) {
+		float f = ((float)(end-now())/duration);
+		if(on) f = 1.0 - f;
+		f = (1.0-a) + (a*f);
+		alpha *= f;
+		return true;
+	}
+	alpha *= on? 1.0: a;
+	return on;
+}
+
+ui_component_t::ui_component_t(unsigned f,ui_component_t* p):
+	mgr(*ui_mgr()), flags(f), r(0,0,0,0),
+	visible(1.0,f&FADE_VISIBLE?500:0,!(f&FADE_VISIBLE)),
 	parent(p), first_child(NULL), next_peer(NULL) {
 	if(parent)
 		parent->add_child(this);
 	else
 		mgr.register_component(this);
+	show();
 }
 
 ui_component_t::~ui_component_t() {
@@ -60,11 +89,15 @@ void ui_component_t::remove_child(ui_component_t* child) {
 }
 
 void ui_component_t::destroy() {
-	delete this;
+	flags |= DESTROYED;
+	if(is_visible() && (FADE_VISIBLE&flags))
+		hide();
+	else
+		delete this;
 }
 
 void ui_component_t::invalidate() {
-	if(visible)
+	if(is_visible())
 		mgr.invalidate(r);
 }
 
@@ -83,10 +116,25 @@ void ui_component_t::set_pos(const vec2_t& pt) {
 	reshaped();
 }
 
+float ui_component_t::base_alpha() const {
+	float alpha = 1.0;
+	visible.calc(alpha);
+	return alpha;
+}
+
+bool ui_component_t::is_visible() const {
+	return visible.on;
+}
+
+bool ui_component_t::is_drawable() const {
+	return visible.on || visible.is_transitioning();
+}
+
 void ui_component_t::set_visible(bool v) {
-	if(v == visible) return;
-	visible = v;
+	if(v == visible.on) return;
+	visible.set(v);
 	mgr.invalidate(r);
+	visibility_changed(v);
 }
 
 static void _draw_box(GLenum type,const rect_t& r) {
@@ -172,7 +220,7 @@ void ui_component_t::draw_cornered_box(const rect_t& r,const vec2_t& corner,bool
 
 bool ui_component_t::offer_children(const SDL_Event& event) {
 	for(ui_component_t* child = first_child; child; child = child->next_peer)
-		if(child->visible && child->offer(event))
+		if(child->is_visible() && child->offer(event))
 			return true;
 	return false;
 }
@@ -190,7 +238,7 @@ rect_t ui_component_t::clip(const rect_t& r) const {
 }
 
 ui_label_t::ui_label_t(const std::string& str,ui_component_t* parent):
-	ui_component_t(parent), r(0xff), g(0xff), b(0xff) {
+	ui_component_t(FADE_VISIBLE,parent), r(0xff), g(0xff), b(0xff) {
 	set_text(str);
 }
 
@@ -205,6 +253,36 @@ void ui_label_t::draw() {
 	font_mgr()->draw(get_rect().tl.x,get_rect().tl.y,s.c_str());
 }
 
+ui_cancel_button_t::ui_cancel_button_t(unsigned flags,handler_t& h,ui_component_t* parent): 
+	ui_component_t(flags,parent), handler(h), radius_sqrd(0) {}
+
+void ui_cancel_button_t::reshaped() {
+	const rect_t r(get_rect());
+	radius_sqrd = std::min(r.w(),r.h())/2;
+	radius_sqrd *= radius_sqrd;
+}
+
+bool ui_cancel_button_t::offer(const SDL_Event& event) {
+	if((event.type == SDL_KEYDOWN) &&
+		(event.key.keysym.sym == SDLK_ESCAPE)) {
+		handler.on_cancel(this);
+		return true;
+	} else if(event.type == SDL_MOUSEBUTTONDOWN) {
+		const rect_t r(get_rect());
+		const vec2_t m(event.button.x,event.button.y);
+		if(r.contains(m) && (radius_sqrd >= m.distance_sqrd(r.centre()))) {
+			handler.on_cancel(this);
+			return true;
+		}
+	}
+	return false;
+}
+
+void ui_cancel_button_t::draw() {
+	glColor4f(0.5,0,0,base_alpha());
+	draw_circle(get_rect(),true);
+}
+
 struct ui_mgr_t::pimpl_t {
 	pimpl_t();
 	~pimpl_t() {
@@ -216,7 +294,7 @@ struct ui_mgr_t::pimpl_t {
 	typedef std::vector<ui_component_t*> components_t;
 	components_t components;
 	rect_t screen;
-	void draw(ui_component_t* comp);
+	void draw(ui_component_t* comp,components_t& destroyed);
 };
 
 ui_mgr_t::pimpl_t::pimpl_t() {
@@ -226,15 +304,16 @@ ui_mgr_t::pimpl_t::pimpl_t() {
 	std::cout << "screen: "<<screen<<std::endl;
 }
 
-void ui_mgr_t::pimpl_t::draw(ui_component_t* comp) {
-	if(comp->visible) { // not calling overriden function
+void ui_mgr_t::pimpl_t::draw(ui_component_t* comp,components_t& destroyed) {
+	if(comp->is_drawable()) { // not calling overriden function
 		comp->clip();
 		comp->draw();
 		if(comp->first_child)
-			draw(comp->first_child);
-	}
+			draw(comp->first_child,destroyed);
+	} else if(comp->flags & ui_component_t::DESTROYED)
+		destroyed.push_back(comp);
 	if(comp->next_peer)
-		draw(comp->next_peer);
+		draw(comp->next_peer,destroyed);
 }
 
 ui_mgr_t::ui_mgr_t(): pimpl(new pimpl_t()) {}
@@ -254,8 +333,9 @@ void ui_mgr_t::draw() {
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	glLoadIdentity();
+	pimpl_t::components_t destroyed;
 	for(pimpl_t::components_t::iterator comp=pimpl->components.begin(); comp!=pimpl->components.end(); comp++)
-		pimpl->draw(*comp);
+		pimpl->draw(*comp,destroyed);
 	glPopMatrix();
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
@@ -263,6 +343,8 @@ void ui_mgr_t::draw() {
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
 	glDisable(GL_SCISSOR_TEST);
+	for(pimpl_t::components_t::iterator i=destroyed.begin(); i!=destroyed.end(); i++)
+		delete *i;
 }
 
 rect_t ui_mgr_t::get_screen_bounds() const {
@@ -275,7 +357,7 @@ void ui_mgr_t::invalidate(const rect_t& r) {
 
 bool ui_mgr_t::offer(const SDL_Event& event) {
 	for(pimpl_t::components_t::iterator i=pimpl->components.begin(); i!=pimpl->components.end(); i++)
-		if((*i)->visible && (*i)->offer(event))
+		if((*i)->is_visible() && (*i)->offer(event))
 			return true;
 	return false;
 }

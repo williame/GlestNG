@@ -57,7 +57,7 @@ struct faction_handler_t: public ui_list_t::handler_t {
 			options.push_back("edit faction xml");
 			options.push_back("select unit");
 			options.push_back("select resource");
-			context = new ui_list_t(ui_list_t::CANCEL_BUTTON,faction->class_t::name,options,factions_menu);
+			context = new ui_list_t(ui_list_t::default_flags,faction->class_t::name,options,factions_menu);
 			context->set_rect(rect_t(pt,pt+context->preferred_size()));
 			context->set_handler(this);
 		} else if(lst == context) {
@@ -391,7 +391,7 @@ void load(fs_t& fs) {
 	fs_file_t::ptr_t g3d_file(fs.get(g3d));
 	istream_t::ptr_t gstream(g3d_file->reader());
 	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*gstream));
-	factions_menu = new ui_list_t(ui_list_t::CANCEL_BUTTON,"factions",factions);
+	factions_menu = new ui_list_t(ui_list_t::default_flags,"factions",factions);
 	factions_menu->set_rect(rect_t(vec2_t(10,50),vec2_t(10,50)+factions_menu->preferred_size()));
 	factions_menu->set_handler(&faction_handler);
 }

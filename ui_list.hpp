@@ -13,9 +13,6 @@
 
 class ui_list_t: public ui_component_t {
 public:
-	enum { // flags
-		CANCEL_BUTTON = 0x01,
-	};
 	ui_list_t(unsigned flags,const std::string& title,const strings_t& list,ui_component_t* parent=NULL);
 	~ui_list_t();
 	struct handler_t {
@@ -25,18 +22,17 @@ public:
 	handler_t* set_handler(handler_t* handler);
 	vec2_t preferred_size() const;
 	bool is_enabled() const;
-	void set_visible(bool visible);
-	bool is_visible() const;
 	void enable();
 	void disable();
-	void destroy();
 	const strings_t& get_list() const;
 	bool has_selection() const;
 	size_t get_selection() const;
 	void set_selection(size_t idx);
 	void clear_selection();
+	static const unsigned default_flags;
 protected:
 	void reshaped();
+	void visibility_changed(bool visible);
 private:
 	bool offer(const SDL_Event& event);
 	void draw();

@@ -17,24 +17,42 @@
 
 class ui_mgr_t;
 
+struct ui_fader_t {
+	ui_fader_t(float a_,unsigned d,bool o): a(a_), duration(d), end(0), on(o) {}
+	bool is_transitioning() const;
+	const float a;
+	const unsigned duration;
+	unsigned end;
+	bool on;
+	void set(bool on);
+	bool calc(float& a) const;
+};
+
 class ui_component_t {
 public:
+	enum { // FLAGS for use to adjust the behaviour of the base and subclasses
+		FADE_VISIBLE =	0x00000001, // transition changes in visiblity?
+		CANCEL_BUTTON =	0x00000100,
+		DESTROYED = 	0x01000000,
+	};
 	inline const rect_t& rect() const { return r; } 
 	rect_t get_rect() const { return r; }
 	vec2_t get_size() const { return r.size(); }
 	void set_rect(const rect_t& r);
 	void set_pos(const vec2_t& pt);
 	vec2_t get_pos() const { return r.tl; }
-	virtual void set_visible(bool visible);
-	virtual bool is_visible() const { return visible; }
+	void set_visible(bool visible);
+	bool is_visible() const;
+	bool is_drawable() const; // may be visible, or transitioning to be shown/hidden
 	void show() { set_visible(true); }
 	void hide() { set_visible(false); }
 	void invalidate();
 	virtual void destroy(); // triggers the (eventual) deletion of this; don't deference after calling!
 protected:
-	ui_component_t(ui_component_t* parent = NULL);                 
+	ui_component_t(unsigned flags,ui_component_t* parent = NULL);                 
 	virtual ~ui_component_t();
 	virtual void reshaped() {}
+	virtual void visibility_changed(bool visible) {}
 	ui_mgr_t& mgr;
 	void draw_box(const rect_t& r) const;
 	void draw_box(short x,short y,short w,short h) const;
@@ -49,6 +67,8 @@ protected:
 	bool offer_children(const SDL_Event& event);
 	rect_t clip() const;
 	rect_t clip(const rect_t& c) const;
+	float base_alpha() const;
+	unsigned flags;
 private:
 	friend class ui_mgr_t;
 	virtual void draw() = 0;
@@ -56,7 +76,7 @@ private:
 	void remove_child(ui_component_t* child);
 	virtual 	bool offer(const SDL_Event& event) { return false; }
 	rect_t r;
-	bool visible;
+	ui_fader_t visible;
 	ui_component_t *parent, *first_child, *next_peer;
 };
 
@@ -71,6 +91,20 @@ private:
 	std::string s;
 	vec2_t sz;
 	uint8_t r,g,b;
+};
+
+class ui_cancel_button_t: public ui_component_t {
+public:
+	struct handler_t {
+		virtual void on_cancel(ui_cancel_button_t* btn) = 0;
+	};
+	ui_cancel_button_t(unsigned flags,handler_t& h,ui_component_t* parent);
+private:
+	void reshaped();
+	bool offer(const SDL_Event& event);
+	void draw();
+	handler_t& handler;
+	int radius_sqrd;
 };
 
 class ui_mgr_t {

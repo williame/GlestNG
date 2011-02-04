@@ -281,8 +281,10 @@ void ui_xml_editor_t::pimpl_t::reload(const std::string& buf) {
 	parse();
 }
 
-ui_xml_editor_t::ui_xml_editor_t(xml_loadable_t& target,ui_component_t* parent):
-ui_component_t(parent), pimpl(new pimpl_t(*this,target)) {
+const unsigned ui_xml_editor_t::default_flags = FADE_VISIBLE;
+
+ui_xml_editor_t::ui_xml_editor_t(unsigned flags,xml_loadable_t& target,ui_component_t* parent):
+	ui_component_t(flags,parent), pimpl(new pimpl_t(*this,target)) {
 	set_rect(rect_t(20,50,500,mgr.get_screen_bounds().br.y-30));
 }
 
@@ -345,7 +347,7 @@ enum { BG_COL, BORDER_COL, TITLE_COL, TITLE_BG_COL, CURSOR_COL, NUM_COLORS };
 
 struct color_t {
 	uint8_t r,g,b,a;
-	void set() const { glColor4ub(r,g,b,a); }
+	void set(float alpha=1) const { glColor4ub(r,g,b,a*alpha); }
 } static const COL[NUM_COLORS] = {
 	{0x40,0x40,0x40,0xc0}, //BG_COL
 	{0x00,0x00,0xff,0xff}, //BORDER_COL
@@ -363,20 +365,21 @@ struct color_t {
 };
 
 void ui_xml_editor_t::draw() {
+	const float alpha = base_alpha(); 
 	// title and background
 	rect_t r = get_rect();
 	font_mgr_t& f = *font_mgr();
 	const int h = pimpl->h;
-	COL[TITLE_BG_COL].set();
+	COL[TITLE_BG_COL].set(alpha);
 	draw_filled_box(r.tl.x,r.tl.y,r.w(),h+2);
-	COL[TITLE_COL].set();
+	COL[TITLE_COL].set(alpha);
 	f.draw(r.tl.x+10,r.tl.y,pimpl->get_title().c_str());
-	COL[BORDER_COL].set();
+	COL[BORDER_COL].set(alpha);
 	draw_box(r.tl.x,r.tl.y,r.w(),h+2);
 	r.tl.y += h + 2;
-	COL[BG_COL].set();
+	COL[BG_COL].set(alpha);
 	draw_filled_box(r);
-	COL[BORDER_COL].set();
+	COL[BORDER_COL].set(alpha);
 	draw_box(r);
 	// get the lines and cursor
 	const lines_t& lines = pimpl->get_lines();
@@ -391,7 +394,7 @@ void ui_xml_editor_t::draw() {
 	if(caret.y+margin.y > view_ofs.y+r.h()) view_ofs.y = ((caret.y+margin.y-r.h())/h)*h;
 	pimpl->view_ofs = view_ofs;
 	// and draw
-	COL[CURSOR_COL].set();
+	COL[CURSOR_COL].set(alpha);
 	caret += r.tl;
 	caret -= view_ofs;
 	draw_filled_box(rect_t(caret,caret+vec2_t((now()%700)>350?10:3,h)));
@@ -402,7 +405,7 @@ void ui_xml_editor_t::draw() {
 		const int start = pimpl->char_from_ofs(view_ofs.x,i);
 		int x = r.tl.x - (view_ofs.x - pimpl->char_to_ofs(start,i));
 		for(size_t j=start; j<line.s.size(); j++) {
-			TEXT_COL[line.type[j]].set();
+			TEXT_COL[line.type[j]].set(alpha);
 			x += f.draw(x,y,line.s[j]);
 		}
 		y += h;
