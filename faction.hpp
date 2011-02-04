@@ -14,6 +14,7 @@ class faction_t: public class_t, public xml_loadable_t {
 public:
 	faction_t(techtree_t& techtree,const std::string& name);
 	const std::string path;
+	std::string get_xml_path() const;
 	const strings_t& get_units() const { return units; }
 	const strings_t& get_upgrades() const { return upgrades; }
 private:

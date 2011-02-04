@@ -24,9 +24,13 @@ faction_t::faction_t(techtree_t& techtree,const  std::string& name):
 			if(fs().exists(path+"/upgrades/"+*i+"/"+*i+".xml"))
 				upgrades.push_back(*i);
 	}
-	fs_file_t::ptr_t f(fs().get(path+"/"+name+".xml"));
+	fs_file_t::ptr_t f(fs().get(get_xml_path()));
 	istream_t::ptr_t in(f->reader());
 	load_xml(*in);
+}
+
+std::string faction_t::get_xml_path() const {
+	return path+"/"+class_t::name+".xml";
 }
 
 faction_t::~faction_t() { reset(); }

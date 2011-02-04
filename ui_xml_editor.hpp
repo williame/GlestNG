@@ -14,11 +14,16 @@ class xml_loadable_t;
 
 class ui_xml_editor_t: public ui_component_t {
 public:
-	ui_xml_editor_t(unsigned flags,xml_loadable_t& target,ui_component_t* parent=NULL);
+	struct handler_t {
+		virtual void on_cancelled(ui_xml_editor_t* xml) = 0;
+	};
+	ui_xml_editor_t(unsigned flags,xml_loadable_t& target,handler_t& handler,ui_component_t* parent=NULL);
 	~ui_xml_editor_t();
 	bool offer(const SDL_Event& event);
 	static const unsigned default_flags;
 private:
+	void reshaped();
+	void visibility_changed();
 	void draw();
 	class pimpl_t;
 	pimpl_t* pimpl;

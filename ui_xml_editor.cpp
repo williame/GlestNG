@@ -35,15 +35,17 @@ namespace {
 	};
 }
 
-class ui_xml_editor_t::pimpl_t {
+class ui_xml_editor_t::pimpl_t: public ui_cancel_button_t::handler_t {
 public:
-	pimpl_t(ui_xml_editor_t& ui_,xml_loadable_t& target_):
+	pimpl_t(ui_xml_editor_t* ui_,xml_loadable_t& target_,ui_xml_editor_t::handler_t& handler_):
 		em(font_mgr()->measure(' ').x),
 		h(font_mgr()->measure(' ').y), 
 		view_ofs(0,0), mouse_grab(false),
-		ui(ui_), target(target_),
+		ui(ui_), target(target_), handler(handler_),
 		dirty(true) {
 		cursor.row = cursor.col = 0;
+		if(CANCEL_BUTTON&ui->flags)
+			cancel = new ui_cancel_button_t(FADE_VISIBLE&ui->flags,*this,ui);
 	}
 	const std::string& get_title() const { return target.name; }
 	const lines_t& get_lines() { parse(); return lines; }
@@ -71,9 +73,14 @@ public:
 	const int h; // line height
 	vec2_t view_ofs;
 	bool mouse_grab;
+	ui_cancel_button_t* cancel;
+	void on_cancel(ui_cancel_button_t*) {
+		handler.on_cancelled(ui);
+	}
 private:
-	ui_xml_editor_t& ui;
+	ui_xml_editor_t* const ui;
 	xml_loadable_t& target;
+	ui_xml_editor_t::handler_t& handler;
 	void _append(const char ch,line_t& line,int i,xml_parser_t::type_t type);
 	void parse();
 	void reload(const std::string& buf);
@@ -123,14 +130,14 @@ void ui_xml_editor_t::pimpl_t::nav_down() {
 }
 
 void ui_xml_editor_t::pimpl_t::nav_pgdn() {
-	const short screenful = ui.get_rect().h()/h;
+	const short screenful = ui->get_rect().h()/h;
 	cursor.row = ((cursor.row / screenful)+1)*screenful;
 	if(cursor.row >= lines.size())
 		cursor.row = lines.size()-1;
 }
 
 void ui_xml_editor_t::pimpl_t::nav_pgup() {
-	const size_t screenful = ui.get_rect().h()/h;
+	const size_t screenful = ui->get_rect().h()/h;
 	if(cursor.row <= screenful)
 		cursor.row = 0;
 	else if(cursor.row % screenful)
@@ -281,15 +288,30 @@ void ui_xml_editor_t::pimpl_t::reload(const std::string& buf) {
 	parse();
 }
 
-const unsigned ui_xml_editor_t::default_flags = FADE_VISIBLE;
+const unsigned ui_xml_editor_t::default_flags = FADE_VISIBLE|CANCEL_BUTTON;
 
-ui_xml_editor_t::ui_xml_editor_t(unsigned flags,xml_loadable_t& target,ui_component_t* parent):
-	ui_component_t(flags,parent), pimpl(new pimpl_t(*this,target)) {
+ui_xml_editor_t::ui_xml_editor_t(unsigned flags,xml_loadable_t& target,handler_t& handler,ui_component_t* parent):
+	ui_component_t(flags,parent), pimpl(new pimpl_t(this,target,handler)) {
 	set_rect(rect_t(20,50,500,mgr.get_screen_bounds().br.y-30));
 }
 
 ui_xml_editor_t::~ui_xml_editor_t() {
 	delete pimpl;
+}
+
+void ui_xml_editor_t::reshaped() {
+	if(pimpl->cancel) {
+		const rect_t r = get_rect();
+		const short margin = 2;
+		const vec2_t sz(pimpl->h-margin*2,pimpl->h-margin*2);
+		const vec2_t pos(r.br.x-sz.x-margin,r.tl.y+margin);
+		pimpl->cancel->set_rect(rect_t(pos,pos+sz));
+	}
+}
+
+void ui_xml_editor_t::visibility_changed() {
+	if(pimpl->cancel)
+		pimpl->cancel->set_visible(is_visible());
 }
 
 bool ui_xml_editor_t::offer(const SDL_Event& event) {

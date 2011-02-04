@@ -31,7 +31,7 @@ struct ui_list_t::pimpl_t: public ui_cancel_button_t::handler_t {
 		for(size_t i=0; i<list.size(); i++)
 			w = std::max<int>(w,font_mgr()->measure(list[i]).x);
 		if(CANCEL_BUTTON&ui->flags)
-			cancel = new ui_cancel_button_t(FADE_VISIBLE,*this,ui);
+			cancel = new ui_cancel_button_t(FADE_VISIBLE&ui->flags,*this,ui);
 	}
 	ui_list_t* const ui;
 	ui_list_t::handler_t* handler;
@@ -47,8 +47,10 @@ struct ui_list_t::pimpl_t: public ui_cancel_button_t::handler_t {
 	void on_cancel(ui_cancel_button_t*) {
 		if(handler)
 			handler->on_cancelled(ui);
-		else
+		else {
+			std::cerr << ui << ": no handler set, and we cancel" << std::endl;
 			ui->hide();
+		}
 	}
 	static const size_t NO_SELECTION = ~(size_t)0;
 };

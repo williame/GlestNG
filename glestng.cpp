@@ -43,37 +43,57 @@ std::auto_ptr<model_g3d_t> model;
 
 ui_list_t* factions_menu = NULL; // ui controls are owned by the ui manager
 
-struct faction_handler_t: public ui_list_t::handler_t {
-	faction_handler_t(): context(NULL), faction(NULL) {}
-	ui_list_t* context;
+struct faction_handler_t: public ui_list_t::handler_t, public ui_xml_editor_t::handler_t {
+	faction_handler_t(): context_menu(NULL), xml(NULL), faction(NULL) {}
+	~faction_handler_t() {}
+	ui_list_t* context_menu;
+	ui_xml_editor_t* xml;
 	faction_t* faction;
+	std::auto_ptr<xml_loadable_t> edit;
 	void on_selected(ui_list_t* lst,size_t idx,const vec2_t& pt) {
 		if(lst == factions_menu) {
 			factions_menu->disable();
 			faction = techtree->get_faction(lst->get_list()[idx]);
 			std::cout << "faction: " << faction << std::endl;
-			if(context) context->destroy(); context = NULL;
+			if(context_menu) context_menu->destroy(); context_menu = NULL;
 			strings_t options;
 			options.push_back("edit faction xml");
 			options.push_back("select unit");
 			options.push_back("select resource");
-			context = new ui_list_t(ui_list_t::default_flags,faction->class_t::name,options,factions_menu);
-			context->set_rect(rect_t(pt,pt+context->preferred_size()));
-			context->set_handler(this);
-		} else if(lst == context) {
-			std::cout << "choice: " << lst->get_list()[idx] << std::endl;
-			context->destroy(); context = NULL;
-			factions_menu->enable();
+			context_menu = new ui_list_t(ui_list_t::default_flags,faction->class_t::name,options,factions_menu);
+			context_menu->set_rect(rect_t(pt,pt+context_menu->preferred_size()));
+			context_menu->set_handler(this);
+		} else if(lst == context_menu) {
+			switch(idx) {
+			case 0: { // edit faction xml
+				edit.reset(new faction_t(*techtree,faction->class_t::name));
+				xml = new ui_xml_editor_t(ui_xml_editor_t::default_flags,*edit,*this);
+				rect_t r(pt.x,factions_menu->get_pos().y,
+					pt.x+500,ui_mgr()->get_screen_bounds().h()-factions_menu->get_pos().y);
+				xml->set_rect(r);
+			} break;
+			default:
+				std::cerr << "context menu "<< idx << " " << lst->get_list()[idx] << " not handled" << std::endl;
+				factions_menu->enable();
+			}
+			context_menu->destroy(); context_menu = NULL;
 		}
 	}
 	void on_cancelled(ui_list_t* lst) {
 		if(lst == factions_menu) {
 			factions_menu->hide();
-		} else if(lst == context) {
+		} else if(lst == context_menu) {
 			factions_menu->enable();
+			factions_menu->clear_selection();
 			factions_menu->show();
-			context->destroy(); context = NULL;
+			context_menu->destroy(); context_menu = NULL;
 		}
+	}
+	void on_cancelled(ui_xml_editor_t* xml) {
+		xml->destroy(); xml = NULL;
+		factions_menu->enable();
+		factions_menu->clear_selection();
+		factions_menu->show();
 	}
 } faction_handler;
 
