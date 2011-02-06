@@ -48,6 +48,12 @@ public:
 	void hide() { set_visible(false); }
 	void invalidate();
 	virtual void destroy(); // triggers the (eventual) deletion of this; don't deference after calling!
+	enum { BG_COL, BORDER_COL, OUTLINE_COL, TITLE_COL, ITEM_COL, ITEM_ACTIVE_COL, TEXT_COL, TEXT_ACTIVE_COL, NUM_COLOURS };
+	struct colour_t {
+		uint8_t r,g,b,a;
+		bool operator==(const colour_t& o) const { return r==o.r && b==o.b && g==o.g && a==o.a; }
+		void set(float alpha=1) const;
+	} static const col[NUM_COLOURS];
 protected:
 	ui_component_t(unsigned flags,ui_component_t* parent = NULL);                 
 	virtual ~ui_component_t();
@@ -58,16 +64,22 @@ protected:
 	void draw_box(short x,short y,short w,short h) const;
 	void draw_filled_box(const rect_t& r) const;
 	void draw_filled_box(short x,short y,short w,short h) const;
-	void draw_corner(const rect_t& r,bool left,bool top,bool filled) const;
+	enum corner_t { INNER, OUTER, LINE };
+	void draw_corner(const rect_t& r,bool left,bool top,corner_t type) const;
 	void draw_cornered_box(const rect_t& r,const vec2_t& corner,bool filled) const;
 	void draw_circle(const rect_t& r,bool filled) const; 
 	void draw_line(const vec2_t& a,const vec2_t& b) const;
 	void draw_hline(const vec2_t& p,short l) const;
 	void draw_vline(const vec2_t& p,short h) const;
+	rect_t draw_border(float alpha,const rect_t& r,const std::string& title,const colour_t& fill = col[BG_COL]) const;
+	rect_t calc_border(const rect_t& r,const std::string& title) const;	
 	bool offer_children(const SDL_Event& event);
 	rect_t clip() const;
 	rect_t clip(const rect_t& c) const;
 	float base_alpha() const;
+	static int line_height();
+	static const vec2_t& corner();
+	static const vec2_t& margin();
 	unsigned flags;
 private:
 	friend class ui_mgr_t;

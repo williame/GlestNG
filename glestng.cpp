@@ -449,7 +449,7 @@ int main(int argc,char** args) {
 
 		// we have a GL context so we can go ahead and init all the singletons
 		std::auto_ptr<graphics_t::mgr_t> graphics_mgr(graphics_t::create());
-		std::auto_ptr<fs_t> fs(fs_t::create("/home/will/Games/megaglest-3.3.7.2"));
+		std::auto_ptr<fs_t> fs(fs_t::create("data/Glest"));
 		std::auto_ptr<ui_mgr_t> ui_(ui_mgr());
 
 		load(*fs);

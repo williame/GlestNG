@@ -177,7 +177,7 @@ strings_t fs_t::list_dirs(const std::string& path) {
 	struct dirent64 **eps;
 	strings_t dirs;
 	if(int n = scandir64(canocial(path).c_str(),&eps,_one,alphasort64)) {
-		if(-1 == n) c_error("list_dirs("<<path<<")");
+		if(-1 == n) c_error("list_dirs("<<path<<" -> "<<canocial(path)<<")");
 		for(int i=0; i<n; i++) {
 			if((eps[i]->d_name[0] != '.') && is_dir(join(path,eps[i]->d_name)))
 				dirs.push_back(eps[i]->d_name);
@@ -192,7 +192,7 @@ strings_t fs_t::list_files(const std::string& path) {
 	struct dirent64 **eps;
 	strings_t files;
 	if(int n = scandir64(canocial(path).c_str(),&eps,_one,alphasort64)) {
-		if(-1 == n) c_error("list_files("<<path<<")");
+		if(-1 == n) c_error("list_files("<<path<<" -> "<<canocial(path)<<")");
 		for(int i=0; i<n; i++) {
 			if((eps[i]->d_name[0] != '.') && is_file(join(path,eps[i]->d_name)))
 				files.push_back(eps[i]->d_name);

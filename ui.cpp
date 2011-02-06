@@ -42,6 +42,19 @@ bool ui_fader_t::calc(float& alpha) const {
 	return on;
 }
 
+void ui_component_t::colour_t::set(float alpha) const { glColor4ub(r,g,b,a*alpha); }
+
+const ui_component_t::colour_t ui_component_t::col[ui_component_t::NUM_COLOURS] = {
+	{0xc0,0xc0,0x40,0xc0}, //BG_COL
+	{0x50,0x50,0x00,0xff}, //BORDER_COL
+	{0xd0,0xd0,0x60,0x80}, //OUTLINE_COL
+	{0x00,0xff,0xff,0xff}, //TITLE_COL
+	{0xc0,0xc0,0x40,0xc0}, //ITEM_COL
+	{0xf0,0xf0,0x40,0xc0}, //ITEM_ACTIVE_COL
+	{0x00,0x80,0xa0,0xff}, //TEXT_COL
+	{0x00,0x40,0xa0,0xff}, //TEXT_ACTIVE_COL
+};
+
 ui_component_t::ui_component_t(unsigned f,ui_component_t* p):
 	mgr(*ui_mgr()), flags(f), r(0,0,0,0),
 	visible(1.0,f&FADE_VISIBLE?500:0,!(f&FADE_VISIBLE)),
@@ -169,14 +182,14 @@ static void _draw_arc(float r,float cx,float cy,int quadrant,int quadrants,bool 
 	}
 }
 
-void ui_component_t::draw_corner(const rect_t& r,bool left,bool top,bool filled) const {
+void ui_component_t::draw_corner(const rect_t& r,bool left,bool top,corner_t type) const {
 	const float cx = (left?r.br.x:r.tl.x),
 		cy = (top?r.br.y:r.tl.y);
 	const int quadrant = (!left&&!top? 0: left&&!top? 1: left&&top? 2: 3);
-	glBegin(filled? GL_POLYGON: GL_LINE_STRIP);
+	glBegin(LINE == type? GL_LINE_STRIP: GL_POLYGON);
+	if(INNER == type) glVertex2f((left?r.tl.x:r.br.x),(top?r.tl.y:r.br.y));
 	_draw_arc(std::min(r.h(),r.w()),cx,cy,quadrant,1,true); 
-	if(filled)
-		glVertex2f(cx,cy);
+	if(OUTER == type) glVertex2f(cx,cy);
 	glEnd();
 }
 
@@ -202,10 +215,10 @@ void ui_component_t::draw_vline(const vec2_t& p,short h) const {
 }
 
 void ui_component_t::draw_cornered_box(const rect_t& r,const vec2_t& corner,bool filled) const {
-	draw_corner(rect_t(r.tl,r.tl+corner),true,true,filled);
-	draw_corner(rect_t(r.br.x-corner.x,r.tl.y,r.br.x,r.tl.y+corner.y),false,true,filled);
-	draw_corner(rect_t(r.br-corner,r.br),false,false,filled);
-	draw_corner(rect_t(r.tl.x,r.br.y-corner.y,r.tl.x+corner.x,r.br.y),true,false,filled);
+	draw_corner(rect_t(r.tl,r.tl+corner),true,true,filled? OUTER: LINE);
+	draw_corner(rect_t(r.br.x-corner.x,r.tl.y,r.br.x,r.tl.y+corner.y),false,true,filled? OUTER: LINE);
+	draw_corner(rect_t(r.br-corner,r.br),false,false,filled? OUTER: LINE);
+	draw_corner(rect_t(r.tl.x,r.br.y-corner.y,r.tl.x+corner.x,r.br.y),true,false,filled? OUTER: LINE);
 	if(filled) {
 		draw_filled_box(rect_t(r.tl.x+corner.x,r.tl.y,r.br.x-corner.x,r.tl.y+corner.y));
 		draw_filled_box(r.inner(vec2_t(0,corner.y)));
@@ -216,6 +229,64 @@ void ui_component_t::draw_cornered_box(const rect_t& r,const vec2_t& corner,bool
 		draw_hline(vec2_t(r.tl.x+corner.x,r.tl.y),r.w()-corner.x*2);
 		draw_hline(vec2_t(r.tl.x+corner.x,r.br.y),r.w()-corner.x*2);
 	}
+}
+
+rect_t ui_component_t::draw_border(float alpha,const rect_t& r,const std::string& title,const colour_t& fill) const {
+	const vec2_t& margin = this->margin(), corner = this->corner();
+	rect_t inner(r.inner(margin));
+	const bool solid = fill == col[BG_COL];
+	if(title.size()) {
+		const int title_y = line_height()+margin.y*2;
+		col[BG_COL].set(alpha);
+		if(solid)
+			draw_cornered_box(r,corner,true);
+		else {
+			draw_corner(rect_t(r.tl,r.tl+corner),true,true,OUTER);
+			draw_corner(rect_t(r.br.x-corner.x,r.tl.y,r.br.x,r.tl.y+corner.y),false,true,OUTER);
+			draw_filled_box(rect_t(r.tl.x+corner.x,r.tl.y,r.br.x-corner.x,r.tl.y+corner.y));
+			draw_filled_box(rect_t(r.tl.x,r.tl.y+corner.y,r.br.x,r.tl.y+title_y));
+		}
+		col[TITLE_COL].set(alpha);
+		font_mgr()->draw(inner.tl.x+corner.x,inner.tl.y,title);
+		inner.tl.y = r.tl.y + title_y;
+		col[BG_COL].set(alpha);
+		if(!solid) {
+			draw_corner(rect_t(inner.tl,inner.tl+corner),true,true,INNER);
+			draw_corner(rect_t(inner.br.x-corner.x,inner.tl.y,inner.br.x,inner.tl.y+corner.y),false,true,INNER);
+		}
+	} else {
+		col[BG_COL].set(alpha);
+		draw_cornered_box(r,corner,solid);
+	}
+	col[OUTLINE_COL].set(alpha);
+	draw_cornered_box(r,corner,false);
+	if(!solid) {
+		fill.set(alpha);
+		draw_cornered_box(inner,corner,true);
+	}
+	return inner;
+}
+
+rect_t ui_component_t::calc_border(const rect_t& r,const std::string& title) const {
+	rect_t inner = r.inner(margin());
+	if(title.size())
+		inner.move(0,line_height()+margin().y*2);
+	return inner;
+}
+
+int ui_component_t::line_height() {
+	static const int h = font_mgr()->measure(" ").y;
+	return h;
+}
+
+const vec2_t& ui_component_t::corner() {
+	static const vec2_t c(line_height()/2,line_height()/2);
+	return c;
+}
+
+const vec2_t& ui_component_t::margin() {
+	static const vec2_t m(3,3);
+	return m;
 }
 
 bool ui_component_t::offer_children(const SDL_Event& event) {

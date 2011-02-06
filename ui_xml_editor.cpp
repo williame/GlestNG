@@ -39,7 +39,7 @@ class ui_xml_editor_t::pimpl_t: public ui_cancel_button_t::handler_t {
 public:
 	pimpl_t(ui_xml_editor_t* ui_,xml_loadable_t& target_,ui_xml_editor_t::handler_t& handler_):
 		em(font_mgr()->measure(' ').x),
-		h(font_mgr()->measure(' ').y), 
+		h(line_height()), 
 		view_ofs(0,0), mouse_grab(false),
 		ui(ui_), target(target_), handler(handler_),
 		dirty(true) {
@@ -365,18 +365,7 @@ bool ui_xml_editor_t::offer(const SDL_Event& event) {
 	}
 }
 
-enum { BG_COL, BORDER_COL, TITLE_COL, TITLE_BG_COL, CURSOR_COL, NUM_COLORS };
-
-struct color_t {
-	uint8_t r,g,b,a;
-	void set(float alpha=1) const { glColor4ub(r,g,b,a*alpha); }
-} static const COL[NUM_COLORS] = {
-	{0x40,0x40,0x40,0xc0}, //BG_COL
-	{0x00,0x00,0xff,0xff}, //BORDER_COL
-	{0xff,0xff,0xff,0xff}, //TITLE_COL
-	{0x20,0x20,0x20,0xc0}, //TITLE_BG_COL
-	{0x80,0x80,0x00,0xc0}, //CURSOR_COL
-}, TEXT_COL[xml_parser_t::NUM_TYPES] = {
+static const ui_component_t::colour_t MARKUP_COL[xml_parser_t::NUM_TYPES] = {
 	{0x80,0x80,0x80,0xff}, //IGNORE
 	{0x00,0x80,0xff,0xff}, //OPEN
 	{0x00,0x40,0x80,0xff}, //CLOSE
@@ -384,25 +373,14 @@ struct color_t {
 	{0x00,0x20,0xff,0xff}, //VALUE
 	{0xa0,0xa0,0xa0,0xff}, //DATA
 	{0xff,0x00,0x00,0xff}, //ERROR
-};
+}, CURSOR_COL = {0xff,0xff,0x00,0xff}, CANVAS_COL = {0xff,0xff,0xff,0xd0};
+
 
 void ui_xml_editor_t::draw() {
-	const float alpha = base_alpha(); 
-	// title and background
-	rect_t r = get_rect();
+	const float alpha = base_alpha();
 	font_mgr_t& f = *font_mgr();
-	const int h = pimpl->h;
-	COL[TITLE_BG_COL].set(alpha);
-	draw_filled_box(r.tl.x,r.tl.y,r.w(),h+2);
-	COL[TITLE_COL].set(alpha);
-	f.draw(r.tl.x+10,r.tl.y,pimpl->get_title().c_str());
-	COL[BORDER_COL].set(alpha);
-	draw_box(r.tl.x,r.tl.y,r.w(),h+2);
-	r.tl.y += h + 2;
-	COL[BG_COL].set(alpha);
-	draw_filled_box(r);
-	COL[BORDER_COL].set(alpha);
-	draw_box(r);
+	rect_t r = draw_border(alpha,get_rect(),pimpl->get_title(),CANVAS_COL); 
+	const int h = line_height();
 	// get the lines and cursor
 	const lines_t& lines = pimpl->get_lines();
 	const pimpl_t::cursor_t cursor = pimpl->get_cursor();
@@ -416,7 +394,7 @@ void ui_xml_editor_t::draw() {
 	if(caret.y+margin.y > view_ofs.y+r.h()) view_ofs.y = ((caret.y+margin.y-r.h())/h)*h;
 	pimpl->view_ofs = view_ofs;
 	// and draw
-	COL[CURSOR_COL].set(alpha);
+	CURSOR_COL.set(alpha);
 	caret += r.tl;
 	caret -= view_ofs;
 	draw_filled_box(rect_t(caret,caret+vec2_t((now()%700)>350?10:3,h)));
@@ -427,7 +405,7 @@ void ui_xml_editor_t::draw() {
 		const int start = pimpl->char_from_ofs(view_ofs.x,i);
 		int x = r.tl.x - (view_ofs.x - pimpl->char_to_ofs(start,i));
 		for(size_t j=start; j<line.s.size(); j++) {
-			TEXT_COL[line.type[j]].set(alpha);
+			MARKUP_COL[line.type[j]].set(alpha);
 			x += f.draw(x,y,line.s[j]);
 		}
 		y += h;
