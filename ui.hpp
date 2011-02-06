@@ -66,11 +66,17 @@ protected:
 	void draw_filled_box(short x,short y,short w,short h) const;
 	enum corner_t { INNER, OUTER, LINE };
 	void draw_corner(const rect_t& r,bool left,bool top,corner_t type) const;
-	void draw_cornered_box(const rect_t& r,const vec2_t& corner,bool filled) const;
+	void draw_corner(const rect_t& r,bool left,bool top,short line_width) const;
+	void draw_cornered_box(const rect_t& r,const vec2_t& corner,short line_width) const;
+	void draw_cornered_box(const rect_t& r,const vec2_t& corner) const;
+	void draw_filled_cornered_box(const rect_t& r,const vec2_t& corner) const;
 	void draw_circle(const rect_t& r,bool filled) const; 
+	void draw_circle(const rect_t& r,short line_width) const;
 	void draw_line(const vec2_t& a,const vec2_t& b) const;
 	void draw_hline(const vec2_t& p,short l) const;
 	void draw_vline(const vec2_t& p,short h) const;
+	void draw_hline(const vec2_t& p,short l,short line_width) const;
+	void draw_vline(const vec2_t& p,short h,short line_width) const;
 	rect_t draw_border(float alpha,const rect_t& r,const std::string& title,const colour_t& fill = col[BG_COL]) const;
 	rect_t calc_border(const rect_t& r,const std::string& title) const;	
 	bool offer_children(const SDL_Event& event);

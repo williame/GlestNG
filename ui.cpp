@@ -182,6 +182,44 @@ static void _draw_arc(float r,float cx,float cy,int quadrant,int quadrants,bool 
 	}
 }
 
+static void _draw_arc2(float r,float cx,float cy,int quadrant,int quadrants,float line_width) {
+	const int num_segments = 4*4,
+		start = quadrant * (num_segments/4),
+		stop = (quadrant+quadrants) * (num_segments/4) + 1;
+	static struct { 
+		struct { 
+			float x, y; 
+			void set(float x_,float y_) { x=x_; y=y_; }
+			void emit() const { glVertex2f(x,y); }
+		} out, in; 
+	} pt[num_segments];
+	const float theta = 2.0 * 3.1415926 / float(num_segments); 
+	const float c = cos(theta);//precalculate the sine and cosine
+	const float s = sin(theta);
+	float x1 = r, x2 = r-line_width-1, y1 = 0, y2 = 0;
+	for(int i = 0; i < stop; i++) {
+		if(i>=start) {
+			pt[i].out.set(x1+cx,y1+cy);
+			pt[i].in.set(x2+cx,y2+cy);
+		}
+		//apply the rotation matrix
+		const float t1 = x1;
+		x1 = c * x1 - s * y1;
+		y1 = s * t1 + c * y1;
+		const float t2 = x2;
+		x2 = c * x2 - s * y2;
+		y2 = s * t2 + c * y2;
+	}
+	glBegin(GL_QUADS);
+	for(int i=start+1; i<stop; i++) {
+		pt[i-1].out.emit();
+		pt[i-1].in.emit();
+		pt[i].in.emit();
+		pt[i].out.emit();
+	}
+	glEnd();
+}
+
 void ui_component_t::draw_corner(const rect_t& r,bool left,bool top,corner_t type) const {
 	const float cx = (left?r.br.x:r.tl.x),
 		cy = (top?r.br.y:r.tl.y);
@@ -193,10 +231,21 @@ void ui_component_t::draw_corner(const rect_t& r,bool left,bool top,corner_t typ
 	glEnd();
 }
 
+void ui_component_t::draw_corner(const rect_t& r,bool left,bool top,short line_width) const {
+	const float cx = (left?r.br.x:r.tl.x),
+		cy = (top?r.br.y:r.tl.y);
+	const int quadrant = (!left&&!top? 0: left&&!top? 1: left&&top? 2: 3);
+	_draw_arc2(std::min(r.h(),r.w()),cx,cy,quadrant,1,line_width);
+}
+
 void ui_component_t::draw_circle(const rect_t& r,bool filled) const {
 	glBegin(filled? GL_POLYGON: GL_LINE_LOOP);
 	_draw_arc(std::min(r.h(),r.w())/2,r.tl.x+r.w()/2,r.tl.y+r.h()/2,0,4,false);
 	glEnd();
+}
+
+void ui_component_t::draw_circle(const rect_t& r,short line_width) const {
+	_draw_arc2(std::min(r.h(),r.w())/2,r.tl.x+r.w()/2,r.tl.y+r.h()/2,0,4,line_width);
 }
 
 void ui_component_t::draw_line(const vec2_t& a,const vec2_t& b) const {
@@ -214,33 +263,67 @@ void ui_component_t::draw_vline(const vec2_t& p,short h) const {
 	draw_line(p,vec2_t(p.x,p.y+h));
 }
 
-void ui_component_t::draw_cornered_box(const rect_t& r,const vec2_t& corner,bool filled) const {
-	draw_corner(rect_t(r.tl,r.tl+corner),true,true,filled? OUTER: LINE);
-	draw_corner(rect_t(r.br.x-corner.x,r.tl.y,r.br.x,r.tl.y+corner.y),false,true,filled? OUTER: LINE);
-	draw_corner(rect_t(r.br-corner,r.br),false,false,filled? OUTER: LINE);
-	draw_corner(rect_t(r.tl.x,r.br.y-corner.y,r.tl.x+corner.x,r.br.y),true,false,filled? OUTER: LINE);
-	if(filled) {
-		draw_filled_box(rect_t(r.tl.x+corner.x,r.tl.y,r.br.x-corner.x,r.tl.y+corner.y));
-		draw_filled_box(r.inner(vec2_t(0,corner.y)));
-		draw_filled_box(rect_t(r.tl.x+corner.x,r.br.y-corner.y,r.br.x-corner.x,r.br.y));
-	} else {
-		draw_vline(vec2_t(r.tl.x,r.tl.y+corner.y),r.h()-corner.y*2);
-		draw_vline(vec2_t(r.br.x,r.tl.y+corner.y),r.h()-corner.y*2);
-		draw_hline(vec2_t(r.tl.x+corner.x,r.tl.y),r.w()-corner.x*2);
-		draw_hline(vec2_t(r.tl.x+corner.x,r.br.y),r.w()-corner.x*2);
-	}
+void ui_component_t::draw_hline(const vec2_t& p,short l,short line_width) const {
+	glBegin(GL_QUADS);
+	glVertex2s(p.x,p.y);
+	glVertex2s(p.x+l,p.y);
+	glVertex2s(p.x+l,p.y+line_width);
+	glVertex2s(p.x,p.y+line_width);
+	glEnd();
+}
+
+void ui_component_t::draw_vline(const vec2_t& p,short h,short line_width) const {
+	glBegin(GL_QUADS);
+	glVertex2s(p.x,p.y);
+	glVertex2s(p.x+line_width,p.y);
+	glVertex2s(p.x+line_width,p.y+h);
+	glVertex2s(p.x,p.y+h);
+	glEnd();
+}
+
+void ui_component_t::draw_cornered_box(const rect_t& r,const vec2_t& corner,short line_width) const {
+	draw_corner(rect_t(r.tl,r.tl+corner),true,true,line_width);
+	draw_corner(rect_t(r.br.x-corner.x,r.tl.y,r.br.x,r.tl.y+corner.y),false,true,line_width);
+	draw_corner(rect_t(r.br-corner,r.br),false,false,line_width);
+	draw_corner(rect_t(r.tl.x,r.br.y-corner.y,r.tl.x+corner.x,r.br.y),true,false,line_width);
+	draw_vline(vec2_t(r.tl.x,r.tl.y+corner.y),r.h()-corner.y*2,line_width);
+	draw_vline(vec2_t(r.br.x-line_width,r.tl.y+corner.y),r.h()-corner.y*2,line_width);
+	draw_hline(vec2_t(r.tl.x+corner.x,r.tl.y),r.w()-corner.x*2,line_width);
+	draw_hline(vec2_t(r.tl.x+corner.x,r.br.y-line_width),r.w()-corner.x*2,line_width);
+}
+
+void ui_component_t::draw_cornered_box(const rect_t& r,const vec2_t& corner) const {
+	draw_corner(rect_t(r.tl,r.tl+corner),true,true,LINE);
+	draw_corner(rect_t(r.br.x-corner.x,r.tl.y,r.br.x,r.tl.y+corner.y),false,true,LINE);
+	draw_corner(rect_t(r.br-corner,r.br),false,false,LINE);
+	draw_corner(rect_t(r.tl.x,r.br.y-corner.y,r.tl.x+corner.x,r.br.y),true,false,LINE);
+	draw_vline(vec2_t(r.tl.x,r.tl.y+corner.y),r.h()-corner.y*2);
+	draw_vline(vec2_t(r.br.x,r.tl.y+corner.y),r.h()-corner.y*2);
+	draw_hline(vec2_t(r.tl.x+corner.x,r.tl.y),r.w()-corner.x*2);
+	draw_hline(vec2_t(r.tl.x+corner.x,r.br.y),r.w()-corner.x*2);
+}
+
+void ui_component_t::draw_filled_cornered_box(const rect_t& r,const vec2_t& corner) const {
+	draw_corner(rect_t(r.tl,r.tl+corner),true,true,OUTER);
+	draw_corner(rect_t(r.br.x-corner.x,r.tl.y,r.br.x,r.tl.y+corner.y),false,true,OUTER);
+	draw_corner(rect_t(r.br-corner,r.br),false,false,OUTER);
+	draw_corner(rect_t(r.tl.x,r.br.y-corner.y,r.tl.x+corner.x,r.br.y),true,false,OUTER);
+	draw_filled_box(rect_t(r.tl.x+corner.x,r.tl.y,r.br.x-corner.x,r.tl.y+corner.y));
+	draw_filled_box(r.inner(vec2_t(0,corner.y)));
+	draw_filled_box(rect_t(r.tl.x+corner.x,r.br.y-corner.y,r.br.x-corner.x,r.br.y));
 }
 
 rect_t ui_component_t::draw_border(float alpha,const rect_t& r,const std::string& title,const colour_t& fill) const {
 	const vec2_t& margin = this->margin(), corner = this->corner();
+	const short line_width = margin.x;
 	rect_t inner(r.inner(margin));
 	const bool solid = fill == col[BG_COL];
+	col[BG_COL].set(alpha);
+	if(solid)
+		draw_filled_cornered_box(r,corner);
 	if(title.size()) {
 		const int title_y = line_height()+margin.y*2;
-		col[BG_COL].set(alpha);
-		if(solid)
-			draw_cornered_box(r,corner,true);
-		else {
+		if(!solid) {
 			draw_corner(rect_t(r.tl,r.tl+corner),true,true,OUTER);
 			draw_corner(rect_t(r.br.x-corner.x,r.tl.y,r.br.x,r.tl.y+corner.y),false,true,OUTER);
 			draw_filled_box(rect_t(r.tl.x+corner.x,r.tl.y,r.br.x-corner.x,r.tl.y+corner.y));
@@ -253,16 +336,21 @@ rect_t ui_component_t::draw_border(float alpha,const rect_t& r,const std::string
 		if(!solid) {
 			draw_corner(rect_t(inner.tl,inner.tl+corner),true,true,INNER);
 			draw_corner(rect_t(inner.br.x-corner.x,inner.tl.y,inner.br.x,inner.tl.y+corner.y),false,true,INNER);
+			const short h = r.br.y-corner.y-inner.tl.y;
+			draw_vline(vec2_t(r.tl.x,inner.tl.y),h,line_width);
+			draw_vline(vec2_t(r.br.x-line_width,inner.tl.y),h,line_width);
+			draw_hline(vec2_t(r.tl.x+corner.x,inner.br.y),r.w()-corner.x*2,line_width);
+			draw_corner(rect_t(r.br-corner,r.br),false,false,line_width);
+			draw_corner(rect_t(r.tl.x,r.br.y-corner.y,r.tl.x+corner.x,r.br.y),true,false,line_width);
 		}
-	} else {
-		col[BG_COL].set(alpha);
-		draw_cornered_box(r,corner,solid);
+	} else if(!solid) {
+		draw_cornered_box(r,corner,line_width);
 	}
 	col[OUTLINE_COL].set(alpha);
-	draw_cornered_box(r,corner,false);
+	draw_cornered_box(r,corner);
 	if(!solid) {
 		fill.set(alpha);
-		draw_cornered_box(inner,corner,true);
+		draw_filled_cornered_box(inner,corner);
 	}
 	return inner;
 }
@@ -351,7 +439,11 @@ bool ui_cancel_button_t::offer(const SDL_Event& event) {
 
 void ui_cancel_button_t::draw() {
 	glColor4f(0.5,0,0,base_alpha());
-	draw_circle(get_rect(),true);
+	const rect_t r(get_rect());
+	const vec2_t& m(margin());
+	draw_circle(r,m.x);
+	draw_line(r.tl+m,r.br-m);
+	draw_line(vec2_t(r.tl.x+m.x,r.br.y-m.y),vec2_t(r.br.x-m.x,r.tl.y+m.y));
 }
 
 struct ui_mgr_t::pimpl_t {

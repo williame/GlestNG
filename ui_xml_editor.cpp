@@ -379,7 +379,8 @@ static const ui_component_t::colour_t MARKUP_COL[xml_parser_t::NUM_TYPES] = {
 void ui_xml_editor_t::draw() {
 	const float alpha = base_alpha();
 	font_mgr_t& f = *font_mgr();
-	rect_t r = draw_border(alpha,get_rect(),pimpl->get_title(),CANVAS_COL); 
+	rect_t r = draw_border(alpha,get_rect(),pimpl->get_title(),CANVAS_COL);
+	clip(r);
 	const int h = line_height();
 	// get the lines and cursor
 	const lines_t& lines = pimpl->get_lines();

@@ -152,9 +152,9 @@ void ui_list_t::draw() {
 		const std::string& s = pimpl->list[i];
 		const rect_t item(inner.tl.x,y,inner.br.x,y+pimpl->line_spacing-margin.y);
 		col[selected? ITEM_ACTIVE_COL: ITEM_COL].set(alpha);
-		draw_cornered_box(item,corner,true);
+		draw_filled_cornered_box(item,corner);
 		col[OUTLINE_COL].set(alpha);
-		draw_cornered_box(item,corner,false);
+		draw_cornered_box(item,corner);
 		col[selected? TEXT_ACTIVE_COL: TEXT_COL].set(alpha);
 		font_mgr()->draw(item.tl.x+corner.x,item.tl.y+(item.h()-h)/2,s);
 		y += pimpl->line_spacing;
