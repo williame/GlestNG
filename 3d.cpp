@@ -144,9 +144,9 @@ bool aabb_t::intersects(const ray_t& r) const {
 }
 
 intersection_t aabb_t::intersects(const aabb_t& o) const {
-	if((a.x>=o.b.x)||(b.x<o.a.x)||(a.y>=o.b.y)||(b.y<o.a.y)||(a.z>=o.b.z)||(b.z<o.a.z))
+	if((a.x>=o.b.x)||(b.x<=o.a.x)||(a.y>=o.b.y)||(b.y<=o.a.y)||(a.z>=o.b.z)||(b.z<=o.a.z))
 		return MISS;
-	if((a.x>=o.a.x)&&(b.x<o.b.x)&&(a.y>=o.a.y)&&(b.y<o.b.y)&&(a.z>=o.a.z)&&(a.z<o.b.z))
+	if((a.x>=o.a.x)&&(b.x<=o.b.x)&&(a.y>=o.a.y)&&(b.y<=o.b.y)&&(a.z>=o.a.z)&&(a.z<=o.b.z))
 		return ALL;
 	return SOME;
 }

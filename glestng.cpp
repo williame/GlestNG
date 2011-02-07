@@ -97,14 +97,14 @@ struct faction_handler_t: public ui_list_t::handler_t, public ui_xml_editor_t::h
 	}
 } faction_handler;
 
-void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
+void caret(const vec_t& pos,float scale,float rx,float ry,float rz,model_g3d_t* model) {
 	glPushMatrix();		
 	glTranslatef(pos.x,pos.y,pos.z);
 	glScalef(scale,scale,scale);
 	if(rx) glRotatef(360.0/rx,1,0,0);
 	if(ry) glRotatef(360.0/ry,0,1,0);
 	if(rz) glRotatef(360.0/rz,0,0,1);
-	if(model.get()) {
+	if(model) {
 		model->draw(0);
 	} else {
 		glBegin(GL_QUADS);	
@@ -179,13 +179,6 @@ struct test_t: public object_t {
 	}
 	void draw(float) {
 		drawn = frame_count;
-		//glColor3ub(r,g,b);
-		//caret(get_pos(),SZ,rx,ry,rz);
-	}
-	void draw_bad() {
-		drawn = frame_count;
-		glColor3ub(0xff,0,0);
-		caret(get_pos(),SZ,rx,ry,rz);
 	}
 	bool refine_intersection(const ray_t&, vec_t& I) { 
 		I = centre;
@@ -206,7 +199,7 @@ tests_t objs;
 void ui() {
 	if(selection) {
 		glColor3f(1,0,0);
-		caret(selected_point,0.03,0,0,0);
+		caret(selected_point,0.03,0,0,0,NULL);
 	}
 	static char fps[128];
 	snprintf(fps,sizeof(fps),"%u fps, %d visible objects (of %u)",(unsigned)framerate.per_second(now()),visible_objects,(unsigned)objs.size());
@@ -237,7 +230,9 @@ void spatial_test() {
 			else
 				glColor3ub(0,0,0xff);
 		}
-		caret(obj->get_pos(),obj->SZ,obj->rx,obj->ry,obj->rz);
+		caret(obj->get_pos(),obj->SZ,obj->rx,obj->ry,obj->rz,model.get());
+		glColor4ub(0xff,0xff,0xff,0x20);
+		caret(obj->get_pos(),obj->SZ,obj->rx,obj->ry,obj->rz,NULL);
 		if(!obj->tick()) {
 			objs.erase(objs.begin()+i);
 			delete obj;
@@ -256,6 +251,7 @@ void spatial_test() {
 
 void tick() {
 	spatial_test();
+	world()->check();
 	frame_count++;
 	const world_t::hits_t& visible = world()->visible();
 	visible_objects = visible.size();
@@ -454,7 +450,7 @@ int main(int argc,char** args) {
 
 		load(*fs);
 		
-		terrain_t::gen_planet(5,500,3);
+		//terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);
 	
 		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),

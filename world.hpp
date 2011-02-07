@@ -84,6 +84,7 @@ public:
 	const hits_t& visible() const;
 	bool has_frustum() const;
 	const frustum_t& frustum() const;
+	void check();
 private:
 	friend class spatial_index_t;
 	friend class object_t;
