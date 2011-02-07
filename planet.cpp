@@ -573,5 +573,8 @@ terrain_t* terrain_t::get_terrain() {
 
 void terrain_t::gen_planet(size_t recursionLevel,size_t iterations,size_t smoothing_passes) {
 	if(_terrain) panic("terrain already exists");
-	_terrain = new planet_t(recursionLevel,iterations,smoothing_passes);
+	if(RUNNING_ON_VALGRIND)
+		_terrain = new planet_t(3,3,2); // speed it up a bit
+	else
+		_terrain = new planet_t(recursionLevel,iterations,smoothing_passes);
 }
