@@ -38,7 +38,7 @@ namespace {
 class ui_xml_editor_t::pimpl_t: public ui_cancel_button_t::handler_t {
 public:
 	pimpl_t(ui_xml_editor_t* ui_,xml_loadable_t& target_,ui_xml_editor_t::handler_t& handler_):
-		em(font_mgr()->measure(' ').x),
+		em(fonts()->get(fonts_t::UI_TITLE)->measure(' ').x),
 		h(line_height()), 
 		view_ofs(0,0), mouse_grab(false),
 		ui(ui_), target(target_), handler(handler_),
@@ -222,7 +222,7 @@ int ui_xml_editor_t::pimpl_t::char_from_ofs(int x,int row) {
 	int i = 0, ofs = 0;
 	while(ofs<=x) {
 		if(i<(int)line.s.size())
-			ofs += font_mgr()->measure(line.s[i]).x;
+			ofs += fonts()->get(fonts_t::UI_TITLE)->measure(line.s[i]).x;
 		else
 			ofs += em;
 		i++;
@@ -234,8 +234,8 @@ int ui_xml_editor_t::pimpl_t::char_to_ofs(int col,int row) {
 	if((size_t)row >= lines.size()) return -1;
 	const line_t& line = lines[row];
 	if((size_t)col >= line.s.size())
-		return font_mgr()->measure(line.s.c_str()).x+(em*(col-line.s.size()));
-	return font_mgr()->measure(line.s.c_str(),col).x;
+		return fonts()->get(fonts_t::UI_TITLE)->measure(line.s.c_str()).x+(em*(col-line.s.size()));
+	return fonts()->get(fonts_t::UI_TITLE)->measure(line.s.c_str(),col).x;
 }
 
 void ui_xml_editor_t::pimpl_t::_append(const char ch,line_t& line,int i,xml_parser_t::type_t type) {
@@ -378,7 +378,7 @@ static const ui_component_t::colour_t MARKUP_COL[xml_parser_t::NUM_TYPES] = {
 
 void ui_xml_editor_t::draw() {
 	const float alpha = base_alpha();
-	font_mgr_t& f = *font_mgr();
+	font_t& f = *fonts()->get(fonts_t::UI_TITLE);
 	rect_t r = draw_border(alpha,get_rect(),pimpl->get_title(),CANVAS_COL);
 	clip(r);
 	const int h = line_height();

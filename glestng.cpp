@@ -97,56 +97,56 @@ struct faction_handler_t: public ui_list_t::handler_t, public ui_xml_editor_t::h
 	}
 } faction_handler;
 
-void caret(const vec_t& pos,float scale,float rx,float ry,float rz,model_g3d_t* model) {
+void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
 	glPushMatrix();		
 	glTranslatef(pos.x,pos.y,pos.z);
 	glScalef(scale,scale,scale);
 	if(rx) glRotatef(360.0/rx,1,0,0);
 	if(ry) glRotatef(360.0/ry,0,1,0);
 	if(rz) glRotatef(360.0/rz,0,0,1);
-	if(model) {
+	if(model.get()) {
 		model->draw(0);
-	} else {
-		glBegin(GL_QUADS);	
-			// classic NeHe	
-			// Front Face
-			glNormal3f( 0.0f, 0.0f, 1.0f); // Normal Pointing Towards Viewer
-			glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 1 (Front)
-			glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 2 (Front)
-			glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Front)
-			glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 4 (Front)
-			// Back Face
-			glNormal3f( 0.0f, 0.0f,-1.0f); // Normal Pointing Away From Viewer
-			glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Back)
-			glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 2 (Back)
-			glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 3 (Back)
-			glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 4 (Back)
-			// Top Face
-			glNormal3f( 0.0f, 1.0f, 0.0f); // Normal Pointing Up
-			glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 1 (Top)
-			glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 2 (Top)
-			glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Top)
-			glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 4 (Top)
-			// Bottom Face
-			glNormal3f( 0.0f,-1.0f, 0.0f); // Normal Pointing Down
-			glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Bottom)
-			glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 2 (Bottom)
-			glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 3 (Bottom)
-			glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 4 (Bottom)
-			// Right face
-			glNormal3f( 1.0f, 0.0f, 0.0f); // Normal Pointing Right
-			glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 1 (Right)
-			glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 2 (Right)
-			glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Right)
-			glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 4 (Right)
-			// Left Face
-			glNormal3f(-1.0f, 0.0f, 0.0f); // Normal Pointing Left
-			glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Left)
-			glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 2 (Left)
-			glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 3 (Left)
-			glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 4 (Left)
-		glEnd();	
 	}
+	glColor4ub(0xff,0xff,0xff,0x15);
+	glBegin(GL_QUADS);	
+	// classic NeHe	
+	// Front Face
+	glNormal3f( 0.0f, 0.0f, 1.0f); // Normal Pointing Towards Viewer
+	glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 1 (Front)
+	glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 2 (Front)
+	glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Front)
+	glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 4 (Front)
+	// Back Face
+	glNormal3f( 0.0f, 0.0f,-1.0f); // Normal Pointing Away From Viewer
+	glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Back)
+	glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 2 (Back)
+	glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 3 (Back)
+	glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 4 (Back)
+	// Top Face
+	glNormal3f( 0.0f, 1.0f, 0.0f); // Normal Pointing Up
+	glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 1 (Top)
+	glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 2 (Top)
+	glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Top)
+	glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 4 (Top)
+	// Bottom Face
+	glNormal3f( 0.0f,-1.0f, 0.0f); // Normal Pointing Down
+	glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Bottom)
+	glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 2 (Bottom)
+	glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 3 (Bottom)
+	glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 4 (Bottom)
+	// Right face
+	glNormal3f( 1.0f, 0.0f, 0.0f); // Normal Pointing Right
+	glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 1 (Right)
+	glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 2 (Right)
+	glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Right)
+	glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 4 (Right)
+	// Left Face
+	glNormal3f(-1.0f, 0.0f, 0.0f); // Normal Pointing Left
+	glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Left)
+	glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 2 (Left)
+	glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 3 (Left)
+	glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 4 (Left)
+	glEnd();	
 	glPopMatrix();
 }
 
@@ -179,6 +179,13 @@ struct test_t: public object_t {
 	}
 	void draw(float) {
 		drawn = frame_count;
+		//glColor3ub(r,g,b);
+		//caret(get_pos(),SZ,rx,ry,rz);
+	}
+	void draw_bad() {
+		drawn = frame_count;
+		glColor3ub(0xff,0,0);
+		caret(get_pos(),SZ,rx,ry,rz);
 	}
 	bool refine_intersection(const ray_t&, vec_t& I) { 
 		I = centre;
@@ -199,7 +206,7 @@ tests_t objs;
 void ui() {
 	if(selection) {
 		glColor3f(1,0,0);
-		caret(selected_point,0.03,0,0,0,NULL);
+		caret(selected_point,0.03,0,0,0);
 	}
 	static char fps[128];
 	snprintf(fps,sizeof(fps),"%u fps, %d visible objects (of %u)",(unsigned)framerate.per_second(now()),visible_objects,(unsigned)objs.size());
@@ -230,9 +237,7 @@ void spatial_test() {
 			else
 				glColor3ub(0,0,0xff);
 		}
-		caret(obj->get_pos(),obj->SZ,obj->rx,obj->ry,obj->rz,model.get());
-		glColor4ub(0xff,0xff,0xff,0x20);
-		caret(obj->get_pos(),obj->SZ,obj->rx,obj->ry,obj->rz,NULL);
+		caret(obj->get_pos(),obj->SZ,obj->rx,obj->ry,obj->rz);
 		if(!obj->tick()) {
 			objs.erase(objs.begin()+i);
 			delete obj;
@@ -445,6 +450,7 @@ int main(int argc,char** args) {
 
 		// we have a GL context so we can go ahead and init all the singletons
 		std::auto_ptr<graphics_t::mgr_t> graphics_mgr(graphics_t::create());
+		std::auto_ptr<fonts_t> fonts(fonts_t::create());
 		std::auto_ptr<fs_t> fs(fs_t::create("data/Glest"));
 		std::auto_ptr<ui_mgr_t> ui_(ui_mgr());
 

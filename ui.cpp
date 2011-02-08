@@ -330,7 +330,7 @@ rect_t ui_component_t::draw_border(float alpha,const rect_t& r,const std::string
 			draw_filled_box(rect_t(r.tl.x,r.tl.y+corner.y,r.br.x,r.tl.y+title_y));
 		}
 		col[TITLE_COL].set(alpha);
-		font_mgr()->draw(inner.tl.x+corner.x,inner.tl.y,title);
+		fonts()->get(fonts_t::UI_TITLE)->draw(inner.tl.x+corner.x,inner.tl.y,title);
 		inner.tl.y = r.tl.y + title_y;
 		col[BG_COL].set(alpha);
 		if(!solid) {
@@ -363,7 +363,7 @@ rect_t ui_component_t::calc_border(const rect_t& r,const std::string& title) con
 }
 
 int ui_component_t::line_height() {
-	static const int h = font_mgr()->measure(" ").y;
+	static const int h = fonts()->get(fonts_t::UI_TITLE)->measure(" ").y;
 	return h;
 }
 
@@ -403,13 +403,13 @@ ui_label_t::ui_label_t(const std::string& str,ui_component_t* parent):
 
 void ui_label_t::set_text(const std::string& str) {
 	s = str;
-	sz = font_mgr()->measure(s.c_str());
+	sz = fonts()->get(fonts_t::UI_TITLE)->measure(s.c_str());
 	set_rect(rect_t(get_rect().tl,get_rect().tl+sz));
 }
 
 void ui_label_t::draw() {
 	glColor3ub(r,g,b);
-	font_mgr()->draw(get_rect().tl.x,get_rect().tl.y,s.c_str());
+	fonts()->get(fonts_t::UI_TITLE)->draw(get_rect().tl.x,get_rect().tl.y,s.c_str());
 }
 
 ui_cancel_button_t::ui_cancel_button_t(unsigned flags,handler_t& h,ui_component_t* parent): 

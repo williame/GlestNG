@@ -20,9 +20,9 @@ struct ui_list_t::pimpl_t: public ui_cancel_button_t::handler_t {
 		enabled(0.5,2000,true),
 		selected(NO_SELECTION),
 		cancel(NULL) {
-		w = font_mgr()->measure(title).x;
+		w = fonts()->get(fonts_t::UI_TITLE)->measure(title).x;
 		for(size_t i=0; i<list.size(); i++)
-			w = std::max<int>(w,font_mgr()->measure(list[i]).x);
+			w = std::max<int>(w,fonts()->get(fonts_t::UI_TITLE)->measure(list[i]).x);
 		if(CANCEL_BUTTON&ui->flags)
 			cancel = new ui_cancel_button_t(FADE_VISIBLE&ui->flags,*this,ui);
 	}
@@ -139,6 +139,7 @@ void ui_list_t::enable() {
 }
 
 void ui_list_t::draw() {
+	font_t* font = fonts()->get(fonts_t::UI_TITLE);
 	float alpha = base_alpha();
 	pimpl->enabled.calc(alpha);
 	const rect_t inner = draw_border(alpha,get_rect(),pimpl->title);
@@ -156,7 +157,7 @@ void ui_list_t::draw() {
 		col[OUTLINE_COL].set(alpha);
 		draw_cornered_box(item,corner);
 		col[selected? TEXT_ACTIVE_COL: TEXT_COL].set(alpha);
-		font_mgr()->draw(item.tl.x+corner.x,item.tl.y+(item.h()-h)/2,s);
+		font->draw(item.tl.x+corner.x,item.tl.y+(item.h()-h)/2,s);
 		y += pimpl->line_spacing;
 	}
 }
