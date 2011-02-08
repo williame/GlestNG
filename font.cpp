@@ -36,10 +36,11 @@ struct code_t {
 class font_angel_t: public font_t {
 public: // bitmap fonts created from TTF using AngelCode's BMFont
 	font_angel_t(const std::string& filename);
-	vec2_t measure(char ch);
+	vec2_t measure(int ch);
 	vec2_t measure(const char* msg,int count);
-	int draw(int x,int y,char ch);
+	int draw(int x,int y,int ch);
 	int draw(int x,int y,const char* msg,int count);
+	int kerning(int first,int second);
 private:
 	int baseline, lineheight;
 	struct glyph_t: public code_t {
@@ -71,9 +72,8 @@ private:
 	kernings_t kernings;
 	GLuint texture;
 	vec2_t texture_size;
-	int gl_draw(int x,int y,char ch) const;
+	int gl_draw(int x,int y,int ch) const;
 	const glyph_t& get(int code) const; // unicode
-	int kerning(int first,int seconds) const;
 };
 
 font_angel_t::font_angel_t(const std::string& filename) {
@@ -122,6 +122,7 @@ font_angel_t::font_angel_t(const std::string& filename) {
 		for(kernings_t::iterator i=kernings.begin(); i!=kernings.end(); i++)
 			std::sort(i->seconds.begin(),i->seconds.end());
 		std::sort(kernings.begin(),kernings.end());
+		std::cout << "(" << kernings.size() << " kernings)" << std::endl;
 	}
 }
 
@@ -137,32 +138,36 @@ const font_angel_t::glyph_t& font_angel_t::get(int code) const {
 	return x_glyphs[idx];
 }
 
-int font_angel_t::kerning(int first,int second) const {
+int font_angel_t::kerning(int first,int second) {
 	if(!kernings.size()) return 0;
 	const int idx = binary_search(kernings,0,kernings.size(),kerning_t(first));
 	if(idx == -1) return 0;
-	return kernings[idx].get(second);
+	const int amount = kernings[idx].get(second);
+	return amount;
 }
 	
-vec2_t font_angel_t::measure(char ch) {
+vec2_t font_angel_t::measure(int ch) {
 	return vec2_t(get(ch).advance,lineheight);
 }
 
 vec2_t font_angel_t::measure(const char* msg,int count) {
 	vec2_t sz(0,lineheight);
-	while(count-- > 0)
-		sz.x += measure(*msg++).x;
+	for(int m=0; m<count; m++) {
+		sz.x += measure(msg[m]).x;
+		if(m)
+			sz.x += kerning(msg[m-1],msg[m]);
+	}
 	return sz;
 }
 
-int font_angel_t::draw(int x,int y,char ch) {
+int font_angel_t::draw(int x,int y,int ch) {
 	glBindTexture(GL_TEXTURE_2D,texture);
 	const int advance = gl_draw(x,y,ch);
 	glBindTexture(GL_TEXTURE_2D,0);
 	return advance;
 }
 
-int font_angel_t::gl_draw(int x,int y,char ch) const {
+int font_angel_t::gl_draw(int x,int y,int ch) const {
 	const glyph_t& g = get(ch);
 	const float
 		tx0 = (float)g.x/texture_size.x,

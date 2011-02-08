@@ -27,6 +27,7 @@ namespace {
 	struct line_t {
 		size_t ofs;
 		std::vector<xml_parser_t::type_t> type;
+		std::vector<bool> visit;
 		std::string s;
 	};
 	typedef std::vector<line_t> lines_t;
@@ -77,11 +78,14 @@ public:
 	void on_cancel(ui_cancel_button_t*) {
 		handler.on_cancelled(ui);
 	}
+	rect_t inner() const { 
+		return ui->calc_border(ui->get_rect(),get_title()).inner(vec2_t(ui->corner().x,0));
+	}
 private:
 	ui_xml_editor_t* const ui;
 	xml_loadable_t& target;
 	ui_xml_editor_t::handler_t& handler;
-	void _append(const char ch,line_t& line,int i,xml_parser_t::type_t type);
+	void _append(const char ch,line_t& line,int i,xml_parser_t::type_t type,bool visit);
 	void parse();
 	void reload(const std::string& buf);
 	lines_t lines;
@@ -218,12 +222,14 @@ void ui_xml_editor_t::pimpl_t::bksp() {
 
 int ui_xml_editor_t::pimpl_t::char_from_ofs(int x,int row) {
 	if(row >= (int)lines.size()) return -1;
+	font_t& f = *fonts()->get(fonts_t::UI_TITLE);
 	const line_t& line = lines[row];
 	int i = 0, ofs = 0;
 	while(ofs<=x) {
-		if(i<(int)line.s.size())
-			ofs += fonts()->get(fonts_t::UI_TITLE)->measure(line.s[i]).x;
-		else
+		if(i<(int)line.s.size()) {
+			ofs += f.measure(line.s[i]).x;
+			if(i) ofs += f.kerning(line.s[i-1],line.s[i]);
+		} else
 			ofs += em;
 		i++;
 	}
@@ -238,7 +244,7 @@ int ui_xml_editor_t::pimpl_t::char_to_ofs(int col,int row) {
 	return fonts()->get(fonts_t::UI_TITLE)->measure(line.s.c_str(),col).x;
 }
 
-void ui_xml_editor_t::pimpl_t::_append(const char ch,line_t& line,int i,xml_parser_t::type_t type) {
+void ui_xml_editor_t::pimpl_t::_append(const char ch,line_t& line,int i,xml_parser_t::type_t type,bool visit) {
 	if(ch == '\n') {
 		line.s.erase(line.s.find_last_not_of(" \n\r\t")+1);
 		lines.push_back(line);
@@ -248,10 +254,12 @@ void ui_xml_editor_t::pimpl_t::_append(const char ch,line_t& line,int i,xml_pars
 		for(size_t j=0; j<TAB_SIZE; j++) {
 			line.s += ' ';
 			line.type.push_back(type);
+			line.visit.push_back(visit);
 		}
 	} else if(ch != '\r') {
 		line.s += ch;
 		line.type.push_back(type);
+		line.visit.push_back(visit);
 	}
 }
 
@@ -269,12 +277,12 @@ void ui_xml_editor_t::pimpl_t::parse() {
 	const char* ch = target.get_xml()->get_buf();
 	for(xml_parser_t::walker_t node = target.get_xml()->walker(); node.ok(); node.next()) {
 		for(; i<node.ofs(); i++)
-			_append(*ch++,line,i,xml_parser_t::IGNORE);
+			_append(*ch++,line,i,xml_parser_t::IGNORE,false);
 		for(; i<(node.ofs()+node.len()); i++)
-			_append(*ch++,line,i,node.type());
+			_append(*ch++,line,i,node.type(),node.visited());
 	}
 	for(; *ch; i++)
-		_append(*ch++,line,i,xml_parser_t::IGNORE);
+		_append(*ch++,line,i,xml_parser_t::IGNORE,false);
 	line.s.erase(line.s.find_last_not_of(" \n\r\t")+1);
 	if(line.s.size())
 		lines.push_back(line);
@@ -326,11 +334,11 @@ bool ui_xml_editor_t::offer(const SDL_Event& event) {
 		return pimpl->mouse_grab;
 	case SDL_MOUSEBUTTONUP:
 		if(pimpl->mouse_grab) {
-			if(get_rect().contains(vec2_t(event.button.x,event.button.y))) {
-				const int x = event.button.x - get_rect().tl.x + pimpl->view_ofs.x;
-				const int y = event.button.y - get_rect().tl.y + pimpl->view_ofs.y - pimpl->h;
-				if(y >= 0) // not on title
-					pimpl->button_up(vec2_t(x,y));
+			const rect_t inner(pimpl->inner());
+			if(inner.contains(vec2_t(event.button.x,event.button.y))) {
+				const int x = event.button.x - inner.tl.x + pimpl->view_ofs.x;
+				const int y = event.button.y - inner.tl.y + pimpl->view_ofs.y;
+				pimpl->button_up(vec2_t(x,y));
 			}
 			return true;
 		}
@@ -378,8 +386,8 @@ static const ui_component_t::colour_t MARKUP_COL[xml_parser_t::NUM_TYPES] = {
 void ui_xml_editor_t::draw() {
 	const float alpha = base_alpha();
 	font_t& f = *fonts()->get(fonts_t::UI_TITLE);
-	rect_t r = draw_border(alpha,get_rect(),pimpl->get_title(),CANVAS_COL);
-	clip(r);
+	draw_border(alpha,get_rect(),pimpl->get_title(),CANVAS_COL);
+	const rect_t r = pimpl->inner();
 	const int h = line_height();
 	// get the lines and cursor
 	const lines_t& lines = pimpl->get_lines();
@@ -401,12 +409,19 @@ void ui_xml_editor_t::draw() {
 	int y = r.tl.y;
 	for(size_t i = view_ofs.y/h; i<lines.size(); i++) {
 		if(y > r.br.y) break;
+		int prev = 0;
 		const line_t& line = lines[i];
 		const int start = pimpl->char_from_ofs(view_ofs.x,i);
 		int x = r.tl.x - (view_ofs.x - pimpl->char_to_ofs(start,i));
 		for(size_t j=start; j<line.s.size(); j++) {
 			MARKUP_COL[line.type[j]].set(alpha);
-			x += f.draw(x,y,line.s[j]);
+			const int ch = line.s[j];
+			if(line.visit[j] || (xml_parser_t::ERROR == line.type[j])) // a poor person's bold
+				f.draw(x+1,y,ch);
+			x += f.draw(x,y,ch);
+			if(prev)
+				x += f.kerning(prev,ch);
+			prev = ch;
 		}
 		y += h;
 	}

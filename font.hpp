@@ -16,14 +16,15 @@
 
 class font_t {
 public:
-	virtual vec2_t measure(char ch) = 0;
+	virtual vec2_t measure(int ch) = 0;
 	inline vec2_t measure(const char* msg) { return measure(msg,strlen(msg)); }
 	inline vec2_t measure(const std::string& s) { return measure(s.c_str(),s.size()); }
 	virtual vec2_t measure(const char* msg,int count) = 0;
-	virtual int draw(int x,int y,char ch) = 0;
+	virtual int draw(int x,int y,int ch) = 0;
 	virtual int draw(int x,int y,const char* msg,int count) = 0;
 	inline int draw(int x,int y,const char* msg) { return draw(x,y,msg,strlen(msg)); }
 	inline int draw(int x,int y,const std::string& s) { return draw(x,y,s.c_str(),s.size()); }
+	virtual int kerning(int first,int second) = 0;
 protected:
 	font_t() {}
 	virtual ~font_t() {}
