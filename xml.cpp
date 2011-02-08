@@ -329,6 +329,14 @@ bool xml_parser_t::walker_t::get_child(const char* tag,size_t i) {
 	return false;
 }
 
+bool xml_parser_t::walker_t::has_child(const char* tag) {
+	get_tag();
+	for(token_t* child = tok->first_child; child; child = child->next_peer)
+		if((OPEN == child->type) && child->equals(tag))
+			return true;
+	return false;
+}
+
 xml_parser_t::walker_t& xml_parser_t::walker_t::up() {
 	get_tag();
 	if(!tok->parent)

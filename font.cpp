@@ -14,15 +14,24 @@
 #include "xml.hpp"
 #include "fs.hpp"
 
-template<typename T> int binary_search(const std::vector<T>& vec, unsigned start, unsigned end, const T& key)
+template<typename T> int binary_search(const std::vector<T>& vec, int start, int end, const T& key)
 { // http://en.wikibooks.org/wiki/Algorithm_Implementation/Search/Binary_search#C.2B.2B
     // surely there is something standard somewhere?
     if(start > end) return -1; // not found
     const unsigned middle = (start + ((end - start) / 2));
     if(vec[middle] == key) return middle;
-    if(vec[middle] > key) return binary_search(vec, start, middle - 1, key);
-    return binary_search(vec, middle + 1, end, key);
+    if(vec[middle] < key) binary_search(vec, middle + 1, end, key);
+    return binary_search(vec, start, middle - 1, key);
 }
+
+struct code_t {
+	enum { INVALID = -1 };
+	code_t(int c): code(c) {}
+	code_t(): code(INVALID) {}
+	int code;
+	bool operator==(const code_t& o) const { return code == o.code; }
+	bool operator<(const code_t& o) const { return code < o.code; }
+};
 
 class font_angel_t: public font_t {
 public: // bitmap fonts created from TTF using AngelCode's BMFont
@@ -32,25 +41,39 @@ public: // bitmap fonts created from TTF using AngelCode's BMFont
 	int draw(int x,int y,char ch);
 	int draw(int x,int y,const char* msg,int count);
 private:
-	enum { INVALID = -1 };
 	int baseline, lineheight;
-	struct glyph_t {
-		glyph_t(int c): code(c) {}
-		glyph_t(): code(INVALID) {}
-		bool operator==(const glyph_t& o) const { return code == o.code; }
-		bool operator<(const glyph_t& o) const { return code < o.code; }
-		bool operator>(const glyph_t& o) const { return code > o.code; }
-		int code;
+	struct glyph_t: public code_t {
+		glyph_t(int c): code_t(c) {}
+		glyph_t() {}
 		short x,y,w,h,ofs_x,ofs_y,advance;
 	};
 	enum { BASE_START = 32, BASE_STOP = 128 };
 	glyph_t base[BASE_STOP-BASE_START], invalid;
 	typedef std::vector<glyph_t> x_glyphs_t;
 	x_glyphs_t x_glyphs;
+	struct kerning_t: public code_t {
+		kerning_t(int c): code_t(c) {}
+		kerning_t() {}
+		struct second_t: public code_t {
+			second_t(int c,int a): code_t(c), amount(a) {}
+			second_t() {}
+			int amount;
+		};
+		std::vector<second_t> seconds;
+		int get(int code) const {
+			if(!seconds.size()) return 0;
+			const int idx = binary_search(seconds,0,seconds.size(),second_t(code,0));
+			if(idx == -1) return 0;
+			return seconds[idx].amount;
+		}
+	};
+	typedef std::vector<kerning_t> kernings_t;
+	kernings_t kernings;
 	GLuint texture;
 	vec2_t texture_size;
 	int gl_draw(int x,int y,char ch) const;
 	const glyph_t& get(int code) const; // unicode
+	int kerning(int first,int seconds) const;
 };
 
 font_angel_t::font_angel_t(const std::string& filename) {
@@ -80,7 +103,7 @@ font_angel_t::font_angel_t(const std::string& filename) {
 		glyph.ofs_x = xml.value_int("xoffset");
 		glyph.ofs_y = xml.value_int("yoffset");
 		glyph.advance = xml.value_int("xadvance");
-		if(code == INVALID) {
+		if(code == code_t::INVALID) {
 			invalid = glyph;
 			has_invalid = true;
 		} else if((code >= BASE_START) && (code < BASE_STOP))
@@ -91,18 +114,36 @@ font_angel_t::font_angel_t(const std::string& filename) {
 	if(!has_invalid) data_error("font "<<*data_file<<" has no invalid glypth");
 	std::sort(x_glyphs.begin(),x_glyphs.end());
 	xml.up();
-	// skip kernings for now
+	if(xml.has_child("kernings")) {
+		xml.get_child("kernings");
+		for(size_t i=0; xml.get_child("kerning",i); i++) {
+			kernings.push_back(kerning_t(xml.value_int("first")));
+			kernings.back().seconds.push_back(kerning_t::second_t(xml.value_int("second"),xml.value_int("amount")));
+			xml.up();
+		}
+		for(kernings_t::iterator i=kernings.begin(); i!=kernings.end(); i++)
+			std::sort(i->seconds.begin(),i->seconds.end());
+		std::sort(kernings.begin(),kernings.end());
+	}
 }
 
 const font_angel_t::glyph_t& font_angel_t::get(int code) const {
-	if(code == INVALID) return invalid;
+	if(code == code_t::INVALID) return invalid;
 	if(code>=BASE_START && code<BASE_STOP) {
-		if(base[code-BASE_START].code == INVALID) return invalid;
+		if(base[code-BASE_START].code == code_t::INVALID) return invalid;
 		return base[code-BASE_START];
 	}
+	if(!x_glyphs.size()) return invalid;
 	const int idx = binary_search(x_glyphs,0,x_glyphs.size(),glyph_t(code));
 	if(idx == -1) return invalid;
 	return x_glyphs[idx];
+}
+
+int font_angel_t::kerning(int first,int second) const {
+	if(!kernings.size()) return 0;
+	const int idx = binary_search(kernings,0,kernings.size(),kerning_t(first));
+	if(idx == -1) return 0;
+	return kernings[idx].get(second);
 }
 	
 vec2_t font_angel_t::measure(char ch) {
@@ -151,8 +192,11 @@ int font_angel_t::gl_draw(int x,int y,char ch) const {
 int font_angel_t::draw(int x,int y,const char* msg,int count) {
 	const int start = x;
 	glBindTexture(GL_TEXTURE_2D,texture);
-	for(int m=0; m<count; m++)
+	for(int m=0; m<count; m++) {
 		x += gl_draw(x,y,msg[m]);
+		if(m)
+			x += kerning(msg[m-1],msg[m]);
+	}
 	glBindTexture(GL_TEXTURE_2D,0);
 	return x-start;
 }
@@ -160,7 +204,7 @@ int font_angel_t::draw(int x,int y,const char* msg,int count) {
 static fonts_t* singleton = NULL;
 
 struct fonts_t::pimpl_t {
-	pimpl_t(): sans(new font_angel_t("bitstream_vera")) {}
+	pimpl_t(): sans(new font_angel_t("bitstream_vera_sans")) {}
 	std::auto_ptr<font_angel_t> sans;
 };
 

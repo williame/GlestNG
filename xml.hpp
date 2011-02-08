@@ -38,6 +38,7 @@ public:
 		// navigation API; preferred way of extracting things
 		void check(const char* tag);
 		walker_t& get_child(const char* tag);
+		bool has_child(const char* tag);
 		bool get_child(const char* tag,size_t i);
 		walker_t& up();
 		// extract attributes
