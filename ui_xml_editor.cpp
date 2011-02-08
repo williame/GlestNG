@@ -302,9 +302,8 @@ ui_xml_editor_t::~ui_xml_editor_t() {
 void ui_xml_editor_t::reshaped() {
 	if(pimpl->cancel) {
 		const rect_t r = get_rect();
-		const short margin = 2;
-		const vec2_t sz(pimpl->h-margin*2,pimpl->h-margin*2);
-		const vec2_t pos(r.br.x-sz.x-margin,r.tl.y+margin);
+		const vec2_t sz(corner()+corner());
+		const vec2_t pos(r.br.x-sz.x-margin().x,r.tl.y+margin().y);
 		pimpl->cancel->set_rect(rect_t(pos,pos+sz));
 	}
 }

@@ -92,7 +92,7 @@ font_angel_t::font_angel_t(const std::string& filename) {
 	fs_file_t::ptr_t tex_handle(fs->get(xml.value_string("file")));
 	texture = graphics()->alloc_texture(*tex_handle);
 	xml.up().up().get_child("chars").get_child("char");
-	bool has_invalid = false;
+	memset(&invalid,0,sizeof(invalid));
 	for(size_t i=0; xml.up().get_child("char",i); i++) {
 		const int code = xml.value_int("id");
 		glyph_t glyph(code);
@@ -103,15 +103,13 @@ font_angel_t::font_angel_t(const std::string& filename) {
 		glyph.ofs_x = xml.value_int("xoffset");
 		glyph.ofs_y = xml.value_int("yoffset");
 		glyph.advance = xml.value_int("xadvance");
-		if(code == code_t::INVALID) {
+		if(code == code_t::INVALID)
 			invalid = glyph;
-			has_invalid = true;
-		} else if((code >= BASE_START) && (code < BASE_STOP))
+		else if((code >= BASE_START) && (code < BASE_STOP))
 			base[code-BASE_START] = glyph;
 		else
 			x_glyphs.push_back(glyph);
 	}
-	if(!has_invalid) data_error("font "<<*data_file<<" has no invalid glypth");
 	std::sort(x_glyphs.begin(),x_glyphs.end());
 	xml.up();
 	if(xml.has_child("kernings")) {
