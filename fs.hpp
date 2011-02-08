@@ -19,6 +19,8 @@
 #include <memory>
 #include <inttypes.h>
 
+#include "utils.hpp"
+
 class fs_t;
 class fs_file_t;
 
@@ -69,8 +71,6 @@ public:
 protected:
 	fs_file_t(fs_t& fs): fs_handle_t(fs) {}
 };
-
-typedef std::vector<std::string> strings_t;
 
 class fs_t {
 public:

@@ -12,7 +12,10 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <string>
+#include <vector>
 #include "memcheck.h"
+
+typedef std::vector<std::string> strings_t;
 
 template<typename T> class fixed_array_t {
 public:

@@ -24,7 +24,7 @@ private:
 	~resource_t();
 	void reset();
 	void _load_xml(xml_parser_t::walker_t& xml);
-	ref_t* _image;
+	ref_t _image;
 	resource_type_t _resource_type;
 	int _interval;
 };

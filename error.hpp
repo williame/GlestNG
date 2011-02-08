@@ -12,6 +12,8 @@
 #include <csignal>
 #include "valgrind.h"
 
+#define traceback(fmt,...) VALGRIND_PRINTF_BACKTRACE(fmt,__VA_ARGS__)
+
 class panic_t: public std::stringstream {
 public:
 	panic_t(): std::stringstream("GlestNG PANIC: ",ios_base::out|ios_base::ate) {}
@@ -19,7 +21,7 @@ public:
 
 #define panic(X) { panic_t* panic = new panic_t(); \
 	*panic << __FILE__ << '#' << __LINE__<<" "<<X; \
-	VALGRIND_PRINTF_BACKTRACE("%s\n",panic->str().c_str()); \
+	traceback("%s\n",panic->str().c_str()); \
 	raise(SIGINT); \
 	throw panic; }
 	
@@ -30,7 +32,7 @@ public:
 
 #define data_error(X) { data_error_t* data_error = new data_error_t(); \
 	*data_error << '(' << __FILE__ << '#' << __LINE__<<") "<<X; \
-	VALGRIND_PRINTF_BACKTRACE("%s\n",data_error->str().c_str()); \
+	traceback("%s\n",data_error->str().c_str()); \
 	throw data_error; }
 	
 class graphics_error_t: public std::stringstream {
@@ -40,7 +42,7 @@ public:
 
 #define graphics_error(X) { graphics_error_t* graphics_error = new graphics_error_t(); \
 	*graphics_error << '(' << __FILE__ << '#' << __LINE__<<") "<<X; \
-	VALGRIND_PRINTF_BACKTRACE("%s\n",graphics_error->str().c_str()); \
+	traceback("%s\n",graphics_error->str().c_str()); \
 	throw graphics_error; }
 
 inline std::ostream& operator<<(std::ostream& out,std::stringstream* p) {

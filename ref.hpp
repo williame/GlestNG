@@ -23,6 +23,11 @@ enum class_type_t {
 	PARTICLE,
 };
 
+class techtree_t;
+class faction_t;
+class resource_t;
+class unit_type_t;
+
 class mgr_t;
 
 class class_t: public fs_handle_t {
@@ -35,31 +40,10 @@ protected:
 	class_t(mgr_t& mgr,class_type_t type,const std::string& name);
 };
 
-class techtree_t;
-class faction_t;
-class resource_t;
-class unit_type_t;
-
-class ref_t {
-public:
-	virtual ~ref_t();
-	mgr_t& mgr;
-	const class_type_t type;
-	const std::string name;
-	faction_t* faction();
-	resource_t* resource();
-private:
-	friend class mgr_t;
-	ref_t(mgr_t& mgr,class_type_t type,const std::string& name);
-	class_t* get();
-};
-
-typedef std::vector<ref_t*> refs_t;
-
 class mgr_t: public fs_handle_t {
 public:
 	~mgr_t();
-	virtual ref_t* ref(class_type_t type,const std::string& name);
+	strings_t list(class_type_t type) const;
 protected:
 	mgr_t(fs_t& fs);
 private:
@@ -68,6 +52,31 @@ private:
 	struct pimpl_t;
 	pimpl_t* pimpl;
 };
+
+class ref_t {
+public:
+	ref_t(mgr_t& mgr,class_type_t type,const std::string& name);
+	ref_t();
+	ref_t(const ref_t& copy);
+	~ref_t();
+	void set(mgr_t& mgr,class_type_t type,const std::string& name);
+	bool is_set() const { return ok; }
+	const std::string& get_name() const;
+	class_type_t get_type() const;
+	void clear();
+	faction_t* faction();
+	resource_t* resource();
+private:
+	friend class mgr_t::pimpl_t;
+	bool ok;
+	mgr_t* mgr;
+	class_t* ptr;
+	class_type_t type;
+	std::string name;
+	class_t* get();
+};
+
+typedef std::vector<ref_t> refs_t;
 
 inline std::ostream& operator<<(std::ostream& out,class_type_t type) {
 	switch(type) {
@@ -90,7 +99,10 @@ inline std::ostream& operator<<(std::ostream& out,const class_t* cls) {
 }
 
 inline std::ostream& operator<<(std::ostream& out,const ref_t& ref) {
-	return out << "ref<"<<ref.type<<','<<ref.name<<'>';
+	out << "ref<";
+	if(ref.is_set()) out << ref.get_type() << ',' << ref.get_name();
+	else out << '?';
+	return out << '>';
 }
 inline std::ostream& operator<<(std::ostream& out,const ref_t* ref) {
 	return out << *ref;

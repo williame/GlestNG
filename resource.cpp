@@ -9,8 +9,7 @@
 
 resource_t::resource_t(techtree_t& techtree,const std::string& name):
 	class_t(techtree,RESOURCE,name), xml_loadable_t(name),
-	path(techtree.fs().canocial(techtree.path+"/resources/"+name)),
-	_image(NULL)
+	path(techtree.fs().canocial(techtree.path+"/resources/"+name))
 {
 	fs_file_t::ptr_t f(fs().get(path+"/"+name+".xml"));
 	istream_t::ptr_t in(f->reader());
@@ -20,12 +19,12 @@ resource_t::resource_t(techtree_t& techtree,const std::string& name):
 resource_t::~resource_t() { reset(); }
 
 void resource_t::reset() {
-	delete _image; _image = NULL;
+	_image.clear();
 }
 
 void resource_t::_load_xml(xml_parser_t::walker_t& xml) {
 	xml.check("resource");
-	_image = mgr.ref(IMAGE,fs().join(path,xml.get_child("image").value_string("path")));
+	_image.set(mgr,IMAGE,fs().join(path,xml.get_child("image").value_string("path")));
 	const std::string type = xml.up().get_child("type").value_string();
 	if(type=="consumable") {
 		_resource_type = CONSUMABLE;

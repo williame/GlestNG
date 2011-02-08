@@ -17,11 +17,16 @@
 template<typename T> int binary_search(const std::vector<T>& vec, int start, int end, const T& key)
 { // http://en.wikibooks.org/wiki/Algorithm_Implementation/Search/Binary_search#C.2B.2B
     // surely there is something standard somewhere?
-    if(start > end) return -1; // not found
+    if(start < 0) panic(start<<','<<end);
+    if(end > 1000) panic(start<<','<<end);
+    if(start >= end)
+    	    return -1; // not found
     const unsigned middle = (start + ((end - start) / 2));
-    if(vec[middle] == key) return middle;
-    if(vec[middle] < key) binary_search(vec, middle + 1, end, key);
-    return binary_search(vec, start, middle - 1, key);
+    if(vec[middle] == key)
+    	    return middle;
+    if(vec[middle] < key)
+    	    return binary_search(vec, middle + 1, end, key);
+    return binary_search(vec, start, middle, key);
 }
 
 struct code_t {
@@ -115,8 +120,15 @@ font_angel_t::font_angel_t(const std::string& filename) {
 	if(xml.has_child("kernings")) {
 		xml.get_child("kernings");
 		for(size_t i=0; xml.get_child("kerning",i); i++) {
-			kernings.push_back(kerning_t(xml.value_int("first")));
-			kernings.back().seconds.push_back(kerning_t::second_t(xml.value_int("second"),xml.value_int("amount")));
+			const int first = xml.value_int("first"),
+				second = xml.value_int("second"),
+				amount = xml.value_int("amount");
+			kernings_t::iterator f = std::find(kernings.begin(),kernings.end(),kerning_t(first));
+			if(f == kernings.end()) {
+				kernings.push_back(kerning_t(first));
+				kernings.back().seconds.push_back(kerning_t::second_t(second,amount));
+			} else
+				f->seconds.push_back(kerning_t::second_t(second,amount));
 			xml.up();
 		}
 		for(kernings_t::iterator i=kernings.begin(); i!=kernings.end(); i++)
@@ -142,8 +154,7 @@ int font_angel_t::kerning(int first,int second) {
 	if(!kernings.size()) return 0;
 	const int idx = binary_search(kernings,0,kernings.size(),kerning_t(first));
 	if(idx == -1) return 0;
-	const int amount = kernings[idx].get(second);
-	return amount;
+	return kernings[idx].get(second);
 }
 	
 vec2_t font_angel_t::measure(int ch) {
