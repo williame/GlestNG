@@ -112,11 +112,10 @@ void mod_ui_t::pimpl_t::create_context_menu(ref_t ref,const vec2_t& pt) {
 void mod_ui_t::pimpl_t::on_selected(ui_list_t* lst,size_t idx,const vec2_t& pt) {
 	const tagged_string_t& item = lst->get_list()[idx];
 	if(lst == context_menu) {
-		switch(item.tag) {
-		case TAG_EDIT_XML: {
+		techtree_t& techtree = context_ref.get_mgr().techtree();
+		const std::string name = context_ref.get_name();
+		if(item.tag == TAG_EDIT_XML) {
 			std::cout << "edit xml for " << context_ref << std::endl;
-			techtree_t& techtree = context_ref.get_mgr().techtree();
-			const std::string name = context_ref.get_name();
 			switch(context_ref.get_type()) {
 			case TECHTREE: 
 				edit.reset(new techtree_t(techtree.fs(),name));
@@ -132,9 +131,9 @@ void mod_ui_t::pimpl_t::on_selected(ui_list_t* lst,size_t idx,const vec2_t& pt) 
 			const short y = menus.back()->get_pos().y;
 			const rect_t r(pt.x,y,pt.x+500,ui_mgr()->get_screen_bounds().h()-y);
 			xml->set_rect(r);
-		} break;
-		default:
-			panic("context menu "<< idx << ',' << item << " not handled");
+		} else {
+			context_ref.set_tag(item.tag);
+			create(context_ref);
 		}
 		context_ref.clear();
 		context_menu->destroy(); context_menu = NULL;
