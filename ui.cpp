@@ -49,6 +49,7 @@ const ui_component_t::colour_t ui_component_t::col[ui_component_t::NUM_COLOURS] 
 	{0x50,0x50,0x00,0xff}, //BORDER_COL
 	{0xd0,0xd0,0x60,0x80}, //OUTLINE_COL
 	{0x00,0xff,0xff,0xff}, //TITLE_COL
+	{0x40,0xff,0x80,0xff}, //SUBTITLE_COL
 	{0xc0,0xc0,0x40,0xc0}, //ITEM_COL
 	{0xf0,0xf0,0x40,0xc0}, //ITEM_ACTIVE_COL
 	{0x00,0x80,0xa0,0xff}, //TEXT_COL
@@ -331,6 +332,7 @@ rect_t ui_component_t::draw_border(float alpha,const rect_t& r,const std::string
 		}
 		col[TITLE_COL].set(alpha);
 		fonts()->get(fonts_t::UI_TITLE)->draw(inner.tl.x+corner.x,inner.tl.y,title);
+		fonts()->get(fonts_t::UI_TITLE)->draw(inner.tl.x+corner.x+1,inner.tl.y,title); // poor man's bold
 		inner.tl.y = r.tl.y + title_y;
 		col[BG_COL].set(alpha);
 		if(!solid) {

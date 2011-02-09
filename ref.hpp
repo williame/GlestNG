@@ -45,11 +45,11 @@ class mgr_t: public fs_handle_t {
 public:
 	~mgr_t();
 	strings_t list(class_type_t type) const;
+	virtual techtree_t& techtree();
 protected:
 	mgr_t(fs_t& fs);
 private:
 	friend class ref_t;
-	virtual techtree_t& techtree();
 	struct pimpl_t;
 	pimpl_t* pimpl;
 };
@@ -70,6 +70,7 @@ public:
 	bool is_set() const { return ok; }
 	const std::string& get_name() const;
 	class_type_t get_type() const;
+	mgr_t& get_mgr();
 	void clear();
 	techtree_t& techtree();
 	faction_t& faction();

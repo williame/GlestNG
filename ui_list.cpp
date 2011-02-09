@@ -64,7 +64,10 @@ bool ui_list_t::offer(const SDL_Event& event) {
 		if(!r.contains(m)) return false;
 		m -= r.tl;
 		r.move(-r.tl);
-		pimpl->selected = m.y / pimpl->line_spacing;
+		const int selected = m.y / pimpl->line_spacing;
+		if(selected >= pimpl->list.size()) return true;
+		if(pimpl->list[selected].tag & TAG_SEP) return true;
+		pimpl->selected = selected;
 		if(pimpl->handler)
 			pimpl->handler->on_selected(this,pimpl->selected,vec2_t(event.button.x,event.button.y));
 		return true;
@@ -152,13 +155,17 @@ void ui_list_t::draw() {
 	for(size_t i=0; i<pimpl->list.size(); i++) {
 		if(y > inner.br.y) break;
 		const bool selected = (pimpl->selected == i);
-		const std::string& s = pimpl->list[i];
+		const tagged_string_t& s = pimpl->list[i];
 		const rect_t item(inner.tl.x,y,inner.br.x,y+pimpl->line_spacing-margin.y);
-		col[selected? ITEM_ACTIVE_COL: ITEM_COL].set(alpha);
-		draw_filled_cornered_box(item,corner);
-		col[OUTLINE_COL].set(alpha);
-		draw_cornered_box(item,corner);
-		col[selected? TEXT_ACTIVE_COL: TEXT_COL].set(alpha);
+		if(s.tag & TAG_SEP)
+			col[SUBTITLE_COL].set(alpha);
+		else {
+			col[selected? ITEM_ACTIVE_COL: ITEM_COL].set(alpha);
+			draw_filled_cornered_box(item,corner);
+			col[OUTLINE_COL].set(alpha);
+			draw_cornered_box(item,corner);
+			col[selected? TEXT_ACTIVE_COL: TEXT_COL].set(alpha);
+		}
 		font->draw(item.tl.x+corner.x,item.tl.y+(item.h()-h)/2,s);
 		y += pimpl->line_spacing;
 	}

@@ -395,6 +395,7 @@ int main(int argc,char** args) {
 		std::auto_ptr<fonts_t> fonts(fonts_t::create());
 		std::auto_ptr<fs_t> fs(fs_t::create("data/Glest"));
 		std::auto_ptr<ui_mgr_t> ui_(ui_mgr());
+		std::auto_ptr<mod_ui_t> mod_ui(mod_ui_t::create());
 
 		load(*fs);
 		
@@ -464,10 +465,10 @@ int main(int argc,char** args) {
 						quit = true;
 						break;
 					case SDLK_m: // MODDING MODE
-						if(mod_ui_is_shown())
-							hide_mod_ui();
+						if(mod_ui->is_shown())
+							mod_ui->hide();
 						else
-							show_mod_ui(ref_t(*techtree,TECHTREE,techtree->name));
+							mod_ui->show(ref_t(*techtree,TECHTREE,techtree->name));
 						break;
 					default:
 						std::cout << "Ignoring key " << 

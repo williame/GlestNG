@@ -25,6 +25,9 @@ public:
 	void enable();
 	void disable();
 	const std::string& get_title() const;
+	enum { // flags that can be placed in the strings_t that have special meaning to ui_list_t
+		TAG_SEP = 0x10000,
+	};
 	const strings_t& get_list() const;
 	bool has_selection() const;
 	size_t get_selection() const;

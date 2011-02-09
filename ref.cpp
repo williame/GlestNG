@@ -74,6 +74,11 @@ class_type_t ref_t::get_type() const {
 	return type;
 }
 
+mgr_t& ref_t::get_mgr() {
+	if(!ok) panic(this << " is not set");
+	return *mgr;
+}	
+
 void ref_t::clear() {
 	if(ok) {
 		mgr->pimpl->detach(*this);

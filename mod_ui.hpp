@@ -8,11 +8,22 @@
 #ifndef __MOD_UI_HPP__
 #define __MOD_UI_HPP__
 
-#include "ref.hpp"
+#include <memory>
 
-void show_mod_ui(const ref_t& base);
-bool mod_ui_is_shown();
-void hide_mod_ui();
+class ref_t;
+
+class mod_ui_t {
+public:
+	static std::auto_ptr<mod_ui_t> create();
+	~mod_ui_t();
+	void show(const ref_t& base);
+	bool is_shown() const;
+	void hide();
+private:
+	struct pimpl_t;
+	pimpl_t* pimpl;
+	mod_ui_t();
+};
 
 #endif //__MOD_UI_HPP__
 

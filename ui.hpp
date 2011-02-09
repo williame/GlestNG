@@ -48,7 +48,7 @@ public:
 	void hide() { set_visible(false); }
 	void invalidate();
 	virtual void destroy(); // triggers the (eventual) deletion of this; don't deference after calling!
-	enum { BG_COL, BORDER_COL, OUTLINE_COL, TITLE_COL, ITEM_COL, ITEM_ACTIVE_COL, TEXT_COL, TEXT_ACTIVE_COL, NUM_COLOURS };
+	enum { BG_COL, BORDER_COL, OUTLINE_COL, TITLE_COL, SUBTITLE_COL, ITEM_COL, ITEM_ACTIVE_COL, TEXT_COL, TEXT_ACTIVE_COL, NUM_COLOURS };
 	struct colour_t {
 		uint8_t r,g,b,a;
 		bool operator==(const colour_t& o) const { return r==o.r && b==o.b && g==o.g && a==o.a; }
