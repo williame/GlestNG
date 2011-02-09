@@ -8,9 +8,11 @@
 #include <iostream>
 
 #include "mod_ui.hpp"
+
 #include "techtree.hpp"
 #include "resource.hpp"
 #include "faction.hpp"
+#include "unit.hpp"
 
 #include "ui_list.hpp"
 #include "ui_xml_editor.hpp"
@@ -20,7 +22,7 @@ struct mod_ui_t::pimpl_t: public ui_list_t::handler_t, public ui_xml_editor_t::h
 	enum {	TAG_EDIT_XML=1,
 		TAG_TT_TT,
 		TAG_TT_FAC, TAG_TT_RES,
-		TAG_FAC_UNITS, TAG_FAC_UPG,
+		TAG_FAC_UNIT, TAG_FAC_UPG,
 	};
 	void clear();
 	void create(ref_t ref);
@@ -73,17 +75,20 @@ void mod_ui_t::pimpl_t::create(ref_t ref) {
 		faction_t& faction = ref.faction();
 		strings_t items;
 		switch(ref.get_tag()) {
-		case TAG_FAC_UNITS: items = faction.get_units(); break;
+		case TAG_FAC_UNIT: items = faction.get_units(); break;
 		case TAG_FAC_UPG: items = faction.get_upgrades(); break;
 		default: panic(ref << " bad tag: "<<ref.get_tag());
 		}
+		for(strings_t::iterator i=items.begin(); i!=items.end(); i++)
+			i->tag = ref.get_tag();
 		menu = new ui_list_t(ui_list_t::default_flags,faction.class_t::name,items,parent);
 	} break;
 	default:
 		panic("cannot create menu for " << ref);
 	}
 	if(!menu) panic("menu not set");
-	menu->set_rect(rect_t(vec2_t(10,50)+(vec2_t(10,0)*menus.size()),vec2_t(10,50)+menu->preferred_size()));
+	const vec2_t sz(menu->preferred_size()), ofs(vec2_t(10,50)+(vec2_t(50,0)*menus.size()));
+	menu->set_rect(rect_t(ofs,ofs+sz));
 	menu->set_handler(this);
 	menus.push_back(menu);
 }
@@ -94,11 +99,12 @@ void mod_ui_t::pimpl_t::create_context_menu(ref_t ref,const vec2_t& pt) {
 	items.push_back("edit XML",TAG_EDIT_XML);
 	switch(ref.get_type()) {
 	case FACTION:
-		items.push_back("units",TAG_FAC_UNITS);
+		items.push_back("units",TAG_FAC_UNIT);
 		items.push_back("upgrades",TAG_FAC_UPG);
 		break;
 	case TECHTREE:
 	case RESOURCE:
+	case UNIT_TYPE:
 		break;
 	default:
 		panic("cannot create context menu for " << ref);
@@ -126,6 +132,9 @@ void mod_ui_t::pimpl_t::on_selected(ui_list_t* lst,size_t idx,const vec2_t& pt) 
 			case FACTION:
 				edit.reset(new faction_t(techtree,name));
 				break;
+			case UNIT_TYPE:
+				edit.reset(new unit_type_t(refs.back().faction(),name));
+				break;
 			default: panic(context_ref << " not handled"); }
 			xml = new ui_xml_editor_t(ui_xml_editor_t::default_flags,*edit,*this);
 			const short y = menus.back()->get_pos().y;
@@ -145,6 +154,7 @@ void mod_ui_t::pimpl_t::on_selected(ui_list_t* lst,size_t idx,const vec2_t& pt) 
 		case TAG_TT_TT: type = TECHTREE; name = refs.front().get_name(); break;
 		case TAG_TT_FAC: type = FACTION; break;
 		case TAG_TT_RES: type = RESOURCE; break;
+		case TAG_FAC_UNIT: type = UNIT_TYPE; break;
 		default: panic(item << " not handled");
 		}
 		create_context_menu(ref_t(refs.front().get_mgr(),type,name),pt);

@@ -350,7 +350,7 @@ void load(fs_t& fs) {
 	std::cout << "loading "<<xml_name<<std::endl;
 	fs_file_t::ptr_t xml_file(fs.get(xml_name));
 	istream_t::ptr_t xstream(xml_file->reader());
-	unit_type = std::auto_ptr<unit_type_t>(new unit_type_t(unit));
+	unit_type = std::auto_ptr<unit_type_t>(new unit_type_t(faction,unit_));
 	unit_type->load_xml(*xstream);
 	//new ui_xml_editor_t(*unit_type);
 	std::cout << "loading "<<g3d<<std::endl;

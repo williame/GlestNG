@@ -12,6 +12,7 @@
 
 #include "world.hpp"
 #include "xml.hpp"
+#include "ref.hpp"
 
 class unit_type_t;
 
@@ -22,11 +23,13 @@ private:
 	unit_type_t& type;
 };
 
-class unit_type_t: public xml_loadable_t {
+class unit_type_t: public class_t, public xml_loadable_t {
 public:
-	unit_type_t(const std::string& name);
+	unit_type_t(faction_t& faction,const std::string& name);
 	~unit_type_t();
+	const std::string path;
 private:
+	void reset();
 	void _load_xml(xml_parser_t::walker_t& xml);
 	float size, height;
 };
