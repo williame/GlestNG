@@ -60,6 +60,7 @@ public:
 	ref_t();
 	ref_t(const ref_t& copy);
 	~ref_t();
+	ref_t& operator=(const ref_t& copy);
 	void set(mgr_t& mgr,class_type_t type,const std::string& name);
 	void set(mgr_t& mgr,class_type_t type,const std::string& name,int tag) {
 		set(mgr,type,name); set_tag(tag);

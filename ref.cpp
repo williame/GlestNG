@@ -47,6 +47,13 @@ ref_t::ref_t(const ref_t& copy): ok(false) {
 
 ref_t::~ref_t() { clear(); }
 
+ref_t& ref_t::operator=(const ref_t& copy) {
+	clear();
+	if(copy.ok)
+		set(*copy.mgr,copy.type,copy.name,copy.tag);
+	return *this;
+}
+
 void ref_t::set(mgr_t& mgr,class_type_t type,const std::string& name) {
 	if(!name.size()) panic(this << ": name is not set");
 	clear();
