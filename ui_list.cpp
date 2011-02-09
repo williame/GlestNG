@@ -91,6 +91,8 @@ vec2_t ui_list_t::preferred_size() const {
 
 const strings_t& ui_list_t::get_list() const { return pimpl->list; }
 
+const std::string& ui_list_t::get_title() const { return pimpl->title; }
+
 bool ui_list_t::has_selection() const { return (pimpl->selected != pimpl_t::NO_SELECTION); }
 
 size_t ui_list_t::get_selection() const {

@@ -24,6 +24,7 @@ public:
 	bool is_enabled() const;
 	void enable();
 	void disable();
+	const std::string& get_title() const;
 	const strings_t& get_list() const;
 	bool has_selection() const;
 	size_t get_selection() const;

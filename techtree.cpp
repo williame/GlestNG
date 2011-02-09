@@ -100,11 +100,11 @@ size_t techtree_t::armour_ID(const std::string& s) const {
 	return _index_of(armour_types,s,"armour");
 }
 
-faction_t* techtree_t::get_faction(const std::string& name) {
+faction_t& techtree_t::get_faction(const std::string& name) {
 	return faction_refs[_index_of(factions,name,"faction")].faction();
 }
 
-resource_t* techtree_t::get_resource(const std::string& name) {
+resource_t& techtree_t::get_resource(const std::string& name) {
 	return resource_refs[_index_of(resources,name,"resource")].resource();
 }
 

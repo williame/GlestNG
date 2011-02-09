@@ -33,8 +33,8 @@ struct mgr_t::pimpl_t {
 	classes_t classes;
 };
 
-ref_t::ref_t(mgr_t& mgr,class_type_t type,const std::string& name):
-	ok(false) { 
+ref_t::ref_t(mgr_t& mgr,class_type_t type,const std::string& name,int t):
+	ok(false), tag(t) { 
 	set(mgr,type,name);
 }
 
@@ -42,7 +42,7 @@ ref_t::ref_t(): ok(false) {}
 
 ref_t::ref_t(const ref_t& copy): ok(false) {
 	if(copy.ok)
-		set(*copy.mgr,copy.type,copy.name);
+		set(*copy.mgr,copy.type,copy.name,copy.tag);
 }
 
 ref_t::~ref_t() { clear(); }
@@ -77,16 +77,24 @@ void ref_t::clear() {
 	}
 }
 
-faction_t* ref_t::faction() {
+faction_t& ref_t::faction() {
 	if(!ok) panic(this << " is not set");
 	if(type != FACTION) panic(this << " is not a faction");
-	return static_cast<faction_t*>(get());
+	return *static_cast<faction_t*>(get());
 }
 
-resource_t* ref_t::resource() {
+resource_t& ref_t::resource() {
 	if(!ok) panic(this << " is not set");
 	if(type != RESOURCE) panic(this << " is not a resource");
-	return static_cast<resource_t*>(get());
+	return *static_cast<resource_t*>(get());
+}
+
+techtree_t& ref_t::techtree() {
+	if(!ok) panic(this << " is not set");
+	if(type != TECHTREE) panic(this << " is not a techtree");
+	techtree_t& techtree = mgr->techtree();
+	if(techtree.name != name) panic(this << " does not ref "<<techtree);
+	return techtree;
 }
 
 class_t* ref_t::get() {

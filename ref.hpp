@@ -15,6 +15,7 @@
 #include "fs.hpp"
 
 enum class_type_t {
+	TECHTREE,
 	FACTION,
 	UNIT_TYPE,
 	RESOURCE,
@@ -55,20 +56,27 @@ private:
 
 class ref_t {
 public:
-	ref_t(mgr_t& mgr,class_type_t type,const std::string& name);
+	ref_t(mgr_t& mgr,class_type_t type,const std::string& name,int tag=0);
 	ref_t();
 	ref_t(const ref_t& copy);
 	~ref_t();
 	void set(mgr_t& mgr,class_type_t type,const std::string& name);
+	void set(mgr_t& mgr,class_type_t type,const std::string& name,int tag) {
+		set(mgr,type,name); set_tag(tag);
+	}
+	void set_tag(int tag) { this->tag = tag; }
+	int get_tag() const { return tag; }
 	bool is_set() const { return ok; }
 	const std::string& get_name() const;
 	class_type_t get_type() const;
 	void clear();
-	faction_t* faction();
-	resource_t* resource();
+	techtree_t& techtree();
+	faction_t& faction();
+	resource_t& resource();
 private:
 	friend class mgr_t::pimpl_t;
 	bool ok;
+	int tag;
 	mgr_t* mgr;
 	class_t* ptr;
 	class_type_t type;
@@ -80,6 +88,7 @@ typedef std::vector<ref_t> refs_t;
 
 inline std::ostream& operator<<(std::ostream& out,class_type_t type) {
 	switch(type) {
+	case TECHTREE: return out << "TECHTREE";
 	case FACTION: return out << "FACTION";
 	case UNIT_TYPE: return out << "UNIT_TYPE";
 	case RESOURCE: return out << "RESOURCE";

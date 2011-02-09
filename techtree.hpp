@@ -23,9 +23,11 @@ public:
 	~techtree_t();
 	const std::string path;
 	const strings_t& get_factions() const { return factions; }
-	faction_t* get_faction(const std::string& name);
+	size_t get_faction_count() const { return factions.size(); }
+	faction_t& get_faction(const std::string& name);
 	const strings_t& get_resources() const { return resources; }
-	resource_t* get_resource(const std::string& name);
+	size_t get_resource_count() const { return resources.size(); }
+	resource_t& get_resource(const std::string& name);
 	const strings_t& get_armour_types() const { return armour_types; }
 	const strings_t& get_attack_types() const { return attack_types; }
 	size_t attack_ID(const std::string& s) const;
@@ -52,6 +54,14 @@ public:
 private:
 	strings_t techtrees;
 };
+
+inline std::ostream& operator<<(std::ostream& out,const techtree_t& techtree) {
+	return out << "techtree<" << techtree.xml_loadable_t::name << '>';
+}
+
+inline std::ostream& operator<<(std::ostream& out,const techtree_t* techtree) {
+	return out << *techtree;
+}
 
 #endif //__TECHTREE_HPP__
 

@@ -15,7 +15,20 @@
 #include <vector>
 #include "memcheck.h"
 
-typedef std::vector<std::string> strings_t;
+struct tagged_string_t: public std::string {
+	tagged_string_t(): tag(-1) {}
+	tagged_string_t(const char* s): std::string(s), tag(-1) {}
+	tagged_string_t(const std::string& s): std::string(s), tag(-1) {}
+	tagged_string_t(const std::string& s,int t): std::string(s), tag(t) {}
+	int tag;
+};
+
+struct strings_t: public std::vector<tagged_string_t> {
+	using std::vector<tagged_string_t>::push_back;
+	void push_back(const std::string& s,int tag) {
+		push_back(tagged_string_t(s,tag));
+	}
+};
 
 template<typename T> class fixed_array_t {
 public:
@@ -34,6 +47,21 @@ private:
 	size_t len;
 	T* data;
 };
+
+template<typename T> int binary_search(const std::vector<T>& vec,const T& key) {
+	// painful that we write this ourselves; is it not standard somewhere?
+	int start = 0, end = vec.size();
+	while(start < end) {
+		const unsigned middle = (start + ((end - start) / 2));
+		if(vec[middle] == key)
+			return middle;
+		if(vec[middle] < key)
+			start = middle + 1;
+		else
+			end = middle;
+	}
+	return -1; // not found
+}
 
 float randf();
 
@@ -72,6 +100,12 @@ template<typename T> void fixed_array_t<T>::fill(const T& t) {
 	for(size_t i=0; i<capacity; i++)
 		data[i] = t;
 	len = capacity;
+}
+
+inline std::ostream& operator<<(std::ostream& out,const tagged_string_t& s) {
+	out << "tag<" << static_cast<const std::string&>(s);
+	if(s.tag != -1) out << ',' << s.tag;
+	return out << '>';
 }
 
 #endif //__UTILS_HPP__

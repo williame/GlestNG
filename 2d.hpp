@@ -19,6 +19,7 @@ struct vec2_t {
 	inline vec2_t& operator-=(const vec2_t& a);
 	inline vec2_t operator-(const vec2_t& a) const;
 	inline vec2_t operator-() const;
+	inline vec2_t operator*(short s) const;
 	inline int distance_sqrd(const vec2_t& v) const;
 	inline static void normalise(vec2_t& tl,vec2_t& br);
 };
@@ -71,6 +72,10 @@ inline vec2_t vec2_t::operator-(const vec2_t& a) const {
 	vec2_t ret = *this;
 	ret -= a;
 	return ret;
+}
+
+inline vec2_t vec2_t::operator*(short s) const {
+	return vec2_t(x*s,y*s);
 }
 
 inline int vec2_t::distance_sqrd(const vec2_t& v) const {

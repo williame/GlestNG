@@ -14,21 +14,6 @@
 #include "xml.hpp"
 #include "fs.hpp"
 
-template<typename T> int binary_search(const std::vector<T>& vec, int start, int end, const T& key)
-{ // http://en.wikibooks.org/wiki/Algorithm_Implementation/Search/Binary_search#C.2B.2B
-    // surely there is something standard somewhere?
-    if(start < 0) panic(start<<','<<end);
-    if(end > 1000) panic(start<<','<<end);
-    if(start >= end)
-    	    return -1; // not found
-    const unsigned middle = (start + ((end - start) / 2));
-    if(vec[middle] == key)
-    	    return middle;
-    if(vec[middle] < key)
-    	    return binary_search(vec, middle + 1, end, key);
-    return binary_search(vec, start, middle, key);
-}
-
 struct code_t {
 	enum { INVALID = -1 };
 	code_t(int c): code(c) {}
@@ -67,8 +52,7 @@ private:
 		};
 		std::vector<second_t> seconds;
 		int get(int code) const {
-			if(!seconds.size()) return 0;
-			const int idx = binary_search(seconds,0,seconds.size(),second_t(code,0));
+			const int idx = binary_search(seconds,second_t(code,0));
 			if(idx == -1) return 0;
 			return seconds[idx].amount;
 		}
@@ -144,15 +128,13 @@ const font_angel_t::glyph_t& font_angel_t::get(int code) const {
 		if(base[code-BASE_START].code == code_t::INVALID) return invalid;
 		return base[code-BASE_START];
 	}
-	if(!x_glyphs.size()) return invalid;
-	const int idx = binary_search(x_glyphs,0,x_glyphs.size(),glyph_t(code));
+	const int idx = binary_search(x_glyphs,glyph_t(code));
 	if(idx == -1) return invalid;
 	return x_glyphs[idx];
 }
 
 int font_angel_t::kerning(int first,int second) {
-	if(!kernings.size()) return 0;
-	const int idx = binary_search(kernings,0,kernings.size(),kerning_t(first));
+	const int idx = binary_search(kernings,kerning_t(first));
 	if(idx == -1) return 0;
 	return kernings[idx].get(second);
 }
