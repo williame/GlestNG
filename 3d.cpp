@@ -6,7 +6,7 @@
 */
 
 #include <math.h>
-#include <assert.h>
+
 #include <float.h>
 #include "memcheck.h"
 
@@ -14,6 +14,44 @@
 #include "3d.hpp"
 
 #define ANG2RAD 3.14159265358979323846/180.0
+
+matrix_t matrix_t::inverse() const {
+	matrix_t inv = *this; 
+	double negpos[2] = {0,0};
+	double temp = f[0] * f[5] * f[10];
+	negpos[temp > 0.] += temp; 
+	temp = f[1] * f[6] * f[8];
+	negpos[temp > 0.] += temp;
+	temp = f[2] * f[4] * f[9];
+	negpos[temp > 0.] += temp;
+	temp = -f[2] * f[5] * f[8]; 
+	negpos[temp > 0.] += temp;
+	temp = -f[1] * f[4] * f[10]; 
+	negpos[temp > 0.] += temp;
+	temp = -f[0] * f[6] * f[9]; 
+	negpos[temp > 0.] += temp;
+	double det_1 = negpos[0]+negpos[1];
+	if((det_1 == 0.) ||
+		(fabs(det_1 / (negpos[1] - negpos[0])) < (2. * 0.00000000000000001)))
+		data_error(this << " cannot be inverted");
+	det_1 = 1. / det_1;
+	inv.f[0] = (f[5]*f[10] - f[6]*f[9])*det_1; 
+	inv.f[1] = -(f[1]*f[10] - f[2]*f[9])*det_1;
+	inv.f[2] = (f[1]*f[6] - f[2]*f[5] )*det_1; 
+	inv.f[3] = 0.0; 
+	inv.f[4] = -(f[4]*f[10] - f[6]*f[8])*det_1; 
+	inv.f[5] = (f[0]*f[10] - f[2]*f[8])*det_1;
+	inv.f[6] = -(f[0]*f[6] - f[2]*f[4])*det_1; 
+	inv.f[7] = 0.0;
+	inv.f[8] = (f[4]*f[9] - f[5]*f[8] )*det_1; 
+	inv.f[9] = -(f[0]*f[9] - f[1]*f[8])*det_1; 
+	inv.f[10] = (f[0]*f[5] - f[1]*f[4])*det_1; 
+	inv.f[11] = 0.0;
+	inv.f[12] = -(f[12] * inv.f[0] + f[13] * inv.f[4] + f[14] * inv.f[8]); 
+	inv.f[13] = -(f[12] * inv.f[1] + f[13] * inv.f[5] + f[14] * inv.f[9]);
+	inv.f[14] = -(f[12] * inv.f[2] + f[13] * inv.f[6] + f[14] * inv.f[10]); 
+	return inv;
+}
 
 quat_t quat_t::slerp(const quat_t& d,float t) const {
 	if(t<=0) return *this;

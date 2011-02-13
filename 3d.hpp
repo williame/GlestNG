@@ -9,7 +9,7 @@
 #define __3D_HPP__
 
 #include <stddef.h>
-#include <assert.h>
+
 #include <iostream>
 #include "error.hpp"
 
@@ -20,6 +20,8 @@ struct matrix_t {
 	inline matrix_t operator*(const matrix_t& o) const;
 	inline matrix_t& operator*=(const matrix_t& o);
 	inline float operator()(int r,int c) const;
+	inline void invert();
+	matrix_t inverse() const;
 };
 
 struct quat_t {
@@ -63,6 +65,7 @@ struct vec_t {
 };
 
 struct ray_t { // a line segment
+	ray_t() {}
 	ray_t(const vec_t& o_,const vec_t& d_): o(o_), d(d_), ddot(d_.dot(d_)) {}
 	vec_t nearest(const vec_t& pt) const;
 	float nearest_inf(const vec_t& pt) const;
@@ -166,6 +169,10 @@ inline matrix_t matrix_t::operator*(const matrix_t& o) const {
 		f[12] * o.f[ 2] + f[13] * o.f[ 6] + f[14] * o.f[10] + f[15] * o.f[14],
 		f[12] * o.f[ 3] + f[13] * o.f[ 7] + f[14] * o.f[11] + f[15] * o.f[15] }};
 	return m;
+}
+
+inline void matrix_t::invert() {
+	*this = inverse();
 }
 
 inline matrix_t& matrix_t::operator*=(const matrix_t& o) {

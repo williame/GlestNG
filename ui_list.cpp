@@ -64,7 +64,7 @@ bool ui_list_t::offer(const SDL_Event& event) {
 		if(!r.contains(m)) return false;
 		m -= r.tl;
 		r.move(-r.tl);
-		const int selected = m.y / pimpl->line_spacing;
+		const size_t selected = m.y / pimpl->line_spacing;
 		if(selected >= pimpl->list.size()) return true;
 		if(pimpl->list[selected].tag & TAG_SEP) return true;
 		pimpl->selected = selected;

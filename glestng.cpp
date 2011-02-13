@@ -42,17 +42,18 @@ std::auto_ptr<techtree_t> techtree;
 std::auto_ptr<unit_type_t> unit_type;
 std::auto_ptr<model_g3d_t> model;
 
-void caret(const vec_t& pos,float scale,float rx,float ry,float rz) {
+void caret(const vec_t& pos,float scale,float rx,float ry,float rz,bool mark=false) {
 	glPushMatrix();		
 	glTranslatef(pos.x,pos.y,pos.z);
 	glScalef(scale,scale,scale);
 	if(rx) glRotatef(360.0/rx,1,0,0);
 	if(ry) glRotatef(360.0/ry,0,1,0);
 	if(rz) glRotatef(360.0/rz,0,0,1);
-	if(model.get()) {
+	if(!mark && model.get()) {
 		model->draw(0);
 	}
-	glColor4ub(0xff,0xff,0xff,0x15);
+	if(!mark)
+		glColor4ub(0xff,0xff,0xff,0x15);
 	glBegin(GL_QUADS);	
 	// classic NeHe	
 	// Front Face
@@ -149,9 +150,12 @@ typedef std::vector<test_t*> tests_t;
 tests_t objs;
 
 void ui() {
+	glColor3f(1,1,1);
 	if(selection) {
+		glDisable(GL_DEPTH_TEST);
 		glColor3f(1,0,0);
-		caret(selected_point,0.03,0,0,0);
+		caret(selected_point,0.03,0,0,0,true);
+		glEnable(GL_DEPTH_TEST);
 	}
 	static char fps[128];
 	snprintf(fps,sizeof(fps),"%u fps, %d visible objects (of %u)",(unsigned)framerate.per_second(now()),visible_objects,(unsigned)objs.size());
@@ -244,13 +248,17 @@ void click(int x,int y) {
 	double mv[16], p[16], a, b, c, d, e, f;
 	glGetDoublev(GL_MODELVIEW_MATRIX,mv);
 	glGetDoublev(GL_PROJECTION_MATRIX,p);
+	matrix_t _mv, _p;
+	glGetFloatv(GL_MODELVIEW_MATRIX,_mv.f);
+	glGetFloatv(GL_PROJECTION_MATRIX,_p.f);
+	const matrix_t inv = (_p*_mv).inverse();
 	GLint viewport[4];
 	glGetIntegerv(GL_VIEWPORT,viewport);
-	gluUnProject(x,viewport[3]-y,-1,mv,p,viewport,&a,&b,&c);
-	const vec_t origin(a,b,c);
+	gluUnProject(x,viewport[3]-y,0,mv,p,viewport,&a,&b,&c);
+	const vec_t origin(vec_t(a,b,c)*inv);
 	gluUnProject(x,viewport[3]-y,1,mv,p,viewport,&d,&e,&f);
-	const vec_t dir(d-a,e-b,f-c);
-	ray_t ray(origin,dir);
+	const vec_t dest(vec_t(d,e,f)*inv);
+	ray_t ray(origin,dest-origin);
 	world_t::hits_t hits;
 	world()->intersection(ray,~0,hits);
 	uint64_t ns = high_precision_time()-start;
@@ -399,7 +407,7 @@ int main(int argc,char** args) {
 
 		load(*fs);
 		
-		//terrain_t::gen_planet(5,500,3);
+		terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);
 	
 		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),
@@ -444,12 +452,21 @@ int main(int argc,char** args) {
 					continue;
 				switch (event.type) {
 				case SDL_MOUSEMOTION:
+					if(selection)
+						std::cout << "drag" << std::endl;
 					/*printf("Mouse moved by %d,%d to (%d,%d)\n", 
 					event.motion.xrel, event.motion.yrel,
 					event.motion.x, event.motion.y);*/
 					break;
 				case SDL_MOUSEBUTTONDOWN:
 					click(event.button.x,event.button.y);
+					if(selection)
+						std::cout << "selection: "<<selected_point<<std::endl;
+					break;
+				case SDL_MOUSEBUTTONUP:
+					if(selection)
+						std::cout << "selection stopped"<<std::endl;
+					selection = false;
 					break;
 				case SDL_KEYDOWN:
 					switch(event.key.keysym.sym) {

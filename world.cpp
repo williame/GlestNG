@@ -21,7 +21,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
-#include <assert.h>
+
 
 #include "world.hpp"
 #include "error.hpp"
@@ -46,7 +46,7 @@ class spatial_index_t: public bounds_t {
 	*/
 public:
 	spatial_index_t(const bounds_t& bounds);
-	void add(object_t* obj,bool keep_visible);
+	void add(object_t* obj);
 	void remove(object_t* obj,bool moving);
 	void move(object_t* obj,const bounds_t& prev);
 	void intersection(const ray_t& r,unsigned type,world_t::hits_t& hits) const;
@@ -54,6 +54,7 @@ public:
 	void dump(std::ostream& out) const;
 	void clear_frustum();
 	void check() const;
+	bool is_visible(const object_t& obj) const;
 private:
 	spatial_index_t(const bounds_t& bounds,spatial_index_t* parent);
 	spatial_index_t* const parent;
@@ -85,7 +86,7 @@ struct world_t::pimpl_t {
 	pimpl_t(): idx(bounds_t(vec_t(-1,-1,-1),vec_t(1,1,1))), has_frustum(false) {}
 	void add_visible(object_t* obj);
 	void adjust_visible(object_t* obj);
-	void remove_visible(object_t* obj,bool dying);
+	void remove_visible(object_t* obj);
 	spatial_index_t idx;
 	bool has_frustum;
 	frustum_t frustum;
@@ -126,6 +127,14 @@ void spatial_index_t::init_sub() {
 		}
 	}
 #endif
+}
+
+bool spatial_index_t::is_visible(const object_t& obj) const {
+	assert(ALL == obj.intersects(*this));
+	assert(this == obj.spatial_index);
+	return ((frustum_all & obj.straddles) ||
+		((frustum_some & obj.straddles) &&
+		world()->is_visible(obj)));
 }
 
 static std::ostream& indent(std::ostream& out,int depth) {
@@ -207,17 +216,12 @@ void spatial_index_t::check() const {
 	}
 }
 
-void spatial_index_t::add(object_t* obj,bool keep_visible) {
+void spatial_index_t::add(object_t* obj) {
 	if(ALL != obj->intersects(*this)) {
 		if(!parent)
 			panic(*obj << "(" << obj->centre << ") intersects " << *this << " = " << obj->intersects(*this))
-		parent->add(obj,keep_visible);
+		parent->add(obj);
 		return;
-	}
-	if(!keep_visible && obj->visible) {
-		panic("not expecting the object to be visible");
-	} else if(keep_visible && (obj->visible != !!world()->is_visible(*obj))) {
-		panic(obj << " is " << (world()->is_visible(*obj)?"":"not ") << "visible when it thinks it is" << (obj->visible?"":"n\'t"));
 	}
 	// would fit entirely inside a child?  delegate
 	obj->straddles = 0;
@@ -226,8 +230,7 @@ void spatial_index_t::add(object_t* obj,bool keep_visible) {
 		case ALL:
 			assert(!obj->straddles);
 			if(sub[i].sub) {
-				sub[i].sub->add(obj,keep_visible);
-				check();
+				sub[i].sub->add(obj);
 				return;
 			} else if(sub[i].items.size() == SPLIT) {
 				sub[i].sub = new spatial_index_t(sub[i].bounds,this);
@@ -244,21 +247,15 @@ void spatial_index_t::add(object_t* obj,bool keep_visible) {
 				}
 				// move the items into the sub-node
 				for(items_t::iterator j=sub[i].items.begin(); j!=sub[i].items.end(); j++)
-					sub[i].sub->add(j->obj,true);
+					sub[i].sub->add(j->obj);
 				sub[i].items.clear();
 				// add the new object
-				sub[i].sub->add(obj,keep_visible);
-				check();
+				sub[i].sub->add(obj);
 				return;
 			} else {
 				obj->straddles |= (1 << i);
 				sub[i].items.push_back(item_t(obj->straddles,obj->type,obj));
 				obj->spatial_index = this;
-				// is visible?
-				if(!keep_visible && ((frustum_all & (1<<i)) ||
-					((frustum_some & (1<<i)) && world()->is_visible(*obj))))
-					world()->pimpl->add_visible(obj);
-				check();
 				return;
 			}
 			panic("internal error if we get here");
@@ -276,11 +273,7 @@ void spatial_index_t::add(object_t* obj,bool keep_visible) {
 	items.push_back(item_t(obj->straddles,obj->type,obj));
 	obj->spatial_index = this;
 	straddlers |= obj->straddles;
-	// is visible?
-	if(!keep_visible && (((obj->straddles & frustum_all) == obj->straddles) ||
-		((obj->straddles & (frustum_all|frustum_some)) && world()->is_visible(*obj))))
-		world()->pimpl->add_visible(obj);
-	check();
+	
 }
 
 void spatial_index_t::remove(object_t* obj,bool moving) {
@@ -288,8 +281,6 @@ void spatial_index_t::remove(object_t* obj,bool moving) {
 	if(!moving && (ALL != obj->intersects(*this)))
 		panic(obj << " intersects " << *this << " = " << obj->intersects(*this))
 	assert(obj->straddles);
-	if(obj->visible)
-		world()->pimpl->remove_visible(obj,true);
 	items_t& items = (
 		popcnt(obj->straddles)>1? 
 		this->items:
@@ -299,7 +290,6 @@ void spatial_index_t::remove(object_t* obj,bool moving) {
 			assert(i->type == obj->type);
 			items.erase(i);
 			obj->spatial_index = NULL;
-			check();
 			return;
 		}
 	panic("object could not be found in the octree");
@@ -311,8 +301,7 @@ void spatial_index_t::move(object_t* obj,const bounds_t& prev) {
 	assert(ALL == prev.intersects(*this));
 	// optimise later
 	remove(obj,true);
-	add(obj,false);
-	check();
+	add(obj);
 }	
 
 void spatial_index_t::intersection(const ray_t& r,unsigned type,world_t::hits_t& hits) const {
@@ -368,7 +357,7 @@ void spatial_index_t::intersection(const frustum_t& f,unsigned type,world_t::hit
 	uint8_t s_all = 0, s_some = 0;
 	for(int i=0; i<8; i++)
 		switch(f.contains(sub[i].bounds)) {
-		case ALL:
+ 		case ALL:
 			s_all |= (1 << i);
 			if(sub[i].sub)
 				sub[i].sub->add_all(f.eye,type,hits,world_frustum);
@@ -447,9 +436,8 @@ void world_t::pimpl_t::adjust_visible(object_t* obj) {
 	//### adjust distance from eye
 }
 
-void world_t::pimpl_t::remove_visible(object_t* obj,bool dying) {
+void world_t::pimpl_t::remove_visible(object_t* obj) {
 	if(!obj->visible) panic(*obj<<" wasn\'t visible");
-	if(!dying && frustum.contains(*obj)) panic(*obj<<" is visible");
 	obj->visible = false;
 	for(size_t i=0; i<visible.size(); i++)
 		if(visible[i].obj == obj) {
@@ -470,13 +458,17 @@ world_t::world_t(): pimpl(new pimpl_t()) {}
 
 void world_t::add(object_t* obj) {
 	if(obj->spatial_index) panic(*obj<<" is already in world");
-	pimpl->idx.add(obj,false);
+	pimpl->idx.add(obj);
+	if(obj->spatial_index->is_visible(*obj))
+		pimpl->add_visible(obj);
 }
 
 void world_t::remove(object_t* obj) {
-	if(obj->spatial_index)
+	if(obj->spatial_index) {
 		obj->spatial_index->remove(obj,true);
-	else if(obj->visible) panic(*obj<<" is visible but not in spatial index");
+		if(obj->visible)
+			pimpl->remove_visible(obj);
+	} else if(obj->visible) panic(*obj<<" is visible but not in spatial index");
 }
 
 static bool cmp_hits_distance(const world_t::hit_t& a,const world_t::hit_t& b) {
@@ -592,29 +584,30 @@ void object_t::bounds_include(const vec_t& v) {
 }
 
 void object_t::bounds_fix() {
-	bounds.bounds_fix();
-	const bool in_world = spatial_index;
-	if(in_world)
-		world()->remove(this);
-	_do_set_pos(centre);
-	if(in_world)
-		world()->add(this);
-}
-
-void object_t::_do_set_pos(const vec_t& p) {
-	pos = p;
-	static_cast<bounds_t&>(*this) = bounds.centred(pos);
+	set_pos(get_pos());
 }
 
 void object_t::set_pos(const vec_t& absolute) {
 	if(spatial_index) {
 		const bounds_t prev(*this);
-		_do_set_pos(absolute);
+		const bool was_visible = visible;
+		bounds.bounds_fix();
+		pos = absolute;
+		static_cast<bounds_t&>(*this) = bounds.centred(pos);
 		spatial_index->move(this,prev);
+		if(was_visible != spatial_index->is_visible(*this)) {
+			if(was_visible)
+				world()->pimpl->remove_visible(this);
+			else
+				world()->pimpl->add_visible(this);
+		} else if(was_visible)
+			world()->pimpl->adjust_visible(this);
 	} else {
 		if(visible)
 			panic(this << " is visible but is not in world");
-		_do_set_pos(absolute);
+		bounds.bounds_fix();
+		pos = absolute;
+		static_cast<bounds_t&>(*this) = bounds.centred(pos);
 	}
 }
 

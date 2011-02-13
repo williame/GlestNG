@@ -6,11 +6,12 @@
 */
 
 #include <vector>
-#include <assert.h>
+
 #include <iostream>
 #include <algorithm>
 #include <math.h>
 
+#include "error.hpp"
 #include "ui.hpp"
 #include "font.hpp"
 #include "graphics.hpp"

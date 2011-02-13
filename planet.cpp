@@ -9,7 +9,7 @@
 #include <map>
 #include <algorithm>
 #include <math.h>
-#include <assert.h>
+
 #include <stdio.h>
 #include <inttypes.h>
 #include <limits.h>

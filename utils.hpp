@@ -10,10 +10,12 @@
 
 #include <ostream>
 #include <inttypes.h>
-#include <assert.h>
+
 #include <string>
 #include <vector>
 #include "memcheck.h"
+
+#include "error.hpp"
 
 struct tagged_string_t: public std::string {
 	tagged_string_t(): tag(-1) {}

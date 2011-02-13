@@ -25,6 +25,8 @@ public:
 	raise(SIGINT); \
 	throw panic; }
 	
+#define assert(expr) if(!(expr)) panic(#expr);
+	
 class data_error_t: public std::stringstream {
 public:
 	data_error_t(): std::stringstream("An error occurred: ",ios_base::out|ios_base::ate) {}
