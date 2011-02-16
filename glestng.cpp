@@ -102,10 +102,13 @@ struct test_t: public object_t {
 		r(128+(rand()%128)), g(128+(rand()%128)), b(128+(rand()%128)),
 		rx(randf()), ry(randf()), rz(randf()),
 		dir(randf(),randf(),randf()),
-		drawn(frame_count)
+		drawn(false)
 	{
-		bounds_include(vec_t(-SZ,-SZ,-SZ));
-		bounds_include(vec_t(SZ,SZ,SZ));
+		bounds_include(vec_t(0,0,0));
+		bounds_include(vec_t(SZ*2,SZ*2,SZ*2));
+		bounds_fix();
+		bounds_include(bounding_box().a);
+		bounds_include(bounding_box().b);
 		bounds_fix();
 		set_pos(vec_t(randf()-MARGIN,randf()-MARGIN,randf()-MARGIN));
 		world()->add(this);
@@ -122,14 +125,7 @@ struct test_t: public object_t {
 		return true;
 	}
 	void draw(float) {
-		drawn = frame_count;
-		//glColor3ub(r,g,b);
-		//caret(get_pos(),SZ,rx,ry,rz);
-	}
-	void draw_bad() {
-		drawn = frame_count;
-		glColor3ub(0xff,0,0);
-		caret(get_pos(),SZ,rx,ry,rz);
+		drawn = true;
 	}
 	bool refine_intersection(const ray_t&, vec_t& I) { 
 		I = centre;
@@ -139,7 +135,7 @@ struct test_t: public object_t {
 	const uint8_t r,g,b;
 	const float rx, ry, rz;
 	vec_t dir;
-	uint64_t drawn;
+	bool drawn;
 };
 const float test_t::SZ = 0.05, test_t::MARGIN = test_t::SZ*2, test_t::SPEED = 0.01;
 bounds_t test_t::legal(vec_t(-1.0+MARGIN,-1.0+MARGIN,-1.0+MARGIN),
@@ -157,7 +153,6 @@ void ui() {
 	}
 	// draw logo
 	{
-		static int logo_deg = 0;
 		glPushMatrix();
 		glDisable(GL_LIGHT1);
 		glColor3f(1,0,0);
@@ -186,18 +181,19 @@ void spatial_test() {
 		if(obj->is_visible()) {
 			if(!world()->is_visible(*obj))
 				std::cerr << *obj << " thinks it is visible but it isn't" << std::endl;
-			else if(obj->drawn != frame_count)
+			else if(!obj->drawn)
 				std::cerr << *obj << " thinks it is visible but wasn't drawn" << std::endl;
 			else
 				glColor3ub(0,0xff,0);
 		} else {
 			if(world()->is_visible(*obj))
 				std::cerr << *obj << " thinks it is invisible but it is" << std::endl;
-			else if(obj->drawn == frame_count)
+			else if(obj->drawn)
 				std::cerr << *obj << " is invisible but was drawn" << std::endl;
 			else
 				glColor3ub(0,0,0xff);
 		}
+		obj->drawn = false;
 		caret(obj->get_pos(),obj->SZ,obj->rx,obj->ry,obj->rz);
 		if(!obj->tick()) {
 			objs.erase(objs.begin()+i);
@@ -205,8 +201,6 @@ void spatial_test() {
 		}
 	}
 	glEnable(GL_TEXTURE_2D);
-//	if(bad)
-//		std::cerr << "("<<bad<<" objects were not drawn)" << std::endl;
 	if(!objs.size() < MIN_OBJS) {
 		const size_t n = MIN_OBJS+(rand()%(MAX_OBJS-MIN_OBJS));
 		while(objs.size()<n) {
@@ -216,7 +210,6 @@ void spatial_test() {
 }
 
 void tick() {
-	spatial_test();
 	world()->check();
 	frame_count++;
 	const world_t::hits_t& visible = world()->visible();
@@ -245,6 +238,7 @@ void tick() {
 		for(tests_t::iterator i=objs.begin(); i!=objs.end(); i++)
 			(*i)->draw(0);
 	}
+	spatial_test();
 	ui();
 	SDL_GL_SwapBuffers();
 	SDL_Flip(screen);
@@ -345,13 +339,9 @@ void load(fs_t& fs) {
 	// this is just some silly test code - find a random model
 	std::auto_ptr<techtrees_t> techtrees(new techtrees_t(fs));
 	const strings_t techtrees_ = techtrees->get_techtrees();
-	for(strings_t::const_iterator i=techtrees_.begin(); i!=techtrees_.end(); i++)
-		std::cout << "techtree "<<*i<<std::endl;
 	const std::string techtree_ = techtrees_[rand()%techtrees_.size()];
 	techtree.reset(new techtree_t(fs,techtree_));
 	const strings_t factions = techtree->get_factions();
-	for(strings_t::const_iterator i=factions.begin(); i!=factions.end(); i++)
-		std::cout << "faction "<<*i<<std::endl;
 	const std::string faction_ = factions[rand()%factions.size()];
 	faction_t& faction = techtree->get_faction(faction_);
 	const strings_t units = fs.list_dirs(faction.path+"/units");

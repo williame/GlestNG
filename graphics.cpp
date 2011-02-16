@@ -93,9 +93,9 @@ void graphics_t::load_texture_2D(GLuint texture,SDL_Surface* image) {
 	if(!texture)
 		graphics_error("texture handle not set");
 	if(image->w&(image->w-1))
-		graphics_error("image width "<<image->w<<" is not a power of 2");
+		std::cerr << "WARNING! image width "<<image->w<<" is not a power of 2" << std::endl;
 	if(image->h&(image->h-1))
-		graphics_error("image height "<<image->h<<" is not a power of 2");
+		std::cerr << "WARNING! image height "<<image->h<<" is not a power of 2" << std::endl;
         GLenum texture_format;
         switch(image->format->BytesPerPixel) {
         case 4:

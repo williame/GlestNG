@@ -85,12 +85,15 @@ enum intersection_t {
 	ALL,
 };
 
+class aabb_t;
+
 struct sphere_t {
 	sphere_t(const vec_t& c,float r): centre(c), radius(r) {}
 	vec_t centre;
 	float radius;
 	inline intersection_t intersects(const sphere_t& s) const;
 	bool intersects(const ray_t& r) const;
+	inline aabb_t bounding_box() const;
 };
 
 struct aabb_t { //axis-aligned bounding box
@@ -319,6 +322,11 @@ inline intersection_t sphere_t::intersects(const sphere_t& s) const {
 	return MISS;
 }
 
+inline aabb_t sphere_t::bounding_box() const {
+	const vec_t ofs(radius,radius,radius);
+	return aabb_t(centre-ofs,centre+ofs);
+}
+
 inline vec_t aabb_t::corner(int corner) const {
 	switch(corner) {
 	case 0: return a;
@@ -342,28 +350,31 @@ inline bounds_t bounds_t::operator+(const vec_t& pos) const {
 }
 
 inline std::ostream& operator<<(std::ostream& out,const vec_t& v) {
-	out << "vec_t<" << v.x << "," << v.y << "," << v.z << ">";
-	return out;
+	return out << "vec_t<" << v.x << "," << v.y << "," << v.z << ">";
 }
 
 inline std::ostream& operator<<(std::ostream& out,const ray_t& r) {
-	out << "ray_t<" << r.o << "," << r.d << ">";
-	return out;
+	return out << "ray_t<" << r.o << "," << r.d << ">";
 }
 
 inline std::ostream& operator<<(std::ostream& out,const sphere_t& s) {
-	out << "sphere_t<" << s.centre << "," << s.radius << ">";
-	return out;
+	return out << "sphere_t<" << s.centre << "," << s.radius << ">";
 }
 
 inline std::ostream& operator<<(std::ostream& out,const aabb_t& a) {
-	out << "aabb_t<" << a.a << "," << a.b << ">";
-	return out;
+	return out << "aabb_t<" << a.a << "," << a.b << ">";
+}
+
+inline std::ostream& operator<<(std::ostream& out,const aabb_t* a) {
+	return out << *a;
 }
 
 inline std::ostream& operator<<(std::ostream& out,const bounds_t& a) {
-	out << "bounds_t<" << static_cast<const aabb_t&>(a) << "," << static_cast<const sphere_t&>(a) << ">";
-	return out;
+	return out << "bounds_t<" << static_cast<const aabb_t&>(a) << "," << static_cast<const sphere_t&>(a) << ">";
+}
+
+inline std::ostream& operator<<(std::ostream& out,const bounds_t* a) {
+	return out << *a;
 }
 
 inline std::ostream& operator<<(std::ostream& out,intersection_t i) {
@@ -374,8 +385,7 @@ inline std::ostream& operator<<(std::ostream& out,intersection_t i) {
 	case MISS: out << "MISS"; break;
 	default: out << (int)i << "!";
 	}
-	out << ">";
-	return out;
+	return out << ">";
 }
 
 #endif //__3D_HPP__

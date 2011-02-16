@@ -18,7 +18,7 @@ faction_t::faction_t(techtree_t& techtree,const  std::string& name):
 		if(!units.size())
 			data_error("faction "<<name<<" contains no units");
 	}
-	{
+	if(fs().exists(path+"/upgrades")) {
 		const strings_t subdirs = fs().list_dirs(path+"/upgrades");
 		for(strings_t::const_iterator i=subdirs.begin(); i!=subdirs.end(); i++)
 			if(fs().exists(path+"/upgrades/"+*i+"/"+*i+".xml"))

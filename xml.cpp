@@ -126,7 +126,7 @@ xml_parser_t::xml_parser_t(const char* t,const char* xml): // copies data into i
 	
 xml_parser_t::xml_parser_t(const char* t,istream_t& in):
 	title(strdup(t)),
-	buf(in.read_allz()),
+	buf(strdup(in.read_all().c_str())),
 	doc(NULL) {}
 	
 void xml_parser_t::parse() {

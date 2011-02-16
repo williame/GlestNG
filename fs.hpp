@@ -36,7 +36,7 @@ public:
 	static istream_t* open_file(const char* filename);
 	virtual void read(void* dest,size_t bytes) = 0;
 	template<int N> std::string fixed_str();
-	virtual char* read_allz() = 0;
+	virtual std::string read_all() = 0;
 	virtual std::ostream& repr(std::ostream& out) const = 0;
 	fs_file_t& file() { return _file; }
 	const fs_file_t& file() const { return _file; }

@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <iostream>
+#include <map>
 
 #include "fs.hpp"
 #include "error.hpp"
@@ -24,7 +26,7 @@ public:
 	const char* path() const { return filename.c_str(); }
 	void read(void* dest,size_t bytes);
 	void write(const void* src,size_t bytes);
-	char* read_allz();
+	std::string read_all();
 	std::ostream& repr(std::ostream& out) const;
 private:
 	const std::string filename;
@@ -43,7 +45,7 @@ FILE_stream_t::~FILE_stream_t() {
 	fclose(f);
 }
 
-char* FILE_stream_t::read_allz() {
+std::string FILE_stream_t::read_all() {
 	std::string ret;
 	bool done = false;
 	for(;;) {
@@ -60,7 +62,7 @@ char* FILE_stream_t::read_allz() {
 		if(bytes < sizeof(buf)-1)
 			break;
 	}
-	return strdup(ret.c_str());
+	return ret;
 }
 
 void FILE_stream_t::read(void* dest,size_t bytes) {
@@ -103,21 +105,60 @@ private:
 	char* p;
 };
 
-
 struct fs_t::pimpl_t {
 	pimpl_t(const std::string& dd): data_directory(dd) {}
 	const std::string data_directory;
+	typedef std::map<std::string,std::string> resolve_t;
+	resolve_t resolved;
+	std::string resolve(const std::string& path);
 };
 
 static bool _starts_with(const std::string& str,const std::string& sub) {
 	return (str.find(sub)==0);
 }
 
+static std::string _path_tok(const std::string& path,size_t start) {
+	size_t end = start;
+	bool term = false;
+	for(; end<path.size() && !term; end++)
+		term = ((path[end]=='/')||(path[end]=='\\'));
+	if(term)
+		return std::string(path,start,end-start-1)+'/'; // standard terminator
+	return std::string(path,start,end-start);
+}
+
+std::string fs_t::pimpl_t::resolve(const std::string& path) {
+	if(!_starts_with(path,data_directory))
+		panic("expecting "<<path<<" to be in "<<data_directory);
+	resolve_t::iterator i=resolved.find(path);
+	data_error(path << " does not exist!");
+}
+
 std::string fs_t::canocial(const std::string& path) const {
-	//### tidy up and .. and check its not breaking root
+	std::string src, cano;
 	if(_starts_with(path,pimpl->data_directory))
-		return path;
-	return pimpl->data_directory+'/'+path;
+		src = std::string(path,pimpl->data_directory.size());
+	else
+		src = path;
+	// tidy up and .. and check its not breaking root
+	size_t start = 0;
+	std::vector<size_t> parts;
+	while(true) {
+		std::string part = _path_tok(src,start);
+		start += part.size();
+		if(part == "") break;
+		if(part == "/") {
+			std::cerr << "in "<<path<<", skipping /" << std::endl;
+			continue;
+		} else if(part == "../") {
+			//### find a test case and we can support it
+			data_error(".. not supported in "<<path);
+		} else if(part[0] == '.')
+			data_error("it is not policy to support hidden files in "<<path);
+		parts.push_back(start-part.size()); 
+		cano += part;
+	}
+	return pimpl->data_directory+cano;
 }
 
 static bool _stat(const char* path,struct stat& s) {
@@ -207,7 +248,16 @@ fs_t::fs_t(const std::string& data_directory): pimpl(new pimpl_t(data_directory)
 
 fs_t::~fs_t() { delete pimpl; }
 
-fs_t* fs_t::create(const std::string& data_directory) {
+fs_t* fs_t::create(const std::string& dd) {
+	std::string data_directory;
+	if(!dd.size())
+		data_directory = ".";
+	else if((dd[dd.size()-1] == '/') || (dd[dd.size()-1] == '\\'))
+		data_directory = std::string(dd,0,dd.size()-1);
+	else
+		data_directory = dd;
+	data_directory += '/';
+	if(!_is_dir(data_directory.c_str())) data_error(dd << " is not a directory");
 	return new fs_t(data_directory);
 }
 
