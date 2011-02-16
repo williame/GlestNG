@@ -8,6 +8,18 @@
 #ifndef __UTILS_HPP__
 #define __UTILS_HPP__
 
+// ensure that NDEBUG is set when including <algorithm>, else sorts will test
+// symmetry of comparators for every single swap 
+#ifndef NDEBUG
+//##	#define _GLESTNG_NDEBUG
+//##	#define NDEBUG
+#endif
+#include <algorithm>
+#ifdef _GLESTNG_NDEBUG
+	#undef _GLESTNG_NDEBUG
+	#undef NDEBUG
+#endif
+
 #include <ostream>
 #include <inttypes.h>
 
@@ -27,8 +39,11 @@ struct tagged_string_t: public std::string {
 
 struct strings_t: public std::vector<tagged_string_t> {
 	using std::vector<tagged_string_t>::push_back;
-	void push_back(const std::string& s,int tag) {
+	inline void push_back(const std::string& s,int tag) {
 		push_back(tagged_string_t(s,tag));
+	}
+	inline bool contains(const std::string& s) const {
+		return end() != std::find(begin(),end(),s);
 	}
 };
 

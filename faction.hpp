@@ -15,13 +15,16 @@ public:
 	faction_t(techtree_t& techtree,const std::string& name);
 	const std::string path;
 	std::string get_xml_path() const;
-	const strings_t& get_units() const { return units; }
-	const strings_t& get_upgrades() const { return upgrades; }
+	const strings_t& get_units() const { return unit_names; }
+	const strings_t& get_upgrades() const { return upgrade_names; }
 private:
 	~faction_t();
 	void reset();
 	void _load_xml(xml_parser_t::walker_t& xml);
-	strings_t units, upgrades;
+	refs_t starting_resources, starting_units;
+	strings_t unit_names, upgrade_names;
+	refs_t units, upgrades;
+	ref_t loading_screen, music;
 };
 
 #endif //__FACTION_HPP__

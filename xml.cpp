@@ -309,6 +309,7 @@ void xml_parser_t::walker_t::get_key(const char* key) {
 			tok->visit = true;
 			return;
 		}
+	tok->set_error("has no key called %s",key);
 	data_error(key << " not found in " << tok->str() << " tag");
 }
 
@@ -402,6 +403,13 @@ int xml_parser_t::walker_t::value_int(const char* key) {
 		tok->set_error(de->str().c_str());
 		throw;
 	}
+}
+
+bool xml_parser_t::walker_t::value_bool(const char* key) {
+	const std::string value = value_string(key);
+	if(value == "true") return true;
+	if(value == "false") return false;
+	data_error(key<<" is not boolean: "<<value);
 }
 
 std::string xml_parser_t::walker_t::get_data_as_string() {
@@ -544,13 +552,21 @@ bool xml_loadable_t::load_xml(xml_parser_t* parser) {
 	inited = false;
 	delete xml;
 	xml = parser;
+	try { // ensure it parses - is well formed xml
+		xml->parse();
+	} catch(data_error_t* de) {
+		std::cerr<<"error parsing "<<name<<": "<<de<<std::endl;
+		return false;
+	}
+	xml_parser_t::walker_t walker = xml->walker();
 	try {
-		xml_parser_t::walker_t walker = xml->walker();
 		_load_xml(walker); // subclasses
 		inited = true;
 		return true;
 	} catch(data_error_t* de) {
 		std::cerr<<"error parsing "<<name<<": "<<de<<std::endl;
+		if(walker.tok && !walker.tok->error)
+			walker.tok->set_error(de->str().c_str());
 		return false;
 	}
 }

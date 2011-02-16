@@ -5,18 +5,6 @@
  (c) William Edwards, 2011; all rights reserved
 */
 
-// ensure that NDEBUG is set when including <algorithm>, else sorts will test
-// symmetry of comparators for every single swap 
-#ifndef NDEBUG
-//##	#define _GLESTNG_NDEBUG
-//##	#define NDEBUG
-#endif
-#include <algorithm>
-#ifdef _GLESTNG_NDEBUG
-	#undef _GLESTNG_NDEBUG
-	#undef NDEBUG
-#endif
-
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -25,6 +13,7 @@
 
 #include "world.hpp"
 #include "error.hpp"
+#include "utils.hpp"
 
 #define popcnt(u) __builtin_popcount(u)
 #define ffs(u) __builtin_ffs(u)

@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "utils.hpp"
 #include "error.hpp"
 #include "fs.hpp"
 
@@ -22,6 +23,8 @@ enum class_type_t {
 	IMAGE,
 	MODEL,
 	PARTICLE,
+	UPGRADE,
+	AUDIO,
 };
 
 class techtree_t;
@@ -86,7 +89,21 @@ private:
 	class_t* get();
 };
 
-typedef std::vector<ref_t> refs_t;
+struct refs_t: public std::vector<ref_t> {
+	using std::vector<ref_t>::push_back;
+	inline void push_back(mgr_t& mgr,class_type_t type,const std::string& name) {
+		push_back(ref_t(mgr,type,name));
+	}
+	inline void push_back(mgr_t& mgr,class_type_t type,const std::string& name,int tag) {
+		push_back(ref_t(mgr,type,name,tag));
+	}
+	inline bool contains(class_type_t type,const std::string& name) const {
+		for(const_iterator i=begin(); i!=end(); i++)
+			if(i->is_set() && (i->get_name()==name))
+				return i->get_type() == type;
+		return false;
+	}
+};
 
 inline std::ostream& operator<<(std::ostream& out,class_type_t type) {
 	switch(type) {
@@ -97,6 +114,8 @@ inline std::ostream& operator<<(std::ostream& out,class_type_t type) {
 	case IMAGE: return out << "IMAGE";
 	case MODEL: return out << "MODEL";
 	case PARTICLE: return out << "PARTICLE";
+	case UPGRADE: return out << "UPGRADE";
+	case AUDIO: return out << "AUDIO";
 	default: return out << "class_type<"<<(int)type<<'>';
 	}
 }

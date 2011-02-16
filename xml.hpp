@@ -12,6 +12,7 @@
 #include <string>
 
 class istream_t;
+class xml_loadable_t;
 
 class xml_parser_t {
 public:
@@ -45,6 +46,7 @@ public:
 		float value_float(const char* key = "value");
 		std::string value_string(const char* key = "value");
 		int value_int(const char* key = "value");
+		bool value_bool(const char* key = "value");
 		std::string get_data_as_string();
 		// query current node
 		type_t type() const;
@@ -54,6 +56,7 @@ public:
 		const char* error_str() const;
 		bool visited() const;
 		friend class xml_parser_t;
+		friend class xml_loadable_t;
 	private:
 		walker_t(xml_parser_t& parser,const token_t* tok);
 		xml_parser_t& parser;
