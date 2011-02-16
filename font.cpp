@@ -77,10 +77,10 @@ font_angel_t::font_angel_t(const std::string& filename) {
 	baseline = xml.value_int("base");
 	texture_size = vec2_t(xml.value_int("scaleW"),xml.value_int("scaleH"));
 	if(xml.value_int("pages") != 1) data_error("font "<<*data_file<<" isn\'t only one page: "<<xml.value_int("pages"));
-	xml.up().get_child("pages").get_child("page");
+	xml.get_peer("pages").get_child("page");
 	fs_file_t::ptr_t tex_handle(fs->get(xml.value_string("file")));
 	texture = graphics()->alloc_texture(*tex_handle);
-	xml.up().up().get_child("chars").get_child("char");
+	xml.up().get_peer("chars").get_child("char");
 	memset(&invalid,0,sizeof(invalid));
 	for(size_t i=0; xml.up().get_child("char",i); i++) {
 		const int code = xml.value_int("id");

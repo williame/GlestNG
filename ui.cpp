@@ -59,7 +59,7 @@ const ui_component_t::colour_t ui_component_t::col[ui_component_t::NUM_COLOURS] 
 
 ui_component_t::ui_component_t(unsigned f,ui_component_t* p):
 	mgr(*ui_mgr()), flags(f), r(0,0,0,0),
-	visible(1.0,f&FADE_VISIBLE?500:0,!(f&FADE_VISIBLE)),
+	visible(1.0,f&FADE_VISIBLE?DEFAULT_FADE:0,!(f&FADE_VISIBLE)),
 	parent(p), first_child(NULL), next_peer(NULL) {
 	if(parent)
 		parent->add_child(this);

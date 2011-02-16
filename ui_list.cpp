@@ -17,7 +17,7 @@ struct ui_list_t::pimpl_t: public ui_cancel_button_t::handler_t {
 		ui(ui_), handler(NULL),
 		title(t),list(l),
 		line_spacing(line_height()+margin().y*2),
-		enabled(0.5,2000,true),
+		enabled(0.5,DEFAULT_FADE,true),
 		selected(NO_SELECTION),
 		cancel(NULL) {
 		w = fonts()->get(fonts_t::UI_TITLE)->measure(title).x;

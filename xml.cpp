@@ -313,10 +313,24 @@ void xml_parser_t::walker_t::get_key(const char* key) {
 	data_error(key << " not found in " << tok->str() << " tag");
 }
 
+bool xml_parser_t::walker_t::has_key(const char* key) {
+	get_tag();
+	for(token_t* child = tok->first_child; child; child = child->next_peer)
+		if((KEY == child->type) && child->equals(key)) {
+			child->visit = true;
+			return true;
+		}
+	return false;
+}
+
 xml_parser_t::walker_t& xml_parser_t::walker_t::get_child(const char* tag) {
 	if(get_child(tag,0)) return *this;
 	tok->set_error("has no child tag called %s",tag);
 	data_error(tok->str()<<" tag has no child tag called "<<tag);
+}
+
+xml_parser_t::walker_t& xml_parser_t::walker_t::get_peer(const char* tag) {
+	return up().get_child(tag);
 }
 
 bool xml_parser_t::walker_t::get_child(const char* tag,size_t i) {

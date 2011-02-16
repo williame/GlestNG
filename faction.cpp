@@ -57,7 +57,7 @@ void faction_t::_load_xml(xml_parser_t::walker_t& xml) {
 		starting_resources.push_back(mgr.techtree(),RESOURCE,
 			name,xml.value_int("amount"));
 	}
-	xml.up().get_child("starting-units");
+	xml.get_peer("starting-units");
 	for(size_t i=0; xml.get_child("unit",i); xml.up(), i++) {
 		const std::string name(xml.value_string("name"));
 		if(!units.contains(UNIT_TYPE,name))

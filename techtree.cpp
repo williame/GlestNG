@@ -51,17 +51,17 @@ void techtree_t::_load_xml(xml_parser_t::walker_t& xml) {
 	reset();
 	xml.check("tech-tree");
 	description = xml.get_child("description").value_string();
-	xml.up().get_child("attack-types");
+	xml.get_peer("attack-types");
 	while(xml.get_child("attack-type",attack_types.size())) {
 		attack_types.push_back(xml.value_string("name"));
 		xml.up();
 	}
-	xml.up().get_child("armor-types");
+	xml.get_peer("armor-types");
 	while(xml.get_child("armor-type",armour_types.size())) {
 		armour_types.push_back(xml.value_string("name"));
 		xml.up();
 	}
-	xml.up().get_child("damage-multipliers");
+	xml.get_peer("damage-multipliers");
 	std::vector<bool> set(attack_types.size()*armour_types.size(),false);
 	damage_multipliers = std::vector<float>(attack_types.size()*armour_types.size(),1);
 	for(size_t dm = 0; xml.get_child("damage-multiplier",dm); dm++) {

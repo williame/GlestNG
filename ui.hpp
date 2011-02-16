@@ -35,6 +35,9 @@ public:
 		CANCEL_BUTTON =	0x00000100,
 		DESTROYED = 	0x01000000,
 	};
+	enum {
+		DEFAULT_FADE = 300, // milliseconds
+	};
 	inline const rect_t& rect() const { return r; } 
 	rect_t get_rect() const { return r; }
 	vec2_t get_size() const { return r.size(); }

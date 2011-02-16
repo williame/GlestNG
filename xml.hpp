@@ -39,10 +39,12 @@ public:
 		// navigation API; preferred way of extracting things
 		void check(const char* tag);
 		walker_t& get_child(const char* tag);
+		walker_t& get_peer(const char* tag);
 		bool has_child(const char* tag);
 		bool get_child(const char* tag,size_t i);
 		walker_t& up();
 		// extract attributes
+		bool has_key(const char* key = "value");
 		float value_float(const char* key = "value");
 		std::string value_string(const char* key = "value");
 		int value_int(const char* key = "value");

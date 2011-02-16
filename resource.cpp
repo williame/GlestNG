@@ -25,7 +25,7 @@ void resource_t::reset() {
 void resource_t::_load_xml(xml_parser_t::walker_t& xml) {
 	xml.check("resource");
 	_image.set(mgr,IMAGE,fs().join(path,xml.get_child("image").value_string("path")));
-	const std::string type = xml.up().get_child("type").value_string();
+	const std::string type = xml.get_peer("type").value_string();
 	if(type=="consumable") {
 		_resource_type = CONSUMABLE;
 		_interval = xml.get_child("interval").value_int();
