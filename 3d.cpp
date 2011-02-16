@@ -368,7 +368,37 @@ intersection_t frustum_t::contains(const sphere_t& sphere) const {
 }
 
 intersection_t frustum_t::contains(const aabb_t& box) const {
-	intersection_t result = ALL;
+/*
+int FrustumG::boxInFrustum(Box &b) {
+	int result = INSIDE, out,in;
+
+	// for each plane do ...
+	for(int i=0; i < 6; i++) {
+
+		// reset counters for corners in and out
+		out=0;in=0;
+		// for each corner of the box do ...
+		// get out of the cycle as soon as a box as corners
+		// both inside and out of the frustum
+		for (int k = 0; k < 8 && (in==0 || out==0); k++) {
+		
+			// is the corner outside or inside
+			if (pl[i].distance(b.getVertex(k)) < 0)
+				out++;
+			else
+				in++;
+		}
+		//if all corners are out
+		if (!in)
+			return (OUTSIDE);
+		// if some corners are out and others are in	
+		else if (out)
+			result = INTERSECT;
+	}
+	return(result);
+
+ }
+*/	intersection_t result = ALL;
 	for(int i=0; i < 6; i++) {
 		if (pl[i].distance(box.p(pl[i].normal)) < 0)
 			return MISS;

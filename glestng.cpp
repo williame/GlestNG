@@ -40,7 +40,7 @@ int visible_objects = 0;
 
 std::auto_ptr<techtree_t> techtree;
 std::auto_ptr<unit_type_t> unit_type;
-std::auto_ptr<model_g3d_t> model;
+std::auto_ptr<model_g3d_t> model, logo;
 
 void caret(const vec_t& pos,float scale,float rx,float ry,float rz,bool mark=false) {
 	glPushMatrix();		
@@ -156,6 +156,20 @@ void ui() {
 		glColor3f(1,0,0);
 		caret(selected_point,0.03,0,0,0,true);
 		glEnable(GL_DEPTH_TEST);
+	}
+	// draw logo
+	{
+		static int logo_deg = 0;
+		glPushMatrix();
+		glDisable(GL_LIGHT1);
+		glColor3f(1,0,0);
+		const bounds_t& b = logo->get_bounds();
+		glTranslatef(-b.centre.x,-b.centre.y,b.centre.z);
+		glTranslatef(-1.2,0,0);
+		glRotatef(90,0,1,0);
+		logo->draw(0);
+		glEnable(GL_LIGHT1);
+		glPopMatrix();
 	}
 	static char fps[128];
 	snprintf(fps,sizeof(fps),"%u fps, %d visible objects (of %u)",(unsigned)framerate.per_second(now()),visible_objects,(unsigned)objs.size());
@@ -354,6 +368,10 @@ void load(fs_t& fs) {
 			break;
 		}
 	if(!g3d.size()) data_error("no G3D models in "<<unit<<"/models");
+	std::cout << "loading "<<g3d<<std::endl;
+	fs_file_t::ptr_t g3d_file(fs.get(g3d));
+	istream_t::ptr_t gstream(g3d_file->reader());
+	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*gstream));
 	// and load it
 	std::cout << "loading "<<xml_name<<std::endl;
 	fs_file_t::ptr_t xml_file(fs.get(xml_name));
@@ -361,10 +379,6 @@ void load(fs_t& fs) {
 	unit_type = std::auto_ptr<unit_type_t>(new unit_type_t(faction,unit_));
 	unit_type->load_xml(*xstream);
 	//new ui_xml_editor_t(*unit_type);
-	std::cout << "loading "<<g3d<<std::endl;
-	fs_file_t::ptr_t g3d_file(fs.get(g3d));
-	istream_t::ptr_t gstream(g3d_file->reader());
-	model = std::auto_ptr<model_g3d_t>(new model_g3d_t(*gstream));
 }
 
 int main(int argc,char** args) {
@@ -404,6 +418,12 @@ int main(int argc,char** args) {
 		std::auto_ptr<fs_t> fs(fs_t::create("data/Glest"));
 		std::auto_ptr<ui_mgr_t> ui_(ui_mgr());
 		std::auto_ptr<mod_ui_t> mod_ui(mod_ui_t::create());
+		std::auto_ptr<fs_t> sys_fs(fs_t::create("data/"));
+		{
+			fs_file_t::ptr_t logo_file(sys_fs->get("logo.g3d"));
+			istream_t::ptr_t logostream(logo_file->reader());
+			logo = std::auto_ptr<model_g3d_t>(new model_g3d_t(*logostream));
+		}
 
 		load(*fs);
 		
