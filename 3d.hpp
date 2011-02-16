@@ -326,7 +326,7 @@ inline vec_t aabb_t::corner(int corner) const {
 	case 2: return vec_t(a.x,b.y,b.z);
 	case 3: return vec_t(a.x,b.y,a.z);
 	case 4: return vec_t(b.x,a.y,a.z);
-	case 5: return vec_t(b.x,b.y,b.z);
+	case 5: return vec_t(b.x,a.y,b.z);
 	case 6: return b;
 	case 7: return vec_t(b.x,b.y,a.z);
 	default: panic("bad index "<<corner);

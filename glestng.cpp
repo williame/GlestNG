@@ -42,58 +42,56 @@ std::auto_ptr<techtree_t> techtree;
 std::auto_ptr<unit_type_t> unit_type;
 std::auto_ptr<model_g3d_t> model, logo;
 
-void caret(const vec_t& pos,float scale,float rx,float ry,float rz,bool mark=false) {
+static void _draw_quad(const vec_t& a,const vec_t& b,const vec_t& c,const vec_t& d) {
+	glVertex3f(a.x,a.y,a.z);
+	glVertex3f(b.x,b.y,b.z);
+	glVertex3f(c.x,c.y,c.z);
+	glVertex3f(d.x,d.y,d.z);
+}
+
+static void draw_cube(const aabb_t& box) {
+	vec_t c[8];
+	for(int i=0; i<8; i++)
+		c[i] = box.corner(i);
+	glBegin(GL_QUADS);
+	// left
+	glNormal3f(-1,0,0);
+	_draw_quad(c[0],c[1],c[2],c[3]);
+	// right
+	glNormal3f(1,0,0);
+	_draw_quad(c[4],c[5],c[6],c[7]);
+	// front
+	glNormal3f(0,0,0);
+	_draw_quad(c[0],c[4],c[7],c[3]);
+	// back
+	glNormal3f(0,0,-1);
+	_draw_quad(c[1],c[5],c[6],c[2]);
+	// up
+	glNormal3f(0,0,0);
+	_draw_quad(c[0],c[1],c[5],c[3]);
+	// down
+	glNormal3f(0,-1,0);
+	_draw_quad(c[3],c[2],c[6],c[7]);
+	glEnd();
+}
+
+static void caret(const vec_t& pos,float scale,float rx,float ry,float rz,bool mark=false) {
 	glPushMatrix();		
 	glTranslatef(pos.x,pos.y,pos.z);
 	glScalef(scale,scale,scale);
 	if(rx) glRotatef(360.0/rx,1,0,0);
 	if(ry) glRotatef(360.0/ry,0,1,0);
 	if(rz) glRotatef(360.0/rz,0,0,1);
+	bounds_t box(vec_t(-1,-1,-1),vec_t(1,1,1));
 	if(!mark && model.get()) {
 		model->draw(0);
+		box = model->get_bounds();
 	}
 	if(!mark)
 		glColor4ub(0xff,0xff,0xff,0x15);
-	glBegin(GL_QUADS);	
-	// classic NeHe	
-	// Front Face
-	glNormal3f( 0.0f, 0.0f, 1.0f); // Normal Pointing Towards Viewer
-	glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 1 (Front)
-	glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 2 (Front)
-	glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Front)
-	glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 4 (Front)
-	// Back Face
-	glNormal3f( 0.0f, 0.0f,-1.0f); // Normal Pointing Away From Viewer
-	glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Back)
-	glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 2 (Back)
-	glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 3 (Back)
-	glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 4 (Back)
-	// Top Face
-	glNormal3f( 0.0f, 1.0f, 0.0f); // Normal Pointing Up
-	glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 1 (Top)
-	glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 2 (Top)
-	glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Top)
-	glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 4 (Top)
-	// Bottom Face
-	glNormal3f( 0.0f,-1.0f, 0.0f); // Normal Pointing Down
-	glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Bottom)
-	glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 2 (Bottom)
-	glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 3 (Bottom)
-	glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 4 (Bottom)
-	// Right face
-	glNormal3f( 1.0f, 0.0f, 0.0f); // Normal Pointing Right
-	glVertex3f( 1.0f, -1.0f, -1.0f);	// Point 1 (Right)
-	glVertex3f( 1.0f,  1.0f, -1.0f);	// Point 2 (Right)
-	glVertex3f( 1.0f,  1.0f,  1.0f);	// Point 3 (Right)
-	glVertex3f( 1.0f, -1.0f,  1.0f);	// Point 4 (Right)
-	// Left Face
-	glNormal3f(-1.0f, 0.0f, 0.0f); // Normal Pointing Left
-	glVertex3f(-1.0f, -1.0f, -1.0f);	// Point 1 (Left)
-	glVertex3f(-1.0f, -1.0f,  1.0f);	// Point 2 (Left)
-	glVertex3f(-1.0f,  1.0f,  1.0f);	// Point 3 (Left)
-	glVertex3f(-1.0f,  1.0f, -1.0f);	// Point 4 (Left)
-	glEnd();	
+	draw_cube(box);
 	glPopMatrix();
+	return;
 }
 
 struct test_t: public object_t {
@@ -427,7 +425,7 @@ int main(int argc,char** args) {
 
 		load(*fs);
 		
-		terrain_t::gen_planet(5,500,3);
+		//terrain_t::gen_planet(5,500,3);
 		//world()->dump(std::cout);
 	
 		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),
