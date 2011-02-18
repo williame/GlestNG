@@ -15,3 +15,10 @@
 float randf() {
 	return (float)rand()/RAND_MAX;
 }
+
+bool starts_with(const char* str,const char* pre) {
+	while(*pre)
+		if(*pre++!=*str++) return false;
+	return true;
+}
+

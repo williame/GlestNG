@@ -37,7 +37,7 @@ public:
 		bool next();
 		bool ok() const { return tok; }
 		// navigation API; preferred way of extracting things
-		void check(const char* tag);
+		walker_t& check(const char* tag);
 		walker_t& get_child(const char* tag);
 		walker_t& get_peer(const char* tag);
 		bool has_child(const char* tag);

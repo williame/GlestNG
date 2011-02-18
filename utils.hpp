@@ -29,11 +29,14 @@
 
 #include "error.hpp"
 
+bool starts_with(const char* str,const char* pre);
+
 struct tagged_string_t: public std::string {
 	tagged_string_t(): tag(-1) {}
 	tagged_string_t(const char* s): std::string(s), tag(-1) {}
 	tagged_string_t(const std::string& s): std::string(s), tag(-1) {}
 	tagged_string_t(const std::string& s,int t): std::string(s), tag(t) {}
+	bool starts_with(const std::string& s) const { return ::starts_with(c_str(),s.c_str()); }
 	int tag;
 };
 
@@ -64,6 +67,16 @@ private:
 	size_t len;
 	T* data;
 };
+
+template<typename T> std::string fmtbin(T val,int digits = sizeof(T)*8) {
+	enum { BITS = sizeof(T)*8+1 };
+	typedef int CHECK[digits < BITS];
+	char out[BITS], *o = out;
+	for(int i=0; i<digits; i++,val>>=1)
+		*o++ = (val&1?'1':'0');
+	*o = 0;
+	return out;
+}
 
 template<typename T> int binary_search(const std::vector<T>& vec,const T& key) {
 	// painful that we write this ourselves; is it not standard somewhere?

@@ -132,15 +132,6 @@ static std::ostream& indent(std::ostream& out,int depth) {
 	return out;
 }
 
-static std::string fmtbin(unsigned val,int digits) {
-	static char out[65];
-	char *o = out;
-	for(int i=0; i<digits; i++,val>>=1)
-		*o++ = (val&1?'1':'0');
-	*o = 0;
-	return out;
-}
-
 void spatial_index_t::dump(std::ostream& out) const {
 	int depth = 0;
 	for(spatial_index_t* p=parent; p; p=p->parent)

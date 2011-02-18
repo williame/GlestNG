@@ -113,11 +113,6 @@ bool xml_parser_t::token_t::set_error(const char* fmt,...) const {
 
 static const char* eat_whitespace(const char* ch) { while(*ch && *ch <= ' ') ch++; return ch; }
 static const char* eat_name(const char* ch) { while((*ch>' ')&&!strchr("/>=",*ch)) ch++; return ch; }
-static bool starts_with(const char* str,const char* pre) {
-	while(*pre)
-		if(*pre++!=*str++) return false;
-	return true;
-}
 
 xml_parser_t::xml_parser_t(const char* t,const char* xml): // copies data into internal buffer
 	title(strdup(t)),
@@ -309,7 +304,6 @@ void xml_parser_t::walker_t::get_key(const char* key) {
 			tok->visit = true;
 			return;
 		}
-	tok->set_error("has no key called %s",key);
 	data_error(key << " not found in " << tok->str() << " tag");
 }
 
@@ -325,7 +319,6 @@ bool xml_parser_t::walker_t::has_key(const char* key) {
 
 xml_parser_t::walker_t& xml_parser_t::walker_t::get_child(const char* tag) {
 	if(get_child(tag,0)) return *this;
-	tok->set_error("has no child tag called %s",tag);
 	data_error(tok->str()<<" tag has no child tag called "<<tag);
 }
 
@@ -360,32 +353,12 @@ xml_parser_t::walker_t& xml_parser_t::walker_t::up() {
 	return *this;
 }
 
-void xml_parser_t::walker_t::check(const char* tag) {
+xml_parser_t::walker_t& xml_parser_t::walker_t::check(const char* tag) {
 	get_tag();
 	if(strncmp(tag,tok->start,strlen(tag)))
 		data_error("expecting "<<tag<<" tag, got "<<tok->str());
 	tok->visit = true;
-}
-
-float xml_parser_t::walker_t::value_float(const char* key) {
-	get_key(key);
-	if(!tok->first_child || (VALUE != tok->first_child->type))
-		data_error("expecting key "<<tok->path()<<" to have a value child");
-	try {
-		tok = tok->first_child;
-		errno = 0;
-		char* endptr;
-		const float val = strtof(tok->start,&endptr);
-		if(errno) data_error("could not convert "<<tok->path()<<" to float: "<<tok->str()<<" ("<<errno<<": "<<strerror(errno));
-		if(endptr != (tok->start+tok->len)) data_error(tok->path()<<" is not a float: "<<tok->str());
-		if(!isnormal(val)) data_error(tok->path()<<" is not a valid float: "<<tok->str());
-		tok->visit = true;
-		tok = tok->parent;
-		return val;
-	} catch(data_error_t* de) {
-		tok->set_error(de->str().c_str());
-		throw;
-	}
+	return *this;
 }
 
 std::string xml_parser_t::walker_t::value_string(const char* key) {
@@ -399,31 +372,40 @@ std::string xml_parser_t::walker_t::value_string(const char* key) {
 	return str;
 }
 
+float xml_parser_t::walker_t::value_float(const char* key) {
+	const std::string value(value_string(key));
+	if(!value.size()) data_error(tok->path()<<" should be a float");
+	tok = tok->first_child; // ensure errors are assigned to child leaf
+	errno = 0;
+	char* endptr;
+	const float val = strtof(value.c_str(),&endptr);
+	if(errno) data_error("could not convert "<<tok->path()<<" to float: "<<value<<" ("<<errno<<": "<<strerror(errno));
+	if(endptr != value.c_str()+value.size()) data_error(tok->path()<<" is not a float: "<<value);
+	if(!isnormal(val) && FP_ZERO!=fpclassify(val)) data_error(tok->path()<<" is not a valid float: "<<value);
+	tok = tok->parent;
+	return val;
+}
+
 int xml_parser_t::walker_t::value_int(const char* key) {
-	get_key(key);
-	if(!tok->first_child || (VALUE != tok->first_child->type))
-		data_error("expecting key "<<tok->path()<<" to have a value child");
-	try {
-		tok = tok->first_child;
-		errno = 0;
-		char* endptr;
-		const int i = strtol(tok->start,&endptr,10);
-		if(errno) data_error("could not convert "<<tok->path()<<" to int: "<<tok->str()<<" ("<<errno<<": "<<strerror(errno));
-		if(endptr != (tok->start+tok->len)) data_error(tok->path()<<" is not an int: "<<tok->str());
-		tok->visit = true;
-		tok = tok->parent;
-		return i;
-	} catch(data_error_t* de) {
-		tok->set_error(de->str().c_str());
-		throw;
-	}
+	const std::string value(value_string(key));
+	if(!value.size()) data_error(tok->path()<<" should be an int");
+	tok = tok->first_child; // ensure errors are assigned to child leaf
+	errno = 0;
+	char* endptr;
+	const int i = strtol(value.c_str(),&endptr,10);
+	if(errno) data_error("could not convert "<<tok->path()<<" to int: "<<value<<" ("<<errno<<": "<<strerror(errno));
+	if(endptr != value.c_str()+value.size()) data_error(tok->path()<<" is not an int: "<<value);
+	tok = tok->parent;
+	return i;
 }
 
 bool xml_parser_t::walker_t::value_bool(const char* key) {
-	const std::string value = value_string(key);
+	const std::string value(value_string(key));
+	if(!value.size()) data_error(tok->path()<<" should be boolean");
 	if(value == "true") return true;
 	if(value == "false") return false;
-	data_error(key<<" is not boolean: "<<value);
+	tok = tok->first_child; // errors are assigned to child leaf
+	data_error(tok->path()<<" is not boolean: "<<value);
 }
 
 std::string xml_parser_t::walker_t::get_data_as_string() {
