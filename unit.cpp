@@ -59,8 +59,8 @@ void unit_type_t::_load_xml(xml_parser_t::walker_t& xml) {
 			for(int i=0; i<size; i++) {
 				if(!xml.get_child("row",i)) data_error("not enough rows in cellmap");
 				const std::string bits = xml.value_string();
-				if(bits.size() != size) data_error("wrong number of bits in cellmap row");
-				for(size_t j=0; j<size; j++)
+				if((int)bits.size() != size) data_error("wrong number of bits in cellmap row");
+				for(int j=0; j<size; j++)
 					if(bits[j] == '1')
 						cellmap |= (1 << j) << (i*8);
 					else if(bits[j] != '0')

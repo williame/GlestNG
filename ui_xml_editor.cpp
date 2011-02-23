@@ -55,9 +55,10 @@ public:
 		size_t col;
 	};
 	cursor_t get_cursor() const { return cursor; }
-	int char_from_ofs(int x,int row);
-	int char_to_ofs(int col,int row);
+	int char_from_ofs(int x,int row) const;
+	int char_to_ofs(int col,int row) const;
 	char char_at(const cursor_t& cursor);
+	vec2_t cursor_to_pos(const cursor_t& cursor) const { return vec2_t(char_to_ofs(cursor.col,cursor.row),cursor.row*h); }
 	void nav_left();
 	void nav_right();
 	void nav_up();
@@ -74,6 +75,8 @@ public:
 	const int h; // line height
 	vec2_t view_ofs;
 	bool mouse_grab;
+	cursor_t error_pos;
+	std::string error;
 	ui_cancel_button_t* cancel;
 	void on_cancel(ui_cancel_button_t*) {
 		handler.on_cancelled(ui);
@@ -220,7 +223,7 @@ void ui_xml_editor_t::pimpl_t::bksp() {
 	}
 }
 
-int ui_xml_editor_t::pimpl_t::char_from_ofs(int x,int row) {
+int ui_xml_editor_t::pimpl_t::char_from_ofs(int x,int row) const {
 	if(row >= (int)lines.size()) return -1;
 	font_t& f = *fonts()->get(fonts_t::UI_TITLE);
 	const line_t& line = lines[row];
@@ -236,7 +239,7 @@ int ui_xml_editor_t::pimpl_t::char_from_ofs(int x,int row) {
 	return i-1;
 }
 
-int ui_xml_editor_t::pimpl_t::char_to_ofs(int col,int row) {
+int ui_xml_editor_t::pimpl_t::char_to_ofs(int col,int row) const {
 	if((size_t)row >= lines.size()) return -1;
 	const line_t& line = lines[row];
 	if((size_t)col >= line.s.size())
@@ -271,6 +274,7 @@ char ui_xml_editor_t::pimpl_t::char_at(const cursor_t& cursor) {
 
 void ui_xml_editor_t::pimpl_t::parse() {
 	if(!dirty) return;
+	error.clear();
 	lines.clear();
 	size_t i = 0;
 	line_t line;
@@ -278,6 +282,11 @@ void ui_xml_editor_t::pimpl_t::parse() {
 	for(xml_parser_t::walker_t node = target.get_xml()->walker(); node.ok(); node.next()) {
 		for(; i<node.ofs(); i++)
 			_append(*ch++,line,i,xml_parser_t::IGNORE,false);
+		if((node.type() == xml_parser_t::ERROR) && !error.size()) {
+			error = node.error_str();
+			error_pos.row = lines.size();
+			error_pos.col = line.s.size();
+		}
 		for(; i<(node.ofs()+node.len()); i++)
 			_append(*ch++,line,i,node.type(),node.visited());
 	}
@@ -392,7 +401,7 @@ void ui_xml_editor_t::draw() {
 	// get the lines and cursor
 	const lines_t& lines = pimpl->get_lines();
 	const pimpl_t::cursor_t cursor = pimpl->get_cursor();
-	vec2_t caret(pimpl->char_to_ofs(cursor.col,cursor.row),cursor.row*h);
+	vec2_t caret(pimpl->cursor_to_pos(cursor));
 	// ensure cursor is visible
 	const vec2_t margin(3*pimpl->em,3*h);
 	vec2_t view_ofs = pimpl->view_ofs;
@@ -424,6 +433,20 @@ void ui_xml_editor_t::draw() {
 			prev = ch;
 		}
 		y += h;
+	}
+	// error?
+	if(pimpl->error.size()) {
+		const vec2_t error_pos(pimpl->cursor_to_pos(pimpl->error_pos) + r.tl - view_ofs + vec2_t(0,h));
+		if(r.contains(error_pos)) {
+			const rect_t error_rect(error_pos,error_pos+f.measure(pimpl->error)+(this->margin()*2));
+			clip(error_rect);
+			glColor3ub(0xff,0xff,0xa0);
+			draw_filled_cornered_box(error_rect,corner());
+			glColor3ub(0xff,0,0);
+			draw_cornered_box(error_rect,corner());
+			const int x = error_pos.x + this->margin().x, y = error_pos.y + this->margin().y;
+			f.draw(x,y,pimpl->error);
+		}
 	}
 }
 
