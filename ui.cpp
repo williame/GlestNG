@@ -15,6 +15,8 @@
 #include "ui.hpp"
 #include "font.hpp"
 #include "graphics.hpp"
+#include "xml.hpp"
+#include "fs.hpp"
 
 unsigned now(); // world.hpp
 
@@ -376,7 +378,9 @@ const vec2_t& ui_component_t::corner() {
 }
 
 const vec2_t& ui_component_t::margin() {
-	static const vec2_t m(3,3);
+	static const vec2_t m(
+		xml_parser_t::settings().get_child("margin").value_int("x"),
+		xml_parser_t::settings().get_child("margin").value_int("y"));
 	return m;
 }
 

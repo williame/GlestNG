@@ -11,14 +11,13 @@
 #include <ostream>
 #include <string>
 
-class istream_t;
 class xml_loadable_t;
 
 class xml_parser_t {
 public:
 	struct token_t;
-	xml_parser_t(const char* title,istream_t& in);
-	xml_parser_t(const char* title,const char* xml); // makes a copy
+	xml_parser_t(const std::string title,const char* xml);
+	xml_parser_t(const std::string title,const std::string xml);
 	void parse();
 	~xml_parser_t();
 	enum type_t {
@@ -68,13 +67,15 @@ public:
 	};
 	walker_t walker();
 	void describe_xml(std::ostream& out);
-	const char* get_title() const { return title; }
-	const char* get_buf() const { return buf; }
+	const std::string title;
+	const std::string buf;
+	void set_as_settings(); // owned by auto_ptr in glestng.cpp
+	static xml_parser_t::walker_t settings();
 private:
-	const char* title;
-	const char* buf;
 	token_t *doc;
 };
+
+class istream_t;
 
 class xml_loadable_t {
 public:

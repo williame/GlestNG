@@ -114,19 +114,15 @@ bool xml_parser_t::token_t::set_error(const char* fmt,...) const {
 static const char* eat_whitespace(const char* ch) { while(*ch && *ch <= ' ') ch++; return ch; }
 static const char* eat_name(const char* ch) { while((*ch>' ')&&!strchr("/>=",*ch)) ch++; return ch; }
 
-xml_parser_t::xml_parser_t(const char* t,const char* xml): // copies data into internal buffer
-	title(strdup(t)),
-	buf(strdup(xml)), // nearly RAII; if strdup() throws, title not freed
-	doc(NULL) {}
-	
-xml_parser_t::xml_parser_t(const char* t,istream_t& in):
-	title(strdup(t)),
-	buf(strdup(in.read_all().c_str())),
-	doc(NULL) {}
+xml_parser_t::xml_parser_t(const std::string t,const char* xml):
+	title(t), buf(xml), doc(NULL) {}
+
+xml_parser_t::xml_parser_t(const std::string t,const std::string xml):
+	title(t), buf(xml), doc(NULL) {}
 	
 void xml_parser_t::parse() {
 	if(doc) return;
-	const char *ch = buf;
+	const char *ch = buf.c_str();
 	token_t* tok = NULL;
 	try {
 		ch = eat_whitespace(ch);
@@ -141,7 +137,7 @@ void xml_parser_t::parse() {
 				if(tok && (DATA == tok->type)) {
 					if(eat_whitespace(tok->start) == ch)
 						data_error("unexpected empty token "<<tok->repr());
-					tok->len = (ch-tok->start)-1;
+					tok->len = (ch-tok->start);
 					tok = tok->parent;
 				}
 				if(starts_with(ch,"<!--")) {
@@ -245,20 +241,18 @@ void xml_parser_t::parse() {
 				data_error("did not understand "<<*ch<<" after"<<tok->repr());
 		}
 	} catch(data_error_t* de) {
-		std::cerr << "Error parsing " << title << " @" << (ch-buf) << ": " << de << std::endl;
+		std::cerr << "Error parsing " << title << " @" << (ch-buf.c_str()) << ": " << de << std::endl;
 		if(!doc)
 			tok = doc = new token_t(ERROR,ch);
 		else
 			tok = tok->add_peer(ERROR,ch);
-		tok->len = (buf+strlen(buf))-ch;
+		tok->len = buf.size()-(ch-buf.c_str());
 		tok->error = strdup(de->str().c_str());
 		throw;
 	}
 }
 	
 xml_parser_t::~xml_parser_t() {
-	free(const_cast<char*>(title));
-	free(const_cast<char*>(buf));
 	delete doc;
 }
 
@@ -410,20 +404,21 @@ bool xml_parser_t::walker_t::value_bool(const char* key) {
 
 std::string xml_parser_t::walker_t::get_data_as_string() {
 	get_tag();
-	if(!tok->first_child || (DATA != tok->first_child->type))
+	token_t* child = tok->first_child;
+	while(child && (DATA != child->type))
+		child = child->next_peer;
+	if(!child)
 		panic("expecting tag "<<tok->path()<<" to have data");
-	tok = tok->first_child;
-	if(!tok->next_peer || (CLOSE != tok->next_peer->type))
-		panic("cannot cope that tag "<<tok->parent->path()<<" has nested tags when extracting data");
-	tok->visit = true;
-	std::string str = tok->str();
-	tok = tok->parent;
+	if(child->next_peer)
+		panic("cannot cope that tag "<<tok->path()<<" has nested tags when extracting data");
+	child->visit = true;
+	std::string str = child->str();
 	return str;
 }
  
 size_t xml_parser_t::walker_t::ofs() const {
 	if(!ok()) panic("no token");
-	return tok->start - parser.buf;
+	return tok->start - parser.buf.c_str();
 }
 
 size_t xml_parser_t::walker_t::len() const {
@@ -541,7 +536,7 @@ bool xml_loadable_t::load_xml(const std::string& s) {
 }
 
 bool xml_loadable_t::load_xml(istream_t& in) {
-	return load_xml(new xml_parser_t(name.c_str(),in));
+	return load_xml(new xml_parser_t(name.c_str(),in.read_all()));
 }
 
 bool xml_loadable_t::load_xml(xml_parser_t* parser) {
@@ -565,6 +560,22 @@ bool xml_loadable_t::load_xml(xml_parser_t* parser) {
 			walker.tok->set_error(de->str().c_str());
 		return false;
 	}
+}
+
+static xml_parser_t* _settings = NULL; // owned by auto_ptr in glestng.cpp
+
+void xml_parser_t::set_as_settings() {
+	if(_settings)
+		panic("settings already set");
+	_settings = this;
+	settings(); // simple check
+}	
+
+xml_parser_t::walker_t xml_parser_t::settings() {
+	if(!_settings)
+		panic("settings not set");
+	walker_t xml(_settings->walker());
+	return xml.check("glestng").get_child("ui_settings");
 }
 
 

@@ -87,6 +87,7 @@ public:
 	fs_file_t* get(const std::string& parent,const std::string& rel);
 	strings_t list_dirs(const std::string& path);
 	strings_t list_files(const std::string& path);
+	static fs_t* settings; // owned by auto_ptr in glestng.cpp
 private:
 	fs_t(const std::string& data_directory);
 	struct pimpl_t;

@@ -278,7 +278,7 @@ void ui_xml_editor_t::pimpl_t::parse() {
 	lines.clear();
 	size_t i = 0;
 	line_t line;
-	const char* ch = target.get_xml()->get_buf();
+	const char* ch = target.get_xml()->buf.c_str();
 	for(xml_parser_t::walker_t node = target.get_xml()->walker(); node.ok(); node.next()) {
 		for(; i<node.ofs(); i++)
 			_append(*ch++,line,i,xml_parser_t::IGNORE,false);

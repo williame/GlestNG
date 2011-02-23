@@ -107,21 +107,22 @@ struct refs_t: public std::vector<ref_t> {
 
 inline std::ostream& operator<<(std::ostream& out,class_type_t type) {
 	switch(type) {
-	case TECHTREE: return out << "TECHTREE";
-	case FACTION: return out << "FACTION";
-	case UNIT_TYPE: return out << "UNIT_TYPE";
-	case RESOURCE: return out << "RESOURCE";
-	case IMAGE: return out << "IMAGE";
-	case MODEL: return out << "MODEL";
-	case PARTICLE: return out << "PARTICLE";
-	case UPGRADE: return out << "UPGRADE";
-	case AUDIO: return out << "AUDIO";
+	case TECHTREE: return out << "techtree";
+	case FACTION: return out << "faction";
+	case UNIT_TYPE: return out << "unit_type";
+	case RESOURCE: return out << "resource";
+	case IMAGE: return out << "image";
+	case MODEL: return out << "model";
+	case PARTICLE: return out << "particle";
+	case UPGRADE: return out << "upgrade";
+	case AUDIO: return out << "audio";
 	default: return out << "class_type<"<<(int)type<<'>';
 	}
 }
 
 inline std::ostream& operator<<(std::ostream& out,const class_t& cls) {
-	return out << "class<"<<cls.type<<','<<cls.name<<'>';
+	
+	return out << cls.type<<'<'<<cls.name<<'>';
 }
 
 inline std::ostream& operator<<(std::ostream& out,const class_t* cls) {

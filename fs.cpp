@@ -261,3 +261,5 @@ fs_t* fs_t::create(const std::string& dd) {
 	return new fs_t(data_directory);
 }
 
+fs_t* fs_t::settings = NULL; // owned by auto_ptr in glestng.cpp
+

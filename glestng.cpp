@@ -401,14 +401,22 @@ int main(int argc,char** args) {
 		fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
 
 		// we have a GL context so we can go ahead and init all the singletons
+		std::auto_ptr<fs_t> fs_settings(fs_t::create("data/"));
+		fs_t::settings = fs_settings.get(); // set it globally
+		std::auto_ptr<xml_parser_t> xml_settings;
+		{
+			fs_file_t::ptr_t ui_settings_file(fs_settings->get("ui_settings.xml"));
+			istream_t::ptr_t ui_settings_stream(ui_settings_file->reader());
+			xml_settings.reset(new xml_parser_t("UI Settings",ui_settings_stream->read_all()));
+			xml_settings->set_as_settings();
+		}
 		std::auto_ptr<graphics_t::mgr_t> graphics_mgr(graphics_t::create());
 		std::auto_ptr<fonts_t> fonts(fonts_t::create());
 		std::auto_ptr<fs_t> fs(fs_t::create("data/Glest"));
 		std::auto_ptr<ui_mgr_t> ui_(ui_mgr());
 		std::auto_ptr<mod_ui_t> mod_ui(mod_ui_t::create());
-		std::auto_ptr<fs_t> sys_fs(fs_t::create("data/"));
 		{
-			fs_file_t::ptr_t logo_file(sys_fs->get("logo.g3d"));
+			fs_file_t::ptr_t logo_file(fs_settings->get("logo.g3d"));
 			istream_t::ptr_t logostream(logo_file->reader());
 			logo = std::auto_ptr<model_g3d_t>(new model_g3d_t(*logostream));
 		}

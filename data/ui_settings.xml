@@ -1,0 +1,8 @@
+<glestng>
+	<ui_settings>
+		<margin x="3" y="3" />
+		<fonts>
+			<sans type="angel">bitstream_vera_sans</sans>
+		</fonts>
+	</ui_settings>
+</glestng>

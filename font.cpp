@@ -25,7 +25,7 @@ struct code_t {
 
 class font_angel_t: public font_t {
 public: // bitmap fonts created from TTF using AngelCode's BMFont
-	font_angel_t(const std::string& filename);
+	font_angel_t(fs_t& fs,const std::string& filename);
 	vec2_t measure(int ch);
 	vec2_t measure(const char* msg,int count);
 	int draw(int x,int y,int ch);
@@ -65,11 +65,10 @@ private:
 	const glyph_t& get(int code) const; // unicode
 };
 
-font_angel_t::font_angel_t(const std::string& filename) {
-	std::auto_ptr<fs_t> fs(fs_t::create("data"));
-	fs_file_t::ptr_t data_file(fs->get(filename+".fnt"));
+font_angel_t::font_angel_t(fs_t& fs,const std::string& filename) {
+	fs_file_t::ptr_t data_file(fs.get(filename+".fnt"));
 	istream_t::ptr_t data_stream(data_file->reader());
-	xml_parser_t data_parser(filename.c_str(),*data_stream);
+	xml_parser_t data_parser(filename.c_str(),data_stream->read_all());
 	xml_parser_t::walker_t xml(data_parser.walker());
 	xml.check("font");
 	xml.get_child("common");
@@ -78,7 +77,7 @@ font_angel_t::font_angel_t(const std::string& filename) {
 	texture_size = vec2_t(xml.value_int("scaleW"),xml.value_int("scaleH"));
 	if(xml.value_int("pages") != 1) data_error("font "<<*data_file<<" isn\'t only one page: "<<xml.value_int("pages"));
 	xml.get_peer("pages").get_child("page");
-	fs_file_t::ptr_t tex_handle(fs->get(xml.value_string("file")));
+	fs_file_t::ptr_t tex_handle(fs.get(xml.value_string("file")));
 	texture = graphics()->alloc_texture(*tex_handle);
 	xml.up().get_peer("chars").get_child("char");
 	memset(&invalid,0,sizeof(invalid));
@@ -200,8 +199,18 @@ int font_angel_t::draw(int x,int y,const char* msg,int count) {
 static fonts_t* singleton = NULL;
 
 struct fonts_t::pimpl_t {
-	pimpl_t(): sans(new font_angel_t("bitstream_vera_sans")) {}
-	std::auto_ptr<font_angel_t> sans;
+	pimpl_t(): sans(NULL) {
+		xml_parser_t::walker_t xml(xml_parser_t::settings());
+		xml.get_child("fonts");
+		std::string type(xml.get_child("sans").value_string("type"));
+		if(type=="angel")
+			sans = new font_angel_t(*fs_t::settings,xml.get_data_as_string());
+		else
+			data_error("font type \""<<type<<"\" not supported");
+		xml.up();
+	}
+	~pimpl_t() { delete sans; }
+	font_t* sans;
 };
 
 fonts_t* fonts_t::create() {
@@ -225,7 +234,7 @@ fonts_t::~fonts_t() {
 
 font_t* fonts_t::get(logical_t face) {
 	switch(face) {
-	case SANS: return pimpl->sans.get();
+	case SANS: return pimpl->sans;
 	default: panic("font "<<face<<" not supported");
 	}
 }
