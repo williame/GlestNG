@@ -83,8 +83,11 @@ public:
 	std::string join(const std::string& path,const std::string& sub) const;
 	std::string parent_directory(const std::string& path) const;
 	fs_file_t* get(const std::string& path);
-	fs_file_t* get(const istream_t& parent,const std::string& rel);
-	fs_file_t* get(const std::string& parent,const std::string& rel);
+	inline fs_file_t* get(const istream_t& parent,const std::string& rel);
+	inline fs_file_t* get(const std::string& parent,const std::string& rel);
+	std::string get_body(const std::string& path);
+	inline std::string get_body(const istream_t& parent,const std::string& rel);
+	inline std::string get_body(const std::string& parent,const std::string& rel);
 	strings_t list_dirs(const std::string& path);
 	strings_t list_files(const std::string& path);
 	static fs_t* settings; // owned by auto_ptr in glestng.cpp
@@ -139,6 +142,14 @@ inline fs_file_t* fs_t::get(const istream_t& parent,const std::string& rel) {
 
 inline fs_file_t* fs_t::get(const std::string& parent,const std::string& rel) {
 	return get(join(parent,rel));
+}
+
+inline std::string fs_t::get_body(const istream_t& parent,const std::string& rel) {
+	return get_body(parent.file().path(),rel);
+}
+
+inline std::string fs_t::get_body(const std::string& parent,const std::string& rel) {
+	return get_body(join(parent,rel));
 }
 
 #endif //__FS_HPP__

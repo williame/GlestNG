@@ -520,6 +520,22 @@ void xml_parser_t::describe_xml(std::ostream& out) {
 	out << "</pre></body></html>" << std::endl;
 }
 
+static xml_parser_t* _settings = NULL; // owned by auto_ptr in glestng.cpp
+
+void xml_parser_t::set_as_settings() {
+	if(_settings)
+		panic("settings already set");
+	_settings = this;
+	settings(); // simple check
+}	
+
+xml_parser_t::walker_t xml_parser_t::settings() {
+	if(!_settings)
+		panic("settings not set");
+	walker_t xml(_settings->walker());
+	return xml.check("glestng").get_child("ui_settings");
+}
+
 xml_loadable_t::xml_loadable_t(const std::string& n):
 	name(n), xml(NULL), inited(false)
 {}
@@ -561,21 +577,4 @@ bool xml_loadable_t::load_xml(xml_parser_t* parser) {
 		return false;
 	}
 }
-
-static xml_parser_t* _settings = NULL; // owned by auto_ptr in glestng.cpp
-
-void xml_parser_t::set_as_settings() {
-	if(_settings)
-		panic("settings already set");
-	_settings = this;
-	settings(); // simple check
-}	
-
-xml_parser_t::walker_t xml_parser_t::settings() {
-	if(!_settings)
-		panic("settings not set");
-	walker_t xml(_settings->walker());
-	return xml.check("glestng").get_child("ui_settings");
-}
-
 

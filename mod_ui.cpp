@@ -168,7 +168,6 @@ void mod_ui_t::pimpl_t::on_cancelled(ui_list_t* lst) {
 		lst->destroy();
 	} else if(lst == context_menu) {
 		context_menu->destroy(); context_menu = NULL;
-		refs.resize(refs.size()-1);
 		menus.back()->enable();
 	} else
 		panic(lst << " was cancelled, was expecting " << menus.back());

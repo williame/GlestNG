@@ -23,6 +23,8 @@
 #include "ui_xml_editor.hpp"
 #include "world.hpp"
 
+void load_colour(xml_parser_t::walker_t& xml,ui_component_t::colour_t& colour); // in ui.cpp
+
 namespace {
 	struct line_t {
 		size_t ofs;
@@ -47,6 +49,17 @@ public:
 		cursor.row = cursor.col = 0;
 		if(CANCEL_BUTTON&ui->flags)
 			cancel = new ui_cancel_button_t(FADE_VISIBLE&ui->flags,*this,ui);
+		xml_parser_t::walker_t xml(xml_parser_t::settings());
+		xml.get_child("colours").get_child("xml_editor");
+		load_colour(xml.get_child("ignore"),MARKUP_COL[xml_parser_t::IGNORE]);
+		load_colour(xml.get_peer("open"),MARKUP_COL[xml_parser_t::OPEN]);
+		load_colour(xml.get_peer("close"),MARKUP_COL[xml_parser_t::CLOSE]);
+		load_colour(xml.get_peer("key"),MARKUP_COL[xml_parser_t::KEY]);
+		load_colour(xml.get_peer("value"),MARKUP_COL[xml_parser_t::VALUE]);
+		load_colour(xml.get_peer("data"),MARKUP_COL[xml_parser_t::DATA]);
+		load_colour(xml.get_peer("error"),MARKUP_COL[xml_parser_t::ERROR]);
+		load_colour(xml.get_peer("cursor"),CURSOR_COL);
+		load_colour(xml.get_peer("canvas"),CANVAS_COL);
 	}
 	const std::string& get_title() const { return target.name; }
 	const lines_t& get_lines() { parse(); return lines; }
@@ -84,6 +97,8 @@ public:
 	rect_t inner() const { 
 		return ui->calc_border(ui->get_rect(),get_title()).inner(vec2_t(ui->corner().x,0));
 	}
+	ui_component_t::colour_t MARKUP_COL[xml_parser_t::NUM_TYPES],
+		CURSOR_COL, CANVAS_COL;
 private:
 	ui_xml_editor_t* const ui;
 	xml_loadable_t& target;
@@ -381,21 +396,10 @@ bool ui_xml_editor_t::offer(const SDL_Event& event) {
 	}
 }
 
-static const ui_component_t::colour_t MARKUP_COL[xml_parser_t::NUM_TYPES] = {
-	{0x80,0x80,0x80,0xff}, //IGNORE
-	{0x00,0x80,0xff,0xff}, //OPEN
-	{0x00,0x40,0x80,0xff}, //CLOSE
-	{0x40,0xa0,0xa0,0xff}, //KEY
-	{0x00,0x20,0xff,0xff}, //VALUE
-	{0xa0,0xa0,0xa0,0xff}, //DATA
-	{0xff,0x00,0x00,0xff}, //ERROR
-}, CURSOR_COL = {0xff,0xff,0x00,0xff}, CANVAS_COL = {0xff,0xff,0xff,0xe8};
-
-
 void ui_xml_editor_t::draw() {
 	const float alpha = base_alpha();
 	font_t& f = *fonts()->get(fonts_t::UI_TITLE);
-	draw_border(alpha,get_rect(),pimpl->get_title(),CANVAS_COL);
+	draw_border(alpha,get_rect(),pimpl->get_title(),pimpl->CANVAS_COL);
 	const rect_t r = pimpl->inner();
 	const int h = line_height();
 	// get the lines and cursor
@@ -411,7 +415,7 @@ void ui_xml_editor_t::draw() {
 	if(caret.y+margin.y > view_ofs.y+r.h()) view_ofs.y = ((caret.y+margin.y-r.h())/h)*h;
 	pimpl->view_ofs = view_ofs;
 	// and draw
-	CURSOR_COL.set(alpha);
+	pimpl->CURSOR_COL.set(alpha);
 	caret += r.tl;
 	caret -= view_ofs;
 	draw_filled_box(rect_t(caret,caret+vec2_t((now()%700)>350?10:3,h)));
@@ -423,7 +427,7 @@ void ui_xml_editor_t::draw() {
 		const int start = pimpl->char_from_ofs(view_ofs.x,i);
 		int x = r.tl.x - (view_ofs.x - pimpl->char_to_ofs(start,i));
 		for(size_t j=start; j<line.s.size(); j++) {
-			MARKUP_COL[line.type[j]].set(alpha);
+			pimpl->MARKUP_COL[line.type[j]].set(alpha);
 			const int ch = line.s[j];
 			if(line.visit[j] || (xml_parser_t::ERROR == line.type[j])) // a poor person's bold
 				f.draw(x+1,y,ch);

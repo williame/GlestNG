@@ -20,6 +20,21 @@
 
 unsigned now(); // world.hpp
 
+struct ui_mgr_t::pimpl_t {
+	pimpl_t();
+	~pimpl_t() {
+		components_t tmp = components;
+		components.clear();
+		for(components_t::iterator i=tmp.begin(); i!=tmp.end(); i++)
+			delete *i;
+	}
+	typedef std::vector<ui_component_t*> components_t;
+	components_t components;
+	rect_t screen;
+	void draw(ui_component_t* comp,components_t& destroyed);
+	ui_component_t::colour_t col[ui_component_t::NUM_COLOURS];
+};
+
 bool ui_fader_t::is_transitioning() const {
 	return (end > now());
 }
@@ -46,18 +61,6 @@ bool ui_fader_t::calc(float& alpha) const {
 }
 
 void ui_component_t::colour_t::set(float alpha) const { glColor4ub(r,g,b,a*alpha); }
-
-const ui_component_t::colour_t ui_component_t::col[ui_component_t::NUM_COLOURS] = {
-	{0xc0,0xc0,0x40,0xc0}, //BG_COL
-	{0x50,0x50,0x00,0xff}, //BORDER_COL
-	{0xd0,0xd0,0x60,0x80}, //OUTLINE_COL
-	{0x00,0xff,0xff,0xff}, //TITLE_COL
-	{0x40,0xff,0x80,0xff}, //SUBTITLE_COL
-	{0xc0,0xc0,0x40,0xc0}, //ITEM_COL
-	{0xf0,0xf0,0x40,0xc0}, //ITEM_ACTIVE_COL
-	{0x00,0x80,0xa0,0xff}, //TEXT_COL
-	{0x00,0x40,0xa0,0xff}, //TEXT_ACTIVE_COL
-};
 
 ui_component_t::ui_component_t(unsigned f,ui_component_t* p):
 	mgr(*ui_mgr()), flags(f), r(0,0,0,0),
@@ -152,6 +155,10 @@ void ui_component_t::set_visible(bool v) {
 	visible.set(v);
 	mgr.invalidate(r);
 	visibility_changed(v);
+}
+
+const ui_component_t::colour_t& ui_component_t::col(logical_colour_t colour) const {
+	return mgr.col(colour);
 }
 
 static void _draw_box(GLenum type,const rect_t& r) {
@@ -321,8 +328,8 @@ rect_t ui_component_t::draw_border(float alpha,const rect_t& r,const std::string
 	const vec2_t& margin = this->margin(), corner = this->corner();
 	const short line_width = margin.x;
 	rect_t inner(r.inner(margin));
-	const bool solid = fill == col[BG_COL];
-	col[BG_COL].set(alpha);
+	const bool solid = fill == col(BG_COL);
+	col(BG_COL).set(alpha);
 	if(solid)
 		draw_filled_cornered_box(r,corner);
 	if(title.size()) {
@@ -333,11 +340,11 @@ rect_t ui_component_t::draw_border(float alpha,const rect_t& r,const std::string
 			draw_filled_box(rect_t(r.tl.x+corner.x,r.tl.y,r.br.x-corner.x,r.tl.y+corner.y));
 			draw_filled_box(rect_t(r.tl.x,r.tl.y+corner.y,r.br.x,r.tl.y+title_y));
 		}
-		col[TITLE_COL].set(alpha);
+		col(TITLE_COL).set(alpha);
 		fonts()->get(fonts_t::UI_TITLE)->draw(inner.tl.x+corner.x,inner.tl.y,title);
 		fonts()->get(fonts_t::UI_TITLE)->draw(inner.tl.x+corner.x+1,inner.tl.y,title); // poor man's bold
 		inner.tl.y = r.tl.y + title_y;
-		col[BG_COL].set(alpha);
+		col(BG_COL).set(alpha);
 		if(!solid) {
 			draw_corner(rect_t(inner.tl,inner.tl+corner),true,true,INNER);
 			draw_corner(rect_t(inner.br.x-corner.x,inner.tl.y,inner.br.x,inner.tl.y+corner.y),false,true,INNER);
@@ -351,7 +358,7 @@ rect_t ui_component_t::draw_border(float alpha,const rect_t& r,const std::string
 	} else if(!solid) {
 		draw_cornered_box(r,corner,line_width);
 	}
-	col[OUTLINE_COL].set(alpha);
+	col(OUTLINE_COL).set(alpha);
 	draw_cornered_box(r,corner);
 	if(!solid) {
 		fill.set(alpha);
@@ -453,25 +460,32 @@ void ui_cancel_button_t::draw() {
 	draw_line(vec2_t(r.tl.x+m.x,r.br.y-m.y),vec2_t(r.br.x-m.x,r.tl.y+m.y));
 }
 
-struct ui_mgr_t::pimpl_t {
-	pimpl_t();
-	~pimpl_t() {
-		components_t tmp = components;
-		components.clear();
-		for(components_t::iterator i=tmp.begin(); i!=tmp.end(); i++)
-			delete *i;
-	}
-	typedef std::vector<ui_component_t*> components_t;
-	components_t components;
-	rect_t screen;
-	void draw(ui_component_t* comp,components_t& destroyed);
-};
+void load_colour(xml_parser_t::walker_t& xml,ui_component_t::colour_t& colour) {
+	colour.r = xml.value_float("r") * 255.0;
+	colour.g = xml.value_float("g") * 255.0;
+	colour.b = xml.value_float("b") * 255.0;
+	if(xml.has_key("a"))
+		colour.a = xml.value_float("a") * 255.0;
+	else
+		colour.a = 0xff;
+}
 
 ui_mgr_t::pimpl_t::pimpl_t() {
 	GLint vp[4];
 	glGetIntegerv(GL_VIEWPORT,vp);
 	screen = rect_t(vp[0],vp[1],vp[0]+vp[2],vp[1]+vp[3]);
 	std::cout << "screen: "<<screen<<std::endl;
+	xml_parser_t::walker_t xml(xml_parser_t::settings());
+	xml.get_child("colours");
+	load_colour(xml.get_child("bg"),col[ui_component_t::BG_COL]);
+	load_colour(xml.get_peer("border"),col[ui_component_t::BORDER_COL]);
+	load_colour(xml.get_peer("outline"),col[ui_component_t::OUTLINE_COL]);
+	load_colour(xml.get_peer("title"),col[ui_component_t::TITLE_COL]);
+	load_colour(xml.get_peer("subtitle"),col[ui_component_t::SUBTITLE_COL]);
+	load_colour(xml.get_peer("item"),col[ui_component_t::ITEM_COL]);
+	load_colour(xml.get_peer("item_active"),col[ui_component_t::ITEM_ACTIVE_COL]);
+	load_colour(xml.get_peer("text"),col[ui_component_t::TEXT_COL]);
+	load_colour(xml.get_peer("text_active"),col[ui_component_t::TEXT_ACTIVE_COL]);
 }
 
 void ui_mgr_t::pimpl_t::draw(ui_component_t* comp,components_t& destroyed) {
@@ -515,6 +529,12 @@ void ui_mgr_t::draw() {
 	glDisable(GL_SCISSOR_TEST);
 	for(pimpl_t::components_t::iterator i=destroyed.begin(); i!=destroyed.end(); i++)
 		delete *i;
+}
+
+const ui_component_t::colour_t& ui_mgr_t::col(ui_component_t::logical_colour_t colour) const {
+	if((colour < 0) || (colour >= ui_component_t::NUM_COLOURS))
+		panic("colour value "<<colour<<" out of range");
+	return pimpl->col[colour];
 }
 
 rect_t ui_mgr_t::get_screen_bounds() const {

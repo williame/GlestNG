@@ -403,13 +403,8 @@ int main(int argc,char** args) {
 		// we have a GL context so we can go ahead and init all the singletons
 		std::auto_ptr<fs_t> fs_settings(fs_t::create("data/"));
 		fs_t::settings = fs_settings.get(); // set it globally
-		std::auto_ptr<xml_parser_t> xml_settings;
-		{
-			fs_file_t::ptr_t ui_settings_file(fs_settings->get("ui_settings.xml"));
-			istream_t::ptr_t ui_settings_stream(ui_settings_file->reader());
-			xml_settings.reset(new xml_parser_t("UI Settings",ui_settings_stream->read_all()));
-			xml_settings->set_as_settings();
-		}
+		std::auto_ptr<xml_parser_t> xml_settings(new xml_parser_t("UI Settings",fs_settings->get_body("ui_settings.xml")));
+		xml_settings->set_as_settings();
 		std::auto_ptr<graphics_t::mgr_t> graphics_mgr(graphics_t::create());
 		std::auto_ptr<fonts_t> fonts(fonts_t::create());
 		std::auto_ptr<fs_t> fs(fs_t::create("data/Glest"));

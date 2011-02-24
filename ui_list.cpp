@@ -147,7 +147,7 @@ void ui_list_t::draw() {
 	font_t* font = fonts()->get(fonts_t::UI_TITLE);
 	float alpha = base_alpha();
 	pimpl->enabled.calc(alpha);
-	const rect_t inner = draw_border(alpha,get_rect(),pimpl->title);
+	const rect_t inner = draw_border(alpha,get_rect(),pimpl->title,col(BG_COL));
 	const int h = line_height();
 	const vec2_t& corner = this->corner(), margin = this->margin();
 	clip(inner);
@@ -158,13 +158,13 @@ void ui_list_t::draw() {
 		const tagged_string_t& s = pimpl->list[i];
 		const rect_t item(inner.tl.x,y,inner.br.x,y+pimpl->line_spacing-margin.y);
 		if(s.tag & TAG_SEP)
-			col[SUBTITLE_COL].set(alpha);
+			col(SUBTITLE_COL).set(alpha);
 		else {
-			col[selected? ITEM_ACTIVE_COL: ITEM_COL].set(alpha);
+			col(selected? ITEM_ACTIVE_COL: ITEM_COL).set(alpha);
 			draw_filled_cornered_box(item,corner);
-			col[OUTLINE_COL].set(alpha);
+			col(OUTLINE_COL).set(alpha);
 			draw_cornered_box(item,corner);
-			col[selected? TEXT_ACTIVE_COL: TEXT_COL].set(alpha);
+			col(selected? TEXT_ACTIVE_COL: TEXT_COL).set(alpha);
 		}
 		font->draw(item.tl.x+corner.x,item.tl.y+(item.h()-h)/2,s);
 		y += pimpl->line_spacing;

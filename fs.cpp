@@ -212,6 +212,12 @@ fs_file_t* fs_t::get(const std::string& path) {
 	return new fs_handle_impl_t(*this,canocial(path).c_str());
 }
 
+std::string fs_t::get_body(const std::string& path) {
+	fs_file_t::ptr_t file(get(path));
+	istream_t::ptr_t istream(file->reader());
+	return istream->read_all();
+}
+
 static int _one(const struct dirent64 *d) { return 1; }
 
 strings_t fs_t::list_dirs(const std::string& path) {

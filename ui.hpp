@@ -51,12 +51,13 @@ public:
 	void hide() { set_visible(false); }
 	void invalidate();
 	virtual void destroy(); // triggers the (eventual) deletion of this; don't deference after calling!
-	enum { BG_COL, BORDER_COL, OUTLINE_COL, TITLE_COL, SUBTITLE_COL, ITEM_COL, ITEM_ACTIVE_COL, TEXT_COL, TEXT_ACTIVE_COL, NUM_COLOURS };
+	enum logical_colour_t { BG_COL, BORDER_COL, OUTLINE_COL, TITLE_COL, SUBTITLE_COL, ITEM_COL, ITEM_ACTIVE_COL, TEXT_COL, TEXT_ACTIVE_COL, NUM_COLOURS };
 	struct colour_t {
 		uint8_t r,g,b,a;
 		bool operator==(const colour_t& o) const { return r==o.r && b==o.b && g==o.g && a==o.a; }
 		void set(float alpha=1) const;
-	} static const col[NUM_COLOURS];
+	};
+	const colour_t& col(logical_colour_t colour) const;
 protected:
 	ui_component_t(unsigned flags,ui_component_t* parent = NULL);                 
 	virtual ~ui_component_t();
@@ -80,7 +81,7 @@ protected:
 	void draw_vline(const vec2_t& p,short h) const;
 	void draw_hline(const vec2_t& p,short l,short line_width) const;
 	void draw_vline(const vec2_t& p,short h,short line_width) const;
-	rect_t draw_border(float alpha,const rect_t& r,const std::string& title,const colour_t& fill = col[BG_COL]) const;
+	rect_t draw_border(float alpha,const rect_t& r,const std::string& title,const colour_t& fill) const;
 	rect_t calc_border(const rect_t& r,const std::string& title) const;	
 	bool offer_children(const SDL_Event& event);
 	rect_t clip() const;
@@ -136,6 +137,7 @@ public:
 	rect_t get_screen_bounds() const;
 	void invalidate(const rect_t& r);
 	bool offer(const SDL_Event& event);
+	const ui_component_t::colour_t& col(ui_component_t::logical_colour_t colour) const;
 private:
 	friend class ui_component_t;
 	virtual void register_component(ui_component_t* comp);
