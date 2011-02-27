@@ -18,6 +18,45 @@ from OpenGL.GLU import *
 from OpenGL.GLUT import *
 import math, numpy
 
+def ray_triangle(ray_origin,ray_dir,T):
+    # http://softsurfer.com/Archive/algorithm_0105/algorithm_0105.htm#intersect_RayTriangle%28%29
+    # get triangle edge vectors and plane normal
+    u = T[1]-T[0]
+    v = T[2]-T[0]
+    n = numpy.cross(u,v) ### cross product
+    if n[0]==0 and n[1]==0 and n[2]==0:            # triangle is degenerate
+        raise Exception("%s %s %s %s %s %s"%(ray_origin,ray_dir,T,u,v,n))
+    w0 = ray_origin-T[0]
+    a = -numpy.dot(n,w0)
+    b = numpy.dot(n,ray_dir)
+    if math.fabs(b) < 0.00000001:     # ray is parallel to triangle plane
+        return None             # ray disjoint from plane
+    # get intersect point of ray with triangle plane
+    r = a / b
+    if (r < 0.0):                   # ray goes away from triangle
+        return None                  # => no intersect
+    # for a segment, also test if (r > 1.0) => no intersect
+
+    I = ray_origin + r * ray_dir           # intersect point of ray and plane
+    
+    # is I inside T?
+    uu = numpy.dot(u,u)
+    uv = numpy.dot(u,v)
+    vv = numpy.dot(v,v)
+    w = I - T[0]
+    wu = numpy.dot(w,u)
+    wv = numpy.dot(w,v)
+    D = uv * uv - uu * vv
+    # get and test parametric coords
+    s = (uv * wv - vv * wu) / D
+    if (s < 0.0 or s > 1.0):        # I is outside T
+        return None
+    t = (uv * wu - uu * wv) / D
+    if (t < 0.0 or (s + t) > 1.0):  # I is outside T
+        return None
+    return I                      # I is in T
+
+
 class GLZPR(gtkgl.DrawingArea):
     def __init__(self,w=640,h=480):
         try:

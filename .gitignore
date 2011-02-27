@@ -4,3 +4,4 @@
 *.opp
 *.dep
 glestng
+*.pyc
