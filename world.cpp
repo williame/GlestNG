@@ -78,6 +78,8 @@ struct world_t::pimpl_t {
 	void remove_visible(object_t* obj);
 	spatial_index_t idx;
 	bool has_frustum;
+	vec_t eye;
+	matrix_t projection, modelview, inv;
 	frustum_t frustum;
 	hits_t visible;
 	int visible_dirty; // index of first unsorted entry; consider tombstones and unsorted part
@@ -503,10 +505,19 @@ void world_t::check() {
 	pimpl->idx.check();
 }
 
-void world_t::set_frustum(const vec_t& eye,const matrix_t& proj_modelview) {
+void world_t::set_frustum(const matrix_t& projection,const matrix_t& modelview) {
 	clear_frustum();
 	pimpl->has_frustum = true;
-	pimpl->frustum = frustum_t(eye,proj_modelview);
+	pimpl->projection = projection;
+	pimpl->modelview = modelview;
+	const matrix_t proj_modelview(projection*modelview);
+	pimpl->inv = proj_modelview.inverse();
+	std::cout << 
+		"projection: "<<projection<<
+		"\nmodelview:  "<<modelview<<
+		"\n*:          "<<proj_modelview<<
+		"\ninv:        "<<pimpl->inv<< std::endl;
+	pimpl->frustum = frustum_t(vec_t(0,0,0)*pimpl->inv,proj_modelview);
 	pimpl->idx.intersection(pimpl->frustum,~0,pimpl->visible,true);
 	for(hits_t::iterator i=pimpl->visible.begin(); i!=pimpl->visible.end(); i++)
 		i->obj->visible = true;
@@ -532,6 +543,19 @@ const frustum_t& world_t::frustum() const {
 	return pimpl->frustum;
 }
 
+vec_t world_t::unproject(const vec_t& in) const {
+	if(!has_frustum()) panic("there is no frustum set on the world");
+	const matrix_t m = pimpl->inv;
+	const float o[4] = {
+		in.x * m.f[0] + in.y * m.f[4] + in.z * m.f[8] + m.f[12],
+		in.x * m.f[1] + in.y * m.f[5] + in.z * m.f[9] + m.f[13],
+		in.x * m.f[2] + in.y * m.f[6] + in.z * m.f[10] + m.f[14],
+		in.x * m.f[3] + in.y * m.f[7] + in.z * m.f[11] + m.f[15]
+	};
+	if(!o[3]) return vec_t(-1,-1,-1); //### review what to do with this
+	const float norm = 1.0 / o[3];
+	return vec_t(o[0] * norm,o[1] * norm,o[2] * norm);
+}
 
 const world_t::hits_t& world_t::visible() const {
 	if(!has_frustum()) panic("there is no frustum set on the world");

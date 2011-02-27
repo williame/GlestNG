@@ -78,13 +78,14 @@ public:
 	void intersection(const ray_t& r,unsigned type,hits_t& hits,sort_by_t sort_by = SORT_BY_DISTANCE);
 	void intersection(const frustum_t& f,unsigned type,hits_t& hits,sort_by_t sort_by = SORT_BY_TYPE_THEN_DISTANCE);
 	void dump(std::ostream& out) const;
-	void set_frustum(const vec_t& eye,const matrix_t& m);
+	void set_frustum(const matrix_t& projection,const matrix_t& modelview);
 	intersection_t is_visible(const bounds_t& bounds) const;
 	void clear_frustum();
 	const hits_t& visible() const;
 	bool has_frustum() const;
 	const frustum_t& frustum() const;
 	void check();
+	vec_t unproject(const vec_t& in) const; //in.z: -1=near 1=far
 private:
 	friend class spatial_index_t;
 	friend class object_t;

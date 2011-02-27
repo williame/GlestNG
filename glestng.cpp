@@ -6,6 +6,7 @@
 */
 
 #include "graphics.hpp"
+//#include <GL/glu.h>
 
 #include <stdio.h>
 #include <inttypes.h>
@@ -216,8 +217,8 @@ void tick() {
 	if(true) {
 		glColor3f(1,0,0);
 		glBegin(GL_LINES);
-		glVertex3f(ray.o.x+0.1,ray.o.y+0.1,ray.o.z);
-		glVertex3f((ray.o.x+ray.d.x)+0.1,(ray.o.y+ray.d.y)+0.1,(ray.o.z+ray.d.z));
+		glVertex3f(ray.o.x,ray.o.y,ray.o.z);
+		glVertex3f((ray.o.x+ray.d.x),(ray.o.y+ray.d.y),(ray.o.z+ray.d.z));
 		glEnd();
 	}
 	const world_t::hits_t& visible = world()->visible();
@@ -260,7 +261,7 @@ void tick() {
 float zoom = 60;
 
 void camera() {
-	std::cout << "zoom="<<zoom<<std::endl;
+	matrix_t projection, modelview;
 	glViewport(0,0,screen->w,screen->h);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
@@ -270,37 +271,37 @@ void camera() {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	glTranslatef(0,0,-3);
-//	glRotatef(90,0,1,0);
-//	glPushMatrix();
-	matrix_t projection, modelview;
-	glGetFloatv(GL_MODELVIEW_MATRIX,projection.f);
-	glGetFloatv(GL_PROJECTION_MATRIX,modelview.f);
-	world()->set_frustum(vec_t(0,0,-3),projection*modelview);
-//	glPopMatrix();
+	glGetFloatv(GL_PROJECTION_MATRIX,projection.f);
+	glGetFloatv(GL_MODELVIEW_MATRIX,modelview.f);
+//	projection = projection.transpose();
+//	modelview = modelview.transpose();
+	world()->set_frustum(projection,modelview);
 }
 
-void click(int x,int y) {
-	camera();
+void click(float x,float y) {
 	uint64_t start = high_precision_time();
-	GLint vp[4];
-	glGetIntegerv(GL_VIEWPORT,vp);
-	matrix_t mv, p;
-	glGetFloatv(GL_MODELVIEW_MATRIX,mv.f);
-	glGetFloatv(GL_PROJECTION_MATRIX,p.f);
-	const matrix_t inv = (mv*p).inverse();
 	const float
-		unit_x = (2.0f*((float)(x-vp[0])/(vp[2]-vp[0])))-1.0f,
-		unit_y = 1.0f-(2.0f*((float)(y-vp[1])/(vp[3]-vp[1])));
-	std::cout << x<<','<<y<< '=' << unit_x<<','<<unit_y << std::endl;
-	const vec_t near(vec_t(unit_x,unit_y,-1)*inv);
-	const vec_t dir = vec_t::normalise(vec_t(0,0,1) * inv);
-	std::cout << near << ',' << dir << '=' << (near+dir) << std::endl;
-	ray = ray_t(near,dir);
-
+		unit_x = (2.0f*(x/screen->w))-1.0f,
+		unit_y = 1.0f-(y/screen->h);
+#if 0
+	const vec_t near(world()->unproject(vec_t(unit_x,unit_y,-1))),
+		far(world()->unproject(vec_t(unit_x,unit_y,1)));
+#else
+	GLint vp[4];
+	double p[16], mv[16], a,b,c,d,e,f;
+	glGetIntegerv(GL_VIEWPORT,vp);
+	glGetDoublev(GL_PROJECTION_MATRIX,p);
+	glGetDoublev(GL_MODELVIEW_MATRIX,mv);
+	gluUnProject(x,screen->h-y,0,mv,p,vp,&a,&b,&c);
+	gluUnProject(x,screen->h-y,1,mv,p,vp,&d,&e,&f);
+	const vec_t near(a,b,c), far(d,e,f);
+#endif
+	ray = ray_t(near,far-near);
+	std::cout << std::endl << "(" << x << "," << y << ") (" << unit_x << ',' << unit_y << ") " << ray << std::endl;
 	world_t::hits_t hits;
 	world()->intersection(ray,~0,hits);
 	uint64_t ns = high_precision_time()-start;
-	std::cout << std::endl << "click(" << x << "," << y << ") " << ray << " (" << ns << " ns) "<<hits.size()<< std::endl;
+	std::cout << std::endl << "click(" << x << "," << y << ") (" << unit_x << ',' << unit_y << ") " << ray << " (" << ns << " ns) "<<hits.size()<< std::endl;
 	selection = false;
 	for(world_t::hits_t::iterator i=hits.begin(); i!=hits.end(); i++) {
 		vec_t pt;

@@ -25,6 +25,7 @@ struct matrix_t {
 	inline float operator()(int r,int c) const;
 	inline void invert();
 	matrix_t inverse() const;
+	inline matrix_t transpose() const;
 };
 
 struct quat_t {
@@ -158,7 +159,7 @@ struct frustum_t {
 inline float sqrd(float x) { return x*x; }
 
 inline matrix_t matrix_t::operator*(const matrix_t& o) const {
-	matrix_t m = {{
+	const matrix_t m = {{
 		f[ 0] * o.f[ 0] + f[ 1] * o.f[ 4] + f[ 2] * o.f[ 8] + f[ 3] * o.f[12],
 		f[ 0] * o.f[ 1] + f[ 1] * o.f[ 5] + f[ 2] * o.f[ 9] + f[ 3] * o.f[13],
 		f[ 0] * o.f[ 2] + f[ 1] * o.f[ 6] + f[ 2] * o.f[10] + f[ 3] * o.f[14],
@@ -175,6 +176,16 @@ inline matrix_t matrix_t::operator*(const matrix_t& o) const {
 		f[12] * o.f[ 1] + f[13] * o.f[ 5] + f[14] * o.f[ 9] + f[15] * o.f[13],
 		f[12] * o.f[ 2] + f[13] * o.f[ 6] + f[14] * o.f[10] + f[15] * o.f[14],
 		f[12] * o.f[ 3] + f[13] * o.f[ 7] + f[14] * o.f[11] + f[15] * o.f[15] }};
+	return m;
+}
+
+inline matrix_t matrix_t::transpose() const {
+	const matrix_t m = {{
+		f[0], f[4], f[8], f[12],
+		f[1], f[5], f[9], f[13],
+		f[2], f[6], f[10], f[14],
+		f[3], f[7], f[11], f[15]
+	}};
 	return m;
 }
 
@@ -361,20 +372,50 @@ inline bounds_t bounds_t::operator+(const vec_t& pos) const {
 	return ret;
 }
 
+inline std::ostream& operator<<(std::ostream& out,const matrix_t& m) {
+	out << "matrix_t<";
+	for(int r=0; r<4; r++) {
+		if(r) out << ',';
+		out << '[';
+		for(int c=0; c<4; c++) {
+			if(c) out << ',';
+			out << m(r,c);
+		}
+		out << ']';
+	}
+	return out << '>';
+}
+
+inline std::ostream& operator<<(std::ostream& out,const matrix_t* m) {
+	return out << *m;
+}
+
 inline std::ostream& operator<<(std::ostream& out,const vec_t& v) {
-	return out << "vec_t<" << v.x << "," << v.y << "," << v.z << ">";
+	return out << "vec_t<" << v.x << ',' << v.y << ',' << v.z << '>';
+}
+
+inline std::ostream& operator<<(std::ostream& out,const vec_t* v) {
+	return out << *v;
 }
 
 inline std::ostream& operator<<(std::ostream& out,const ray_t& r) {
-	return out << "ray_t<" << r.o << "," << r.d << ">";
+	return out << "ray_t<" << r.o << ',' << r.d << '>';
+}
+
+inline std::ostream& operator<<(std::ostream& out,const ray_t* r) {
+	return out << *r;
 }
 
 inline std::ostream& operator<<(std::ostream& out,const sphere_t& s) {
-	return out << "sphere_t<" << s.centre << "," << s.radius << ">";
+	return out << "sphere_t<" << s.centre << ',' << s.radius << '>';
+}
+
+inline std::ostream& operator<<(std::ostream& out,const sphere_t* s) {
+	return out << *s;
 }
 
 inline std::ostream& operator<<(std::ostream& out,const aabb_t& a) {
-	return out << "aabb_t<" << a.a << "," << a.b << ">";
+	return out << "aabb_t<" << a.a << ',' << a.b << '>';
 }
 
 inline std::ostream& operator<<(std::ostream& out,const aabb_t* a) {
@@ -382,7 +423,7 @@ inline std::ostream& operator<<(std::ostream& out,const aabb_t* a) {
 }
 
 inline std::ostream& operator<<(std::ostream& out,const bounds_t& a) {
-	return out << "bounds_t<" << static_cast<const aabb_t&>(a) << "," << static_cast<const sphere_t&>(a) << ">";
+	return out << "bounds_t<" << static_cast<const aabb_t&>(a) << ',' << static_cast<const sphere_t&>(a) << '>';
 }
 
 inline std::ostream& operator<<(std::ostream& out,const bounds_t* a) {

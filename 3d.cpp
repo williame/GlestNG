@@ -15,42 +15,160 @@
 
 #define ANG2RAD 3.14159265358979323846/180.0
 
+
 matrix_t matrix_t::inverse() const {
-	matrix_t inv = *this; 
-	double negpos[2] = {0,0};
-	double temp = f[0] * f[5] * f[10];
-	negpos[temp > 0.] += temp; 
-	temp = f[1] * f[6] * f[8];
-	negpos[temp > 0.] += temp;
-	temp = f[2] * f[4] * f[9];
-	negpos[temp > 0.] += temp;
-	temp = -f[2] * f[5] * f[8]; 
-	negpos[temp > 0.] += temp;
-	temp = -f[1] * f[4] * f[10]; 
-	negpos[temp > 0.] += temp;
-	temp = -f[0] * f[6] * f[9]; 
-	negpos[temp > 0.] += temp;
-	double det_1 = negpos[0]+negpos[1];
-	if((det_1 == 0.) ||
-		(fabs(det_1 / (negpos[1] - negpos[0])) < (2. * 0.00000000000000001)))
-		data_error(this << " cannot be inverted");
-	det_1 = 1. / det_1;
-	inv.f[0] = (f[5]*f[10] - f[6]*f[9])*det_1; 
-	inv.f[1] = -(f[1]*f[10] - f[2]*f[9])*det_1;
-	inv.f[2] = (f[1]*f[6] - f[2]*f[5] )*det_1; 
-	inv.f[3] = 0.0; 
-	inv.f[4] = -(f[4]*f[10] - f[6]*f[8])*det_1; 
-	inv.f[5] = (f[0]*f[10] - f[2]*f[8])*det_1;
-	inv.f[6] = -(f[0]*f[6] - f[2]*f[4])*det_1; 
-	inv.f[7] = 0.0;
-	inv.f[8] = (f[4]*f[9] - f[5]*f[8] )*det_1; 
-	inv.f[9] = -(f[0]*f[9] - f[1]*f[8])*det_1; 
-	inv.f[10] = (f[0]*f[5] - f[1]*f[4])*det_1; 
-	inv.f[11] = 0.0;
-	inv.f[12] = -(f[12] * inv.f[0] + f[13] * inv.f[4] + f[14] * inv.f[8]); 
-	inv.f[13] = -(f[12] * inv.f[1] + f[13] * inv.f[5] + f[14] * inv.f[9]);
-	inv.f[14] = -(f[12] * inv.f[2] + f[13] * inv.f[6] + f[14] * inv.f[10]); 
-	return inv;
+#define SWAP_ROWS_FLOAT(a, b) { float *_tmp = a; (a)=(b); (b)=_tmp; }
+	matrix_t out;
+	const matrix_t& in(*this);
+   float wtmp[4][8];
+   float m0, m1, m2, m3, s;
+   float *r0, *r1, *r2, *r3;
+   r0 = wtmp[0], r1 = wtmp[1], r2 = wtmp[2], r3 = wtmp[3];
+   r0[0] = in( 0, 0), r0[1] = in( 0, 1),
+      r0[2] = in( 0, 2), r0[3] = in( 0, 3),
+      r0[4] = 1.0, r0[5] = r0[6] = r0[7] = 0.0,
+      r1[0] = in( 1, 0), r1[1] = in( 1, 1),
+      r1[2] = in( 1, 2), r1[3] = in( 1, 3),
+      r1[5] = 1.0, r1[4] = r1[6] = r1[7] = 0.0,
+      r2[0] = in( 2, 0), r2[1] = in( 2, 1),
+      r2[2] = in( 2, 2), r2[3] = in( 2, 3),
+      r2[6] = 1.0, r2[4] = r2[5] = r2[7] = 0.0,
+      r3[0] = in( 3, 0), r3[1] = in( 3, 1),
+      r3[2] = in( 3, 2), r3[3] = in( 3, 3),
+      r3[7] = 1.0, r3[4] = r3[5] = r3[6] = 0.0;
+   /* choose pivot - or die */
+   if (fabsf(r3[0]) > fabsf(r2[0]))
+      SWAP_ROWS_FLOAT(r3, r2);
+   if (fabsf(r2[0]) > fabsf(r1[0]))
+      SWAP_ROWS_FLOAT(r2, r1);
+   if (fabsf(r1[0]) > fabsf(r0[0]))
+      SWAP_ROWS_FLOAT(r1, r0);
+   if (0.0 == r0[0])
+      data_error("cannot inverse "<<this);
+   /* eliminate first variable     */
+   m1 = r1[0] / r0[0];
+   m2 = r2[0] / r0[0];
+   m3 = r3[0] / r0[0];
+   s = r0[1];
+   r1[1] -= m1 * s;
+   r2[1] -= m2 * s;
+   r3[1] -= m3 * s;
+   s = r0[2];
+   r1[2] -= m1 * s;
+   r2[2] -= m2 * s;
+   r3[2] -= m3 * s;
+   s = r0[3];
+   r1[3] -= m1 * s;
+   r2[3] -= m2 * s;
+   r3[3] -= m3 * s;
+   s = r0[4];
+   if (s != 0.0) {
+      r1[4] -= m1 * s;
+      r2[4] -= m2 * s;
+      r3[4] -= m3 * s;
+   }
+   s = r0[5];
+   if (s != 0.0) {
+      r1[5] -= m1 * s;
+      r2[5] -= m2 * s;
+      r3[5] -= m3 * s;
+   }
+   s = r0[6];
+   if (s != 0.0) {
+      r1[6] -= m1 * s;
+      r2[6] -= m2 * s;
+      r3[6] -= m3 * s;
+   }
+   s = r0[7];
+   if (s != 0.0) {
+      r1[7] -= m1 * s;
+      r2[7] -= m2 * s;
+      r3[7] -= m3 * s;
+   }
+   /* choose pivot - or die */
+   if (fabsf(r3[1]) > fabsf(r2[1]))
+      SWAP_ROWS_FLOAT(r3, r2);
+   if (fabsf(r2[1]) > fabsf(r1[1]))
+      SWAP_ROWS_FLOAT(r2, r1);
+   if (0.0 == r1[1])
+      data_error("cannot inverse "<<this);
+   /* eliminate second variable */
+   m2 = r2[1] / r1[1];
+   m3 = r3[1] / r1[1];
+   r2[2] -= m2 * r1[2];
+   r3[2] -= m3 * r1[2];
+   r2[3] -= m2 * r1[3];
+   r3[3] -= m3 * r1[3];
+   s = r1[4];
+   if (0.0 != s) {
+      r2[4] -= m2 * s;
+      r3[4] -= m3 * s;
+   }
+   s = r1[5];
+   if (0.0 != s) {
+      r2[5] -= m2 * s;
+      r3[5] -= m3 * s;
+   }
+   s = r1[6];
+   if (0.0 != s) {
+      r2[6] -= m2 * s;
+      r3[6] -= m3 * s;
+   }
+   s = r1[7];
+   if (0.0 != s) {
+      r2[7] -= m2 * s;
+      r3[7] -= m3 * s;
+   }
+   /* choose pivot - or die */
+   if (fabsf(r3[2]) > fabsf(r2[2]))
+      SWAP_ROWS_FLOAT(r3, r2);
+   if (0.0 == r2[2])
+      data_error("cannot inverse "<<this);
+   /* eliminate third variable */
+   m3 = r3[2] / r2[2];
+   r3[3] -= m3 * r2[3], r3[4] -= m3 * r2[4],
+      r3[5] -= m3 * r2[5], r3[6] -= m3 * r2[6], r3[7] -= m3 * r2[7];
+   /* last check */
+   if (0.0 == r3[3])
+      data_error("cannot inverse "<<this);
+   s = 1.0 / r3[3];		/* now back substitute row 3 */
+   r3[4] *= s;
+   r3[5] *= s;
+   r3[6] *= s;
+   r3[7] *= s;
+   m2 = r2[3];			/* now back substitute row 2 */
+   s = 1.0 / r2[2];
+   r2[4] = s * (r2[4] - r3[4] * m2), r2[5] = s * (r2[5] - r3[5] * m2),
+      r2[6] = s * (r2[6] - r3[6] * m2), r2[7] = s * (r2[7] - r3[7] * m2);
+   m1 = r1[3];
+   r1[4] -= r3[4] * m1, r1[5] -= r3[5] * m1,
+      r1[6] -= r3[6] * m1, r1[7] -= r3[7] * m1;
+   m0 = r0[3];
+   r0[4] -= r3[4] * m0, r0[5] -= r3[5] * m0,
+      r0[6] -= r3[6] * m0, r0[7] -= r3[7] * m0;
+   m1 = r1[2];			/* now back substitute row 1 */
+   s = 1.0 / r1[1];
+   r1[4] = s * (r1[4] - r2[4] * m1), r1[5] = s * (r1[5] - r2[5] * m1),
+      r1[6] = s * (r1[6] - r2[6] * m1), r1[7] = s * (r1[7] - r2[7] * m1);
+   m0 = r0[2];
+   r0[4] -= r2[4] * m0, r0[5] -= r2[5] * m0,
+      r0[6] -= r2[6] * m0, r0[7] -= r2[7] * m0;
+   m0 = r0[1];			/* now back substitute row 0 */
+   s = 1.0 / r0[0];
+   r0[4] = s * (r0[4] - r1[4] * m0), r0[5] = s * (r0[5] - r1[5] * m0),
+      r0[6] = s * (r0[6] - r1[6] * m0), r0[7] = s * (r0[7] - r1[7] * m0);
+   matrix_t m = {
+   	r0[4],
+   	r0[5], r0[6],
+   	r0[7], r1[4],
+   	r1[5], r1[6],
+   	r1[7], r2[4],
+   	r2[5], r2[6],
+   	r2[7], r3[4],
+   	r3[5], r3[6],
+      r3[7] };
+   return m;
+   #undef SWAP_ROWS_FLOAT
 }
 
 quat_t quat_t::slerp(const quat_t& d,float t) const {
