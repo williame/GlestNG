@@ -568,13 +568,15 @@ bool planet_t::surface_at(const vec_t& normal,vec_t& pt) const {
 static terrain_t* _terrain = NULL;
 
 terrain_t* terrain_t::get_terrain() {
+	if(!_terrain) panic("terrain does not exist");
 	return _terrain;
 }
 
-void terrain_t::gen_planet(size_t recursionLevel,size_t iterations,size_t smoothing_passes) {
+terrain_t* terrain_t::gen_planet(size_t recursionLevel,size_t iterations,size_t smoothing_passes) {
 	if(_terrain) panic("terrain already exists");
 	if(RUNNING_ON_VALGRIND)
 		_terrain = new planet_t(3,3,2); // speed it up a bit
 	else
 		_terrain = new planet_t(recursionLevel,iterations,smoothing_passes);
+	return _terrain;
 }

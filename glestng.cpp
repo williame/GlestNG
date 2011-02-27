@@ -36,6 +36,7 @@ uint64_t frame_count = 0;
 
 bool selection = false;
 vec_t selected_point;
+ray_t ray;
 int visible_objects = 0;
 
 std::auto_ptr<techtree_t> techtree;
@@ -152,7 +153,7 @@ void ui() {
 		glEnable(GL_DEPTH_TEST);
 	}
 	// draw logo
-	{
+	if(logo.get()) {
 		glPushMatrix();
 		glDisable(GL_LIGHT1);
 		glColor3f(1,0,0);
@@ -212,6 +213,13 @@ void spatial_test() {
 void tick() {
 	world()->check();
 	frame_count++;
+	if(true) {
+		glColor3f(1,0,0);
+		glBegin(GL_LINES);
+		glVertex3f(ray.o.x+0.1,ray.o.y+0.1,ray.o.z);
+		glVertex3f((ray.o.x+ray.d.x)+0.1,(ray.o.y+ray.d.y)+0.1,(ray.o.z+ray.d.z));
+		glEnd();
+	}
 	const world_t::hits_t& visible = world()->visible();
 	visible_objects = visible.size();
 //#define EXPLAIN // useful for seeing if it does draw front-to-back
@@ -238,7 +246,7 @@ void tick() {
 		for(tests_t::iterator i=objs.begin(); i!=objs.end(); i++)
 			(*i)->draw(0);
 	}
-	spatial_test();
+	//spatial_test();
 	ui();
 	SDL_GL_SwapBuffers();
 	SDL_Flip(screen);
@@ -249,22 +257,46 @@ void tick() {
 #endif
 }
 
+float zoom = 60;
+
+void camera() {
+	std::cout << "zoom="<<zoom<<std::endl;
+	glViewport(0,0,screen->w,screen->h);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	const float wh = (float)screen->w/(float)screen->h;
+//	glOrtho(-wh,wh,-1,1,-1,1);
+	gluPerspective(zoom,wh,1,10);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glTranslatef(0,0,-3);
+//	glRotatef(90,0,1,0);
+//	glPushMatrix();
+	matrix_t projection, modelview;
+	glGetFloatv(GL_MODELVIEW_MATRIX,projection.f);
+	glGetFloatv(GL_PROJECTION_MATRIX,modelview.f);
+	world()->set_frustum(vec_t(0,0,-3),projection*modelview);
+//	glPopMatrix();
+}
+
 void click(int x,int y) {
+	camera();
 	uint64_t start = high_precision_time();
-	double mv[16], p[16], a, b, c, d, e, f;
-	glGetDoublev(GL_MODELVIEW_MATRIX,mv);
-	glGetDoublev(GL_PROJECTION_MATRIX,p);
-	matrix_t _mv, _p;
-	glGetFloatv(GL_MODELVIEW_MATRIX,_mv.f);
-	glGetFloatv(GL_PROJECTION_MATRIX,_p.f);
-	const matrix_t inv = (_p*_mv).inverse();
-	GLint viewport[4];
-	glGetIntegerv(GL_VIEWPORT,viewport);
-	gluUnProject(x,viewport[3]-y,0,mv,p,viewport,&a,&b,&c);
-	const vec_t origin(vec_t(a,b,c)*inv);
-	gluUnProject(x,viewport[3]-y,1,mv,p,viewport,&d,&e,&f);
-	const vec_t dest(vec_t(d,e,f)*inv);
-	ray_t ray(origin,dest-origin);
+	GLint vp[4];
+	glGetIntegerv(GL_VIEWPORT,vp);
+	matrix_t mv, p;
+	glGetFloatv(GL_MODELVIEW_MATRIX,mv.f);
+	glGetFloatv(GL_PROJECTION_MATRIX,p.f);
+	const matrix_t inv = (mv*p).inverse();
+	const float
+		unit_x = (2.0f*((float)(x-vp[0])/(vp[2]-vp[0])))-1.0f,
+		unit_y = 1.0f-(2.0f*((float)(y-vp[1])/(vp[3]-vp[1])));
+	std::cout << x<<','<<y<< '=' << unit_x<<','<<unit_y << std::endl;
+	const vec_t near(vec_t(unit_x,unit_y,-1)*inv);
+	const vec_t dir = vec_t::normalise(vec_t(0,0,1) * inv);
+	std::cout << near << ',' << dir << '=' << (near+dir) << std::endl;
+	ray = ray_t(near,dir);
+
 	world_t::hits_t hits;
 	world()->intersection(ray,~0,hits);
 	uint64_t ns = high_precision_time()-start;
@@ -312,28 +344,6 @@ struct v4_t {
 	}
 	float v[4];
 };
-
-float zoom = 60;
-
-void camera() {
-	std::cout << "zoom="<<zoom<<std::endl;
-	glViewport(0,0,screen->w,screen->h);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	const float wh = (float)screen->w/(float)screen->h;
-//	glOrtho(-wh,wh,-1,1,-1,1);
-	gluPerspective(zoom,wh,1,10);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-	glTranslatef(0,0,-3);
-//	glRotatef(90,0,1,0);
-//	glPushMatrix();
-	matrix_t projection, modelview;
-	glGetFloatv(GL_MODELVIEW_MATRIX,projection.f);
-	glGetFloatv(GL_PROJECTION_MATRIX,modelview.f);
-	world()->set_frustum(vec_t(0,0,-3),projection*modelview);
-//	glPopMatrix();
-}
 
 void load(fs_t& fs) {
 	// this is just some silly test code - find a random model
@@ -410,7 +420,7 @@ int main(int argc,char** args) {
 		std::auto_ptr<fs_t> fs(fs_t::create("data/Glest"));
 		std::auto_ptr<ui_mgr_t> ui_(ui_mgr());
 		std::auto_ptr<mod_ui_t> mod_ui(mod_ui_t::create());
-		{
+		if(false) {
 			fs_file_t::ptr_t logo_file(fs_settings->get("logo.g3d"));
 			istream_t::ptr_t logostream(logo_file->reader());
 			logo = std::auto_ptr<model_g3d_t>(new model_g3d_t(*logostream));
@@ -418,7 +428,7 @@ int main(int argc,char** args) {
 
 		load(*fs);
 		
-		//terrain_t::gen_planet(5,500,3);
+		std::auto_ptr<terrain_t> terrain(terrain_t::gen_planet(5,500,3));
 		//world()->dump(std::cout);
 	
 		v4_t light_amb(0,0,0,1), light_dif(1.,1.,1.,1.), light_spec(1.,1.,1.,1.), light_pos(1.,1.,-1.,0.),

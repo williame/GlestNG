@@ -9,16 +9,19 @@
 #define __3D_HPP__
 
 #include <stddef.h>
+#include <math.h>
 
 #include <iostream>
 #include "error.hpp"
 
 struct quat_t;
+struct vec_t;
 
 struct matrix_t {
 	float f[16];
 	inline matrix_t operator*(const matrix_t& o) const;
 	inline matrix_t& operator*=(const matrix_t& o);
+	inline vec_t translation() const;
 	inline float operator()(int r,int c) const;
 	inline void invert();
 	matrix_t inverse() const;
@@ -51,6 +54,7 @@ struct vec_t {
 	inline vec_t operator/(float d) const;
 	inline float operator[](int i) const;
 	inline float& operator[](int i);
+	inline vec_t operator-() const;
 	inline vec_t cross(const vec_t& v) const;
 	inline float dot(const vec_t& v) const;
 	inline float magnitude_sqrd() const;
@@ -174,6 +178,10 @@ inline matrix_t matrix_t::operator*(const matrix_t& o) const {
 	return m;
 }
 
+inline vec_t matrix_t::translation() const {
+	return vec_t(f[12],f[13],f[14]);
+}
+
 inline void matrix_t::invert() {
 	*this = inverse();
 }
@@ -224,7 +232,7 @@ inline vec_t& vec_t::operator*=(const matrix_t& m) {
 	const float x = this->x, y = this->y, z = this->z;
 	this->x = x * m.f[0] + y * m.f[4] + z * m.f[8] + m.f[12];
 	this->y = x * m.f[1] + y * m.f[5] + z * m.f[9] + m.f[13];
-	this->z = x * m.f[2] + y * m.f[6] + z * m.f[10] + m.f[14];  	
+	this->z = x * m.f[2] + y * m.f[6] + z * m.f[10] + m.f[14];
 	return *this;
 }
 
@@ -289,6 +297,10 @@ inline float& vec_t::operator[](int i) {
 	case 2: return z;
 	default: panic("bad index "<<i);
 	}
+}
+
+inline vec_t vec_t::operator-() const {
+	return vec_t(-x,-y,-z);
 }
 
 inline vec_t vec_t::cross(const vec_t& v) const {

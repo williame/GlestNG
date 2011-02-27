@@ -13,7 +13,7 @@
 #include <vector>
 
 struct terrain_t {
-	static void gen_planet(size_t recursionLevel,size_t iterations,size_t smoothing_passes);
+	static terrain_t* gen_planet(size_t recursionLevel,size_t iterations,size_t smoothing_passes);
 	static terrain_t* get_terrain();
 	virtual ~terrain_t() {}
 	virtual void draw_init() = 0;
