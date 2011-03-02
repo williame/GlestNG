@@ -45,7 +45,7 @@ def HermiteInterpolate(y0,y1,y2,y3,mu,tension,bias):
 def HermiteSpline(Y): # Y is a path of points
     if len(Y) < 2: return ()
     SEG = 10
-    tension, bias = 0.1, 0.
+    tension, bias = 0.01, 0.5
     spline = []
     for y in xrange(len(Y)-1):
         y0 = Y[y-1] if (y > 0) else Y[0]
@@ -73,10 +73,14 @@ def triangles(pt,width):
         l = (x2+sin,y2,z2-cos)
         r = (x2-sin,y2,z2+cos)
         return (l,r)
+    def feq(a,b,tolerance):
+        return abs(a-b) < tolerance
     tri = []
     left,right = side(pt[0],pt[0],pt[1])
     for i in xrange(len(pt)):
-        l,r = side(pt[i],pt[min(i+1,len(pt)-1)],pt[min(i+2,len(pt)-1)])
+        i1,i2 = min(i+1,len(pt)-1),min(i+2,len(pt)-1)
+        y,mu,_ = pt[i1]
+        l,r = side(pt[i],pt[i1],pt[i2])
         if sum((p-q)**2 for p,q in zip(l,left)) > sqrwidth:
             tri.append((left,right,l))
             left = l
@@ -107,8 +111,52 @@ def quad_line(p1,p2,width=0.05):
         (x2 - sin, y2, z2 + cos),
         (x1 - sin, y1, z1 + cos)
         )
+    
+def draw_circle(a,r,*rgb):
+    cx,y,cz = a
+    glColor(*rgb)
+    num_segments = 4*4
+    theta = 2.0 * 3.1415926 / float(num_segments)
+    c = math.cos(theta)
+    s = math.sin(theta)
+    x, z = r, 0
+    glBegin(GL_LINE_LOOP)
+    for i in xrange(num_segments):
+        glVertex(x + cx, y, z + cz) 
+        t = x
+        x = c * x - s * z
+        z = s * t + c * z
+    glEnd()
+
+def tangents(a,r1,b,r2):
+    x1,y1,z1 = a
+    x2,y2,z2 = b
+    d_sq = (x1 - x2) * (x1 - x2) + (z1 - z2) * (z1 - z2)
+    if (d_sq <= (r1-r2)*(r1-r2)): return ()
+    d = math.sqrt(d_sq)
+    vx = (x2 - x1) / d
+    vz = (z2 - z1) / d 
+    res = []
+    c = (r1 - 1 * r2) / d
+    h = math.sqrt(max(0.0, 1.0 - c*c))
+    for sign2 in (+1,-1):
+        nx = vx * c - sign2 * h * vz
+        nz = vz * c + sign2 * h * vx
+        res.append((x1 + r1 * nx,y1,z1 + r1 * nz))
+        res.append((x2 + 1 * r2 * nx,y2,z2 + 1 * r2 * nz))
+    return res
+    
+def distance_line_to_point(line,pt):
+    (x1,_,z1),(x2,_,z2) = line
+    x,y,z = pt
+    A = x - x1
+    B = z - z1
+    C = x2 - x1
+    D = z2 - z1
+    return abs(A * D - C * B) / math.sqrt(C * C + D * D)
 
 class RoadMaker(zpr.GLZPR):
+    MARK, INNER, OUTER = 0.01, 0.03, 0.09
     def __init__(self):
         zpr.GLZPR.__init__(self)
         self.ground = Ground()
@@ -139,20 +187,58 @@ class RoadMaker(zpr.GLZPR):
             glVertex(1,0,.2)
             glEnd()
             glPopMatrix()
-        glLineWidth(4)
-        spline = HermiteSpline(self.path)
-        if len(spline) > 1:
-            tri = triangles(spline,0.05)
-            glColor(1,1,1)
-            glBegin(GL_LINE_STRIP)
-            for _,_,v in spline:
-                glVertex(*v)
-            glEnd()
-            if self.info:
-                self.info = False
-                print len(self.path),"points"
-                print "  ->",len(spline),"centre-line"
-                print "  ->",len(tri),"triangles"
+        if len(self.path) > 1:
+            def draw_left(a,b):
+                glColor(0,0.5,1)
+                glBegin(GL_LINES)
+                glVertex(*a)
+                glVertex(*b)
+                glEnd()
+            def draw_right(a,b):
+                glColor(0,1,0.5)
+                glBegin(GL_LINES)
+                glVertex(*a)
+                glVertex(*b)
+                glEnd()
+            glLineWidth(2)
+            path = quad_line(self.path[0],self.path[1],self.OUTER-self.INNER)
+            prev = self.path[0]
+            draw_circle(prev,self.MARK,1,0.6,0.4)
+            l,r = path[0],path[3]
+            prev_to_left = True
+            for i in xrange(1,len(self.path)-1):
+                pt = self.path[i]
+                tan_outer = tangents(prev,self.OUTER,pt,self.OUTER)
+                draw_circle(pt,self.MARK,1,0.6,0.4)
+                draw_circle(pt,self.INNER,0,0.6,0.4)
+                next = self.path[i+1]
+                to_left = distance_line_to_point((prev,next),tan_outer[1]) > \
+                    distance_line_to_point((prev,next),tan_outer[3])
+                if to_left:
+                    draw_circle(pt,self.OUTER,0,0.6,0.4)
+                    idx = 1
+                else:
+                    draw_circle(pt,self.OUTER,1,0.6,0.4)
+                    idx = 3
+                tan_inner = tangents(prev,self.INNER,pt,self.INNER)
+                left = tan_inner[idx]
+                right = tan_outer[idx]
+                if prev_to_left != to_left:
+                    left, right = right, left
+                    prev_to_left = to_left
+                tan_inner = tangents(pt,self.INNER,next,self.INNER)
+                tan_outer = tangents(pt,self.OUTER,next,self.OUTER)
+                next_left = tan_inner[idx-1]
+                next_right = tan_outer[idx-1]
+                draw_left(l,left)
+                draw_right(r,right)
+                l, r, prev = next_left, next_right, pt
+            path = quad_line([(p+q)/2. for p,q in zip(l,r)],self.path[-1],self.OUTER-self.INNER)
+            draw_left(path[0],path[1])
+            draw_right(path[3],path[2])
+        if self.info:
+            self.info = False
+            print len(self.path),"points"
         glEnable(GL_DEPTH_TEST)
             
     def _pick(self,x,y,dx,dy,event):
@@ -165,10 +251,26 @@ class RoadMaker(zpr.GLZPR):
             dtype=numpy.float32)
         ray[1] -= ray[0]
         point = self.ground.pick(ray)
-        if point is not None:
-            self.end_point = point
-            self.path.append(self.end_point)
+        while (point is not None):
+            selected = error = None
+            for i,pt in enumerate(self.path):
+                if math.sqrt(sum((p-q)**2 for p,q in zip(point,pt))) <= (self.OUTER*2):
+                    if selected is not None:
+                        print "ARGH"
+                        error = True
+                        break
+                    else:
+                        selected = i
+            if error: break
+            if selected:
+                self.path[selected] = point
+                if selected == len(self.path)-1:
+                    self.end_point = point
+            else:
+                self.end_point = point
+                self.path.append(self.end_point)
             self.info = True
+            break
         return ((),())
     def pick(self,*args):
         pass
