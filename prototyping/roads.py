@@ -12,8 +12,8 @@ import zpr
 
 class Ground:
     def __init__(self):
-        self.triangles = numpy.array((((-1,-1,-1),(1,-1,-1),(1,-1,1)),
-            ((-1,-1,-1),(1,-1,1),(-1,-1,1))),dtype=numpy.float32)
+        self.triangles = numpy.array((((-1,-1,0),(-1,1,0),(1,1,0)),
+            ((1,1,0),(1,-1,0),(-1,-1,0))),dtype=numpy.float32)
     def draw(self):
         glColor(0,0.6,0,1) # dark green
         glBegin(GL_TRIANGLES)
@@ -26,78 +26,6 @@ class Ground:
             I = zpr.ray_triangle(ray[0],ray[1],triangle)
             if I is not None:
                 return I
-                
-def HermiteInterpolate(y0,y1,y2,y3,mu,tension,bias):
-    # from http://paulbourke.net/miscellaneous/interpolation/
-    tension = (1.-tension)/2
-    mu2 = mu * mu
-    mu3 = mu2 * mu
-    m0  = (y1-y0)*(1.+bias)*tension
-    m0 += (y2-y1)*(1.-bias)*tension
-    m1  = (y2-y1)*(1.+bias)*tension
-    m1 += (y3-y2)*(1.-bias)*tension
-    a0 =  2*mu3 - 3*mu2 + 1
-    a1 =    mu3 - 2*mu2 + mu
-    a2 =    mu3 -   mu2
-    a3 = -2*mu3 + 3*mu2
-    return(a0*y1+a1*m0+a2*m1+a3*y2)
-
-def HermiteSpline(Y): # Y is a path of points
-    if len(Y) < 2: return ()
-    SEG = 10
-    tension, bias = 0.01, 0.5
-    spline = []
-    for y in xrange(len(Y)-1):
-        y0 = Y[y-1] if (y > 0) else Y[0]
-        y1 = Y[y]
-        y2 = Y[y+1]
-        y3 = Y[y+2] if (y < len(Y)-2) else Y[-1]
-        for mu in xrange(SEG+1):
-            mu *= 1./SEG
-            spline.append((y,mu,(
-                HermiteInterpolate(y0[0],y1[0],y2[0],y3[0],mu,tension,bias),
-                HermiteInterpolate(y0[1],y1[1],y2[1],y3[1],mu,tension,bias),
-                HermiteInterpolate(y0[2],y1[2],y2[2],y3[2],mu,tension,bias))))
-    return spline
-    
-def triangles(pt,width):
-    halfwidth = width/2 
-    sqrwidth = width**2
-    def side(a,b,c):
-        _,_,(x1,y1,z1) = a
-        _,_,(x2,y2,z2) = b
-        _,_,(x3,y3,z3) = c
-        theta = math.atan2(z3 - z1,x3 - x1)
-        sin = halfwidth * math.sin(theta)
-        cos = halfwidth * math.cos(theta)
-        l = (x2+sin,y2,z2-cos)
-        r = (x2-sin,y2,z2+cos)
-        return (l,r)
-    def feq(a,b,tolerance):
-        return abs(a-b) < tolerance
-    tri = []
-    left,right = side(pt[0],pt[0],pt[1])
-    for i in xrange(len(pt)):
-        i1,i2 = min(i+1,len(pt)-1),min(i+2,len(pt)-1)
-        y,mu,_ = pt[i1]
-        l,r = side(pt[i],pt[i1],pt[i2])
-        if sum((p-q)**2 for p,q in zip(l,left)) > sqrwidth:
-            tri.append((left,right,l))
-            left = l
-        if sum((p-q)**2 for p,q in zip(r,right)) > sqrwidth:
-            tri.append((right,left,r))
-            right = r
-    glColor(1,1,1)
-    glBegin(GL_TRIANGLES)
-    for i,t in enumerate(tri):
-        if i % 2 == 1:
-            glColor(0,.5,1)
-        else:
-            glColor(.5,1,0)
-        for v in t:
-            glVertex(*v)
-    glEnd()
-    return tri
 
 def quad_line(p1,p2,width=0.05):
     x1, y1, z1 = p1
@@ -111,49 +39,88 @@ def quad_line(p1,p2,width=0.05):
         (x2 - sin, y2, z2 + cos),
         (x1 - sin, y1, z1 + cos)
         )
-    
-def draw_circle(a,r,*rgb):
-    cx,y,cz = a
-    glColor(*rgb)
-    num_segments = 4*4
-    theta = 2.0 * 3.1415926 / float(num_segments)
-    c = math.cos(theta)
-    s = math.sin(theta)
-    x, z = r, 0
-    glBegin(GL_LINE_LOOP)
-    for i in xrange(num_segments):
-        glVertex(x + cx, y, z + cz) 
-        t = x
-        x = c * x - s * z
-        z = s * t + c * z
-    glEnd()
 
-def tangents(a,r1,b,r2):
-    x1,y1,z1 = a
-    x2,y2,z2 = b
-    d_sq = (x1 - x2) * (x1 - x2) + (z1 - z2) * (z1 - z2)
-    if (d_sq <= (r1-r2)*(r1-r2)): return ()
-    d = math.sqrt(d_sq)
-    vx = (x2 - x1) / d
-    vz = (z2 - z1) / d 
-    res = []
-    c = (r1 - 1 * r2) / d
-    h = math.sqrt(max(0.0, 1.0 - c*c))
-    for sign2 in (+1,-1):
-        nx = vx * c - sign2 * h * vz
-        nz = vz * c + sign2 * h * vx
-        res.append((x1 + r1 * nx,y1,z1 + r1 * nz))
-        res.append((x2 + 1 * r2 * nx,y2,z2 + 1 * r2 * nz))
-    return res
+class Point:
+    def __init__(self,x,y):
+        self.x = float(x)
+        self.y = float(y)
+    def __div__(self,n):
+        self.x /= n
+        self.y /= n
+    def distance(self,other):
+        return math.sqrt(self.distance_sqrd(other))
+    def distance_sqrd(self,other):
+        return (self.x-other.x)**2 + (self.y-other.y)**2
+    def circle(self,radius):
+        return Circle(self,radius)
+    def line(self,to):
+        return Line(self,to)
+    def to_3d(self):
+        return (self.x,self.y,0)
+        
+class Line:
+    def __init__(self,a,b):
+        self.a, self.b = a, b
+        self.dx, self.dy = (self.b.x - self.a.x), (self.b.y - self.a.y)
+    def closest(self,pt):
+        U = (pt.x-self.a.x)*self.dx + (pt.y-self.a.y)*self.dy
+        U /= self.a.distance_sqrd(self.b)
+        if U >= 1.: return self.b
+        if U <= 0.: return self.a
+        return self.interpolate(U)
+    def distance(self,pt):
+        return abs((pt.x-self.a.x)*self.dy - self.dx*(pt.y-self.a.y)) / \
+            math.sqrt(self.dx**2 + self.dy**2)
+    def length(self):
+        return self.a.distance(self.b)
+    def interpolate(self,U):
+        return Point(self.a.x + U * self.dx,self.a.y + U * self.dy)
+    def draw(self,*rgb):
+        glColor(*rgb)
+        glBegin(GL_LINES)
+        glVertex(*self.a.to_3d())
+        glVertex(*self.b.to_3d())
+        glEnd()
     
-def distance_line_to_point(line,pt):
-    (x1,_,z1),(x2,_,z2) = line
-    x,y,z = pt
-    A = x - x1
-    B = z - z1
-    C = x2 - x1
-    D = z2 - z1
-    return abs(A * D - C * B) / math.sqrt(C * C + D * D)
+class Circle:
+    def __init__(self,pt,radius):
+        self.pt = pt
+        self.radius = radius
+    def draw(self,*rgb):
+        glColor(*rgb)
+        num_segments = 4*4
+        theta = 2.0 * 3.1415926 / float(num_segments)
+        c = math.cos(theta)
+        s = math.sin(theta)
+        x, y = self.radius, 0
+        glBegin(GL_LINE_LOOP)
+        for i in xrange(num_segments):
+            glVertex(x + self.pt.x, y + self.pt.y) 
+            t = x
+            x = c * x - s * y
+            y = s * t + c * y
+        glEnd()
+    def outer_tangents(self,other):
+        return self._tangents(other,+1)
+    def inner_tangents(self,other):
+        return self._tangents(other,-1)
+    def _tangents(self,other,sign1):
+        d_sq = self.pt.distance_sqrd(other.pt)
+        if (d_sq <= (self.radius-other.radius)**2): raise Exception("containment")
+        d = math.sqrt(d_sq)
+        vx = (other.pt.x - self.pt.x) / d
+        vy = (other.pt.y - self.pt.y) / d 
+        res = []
+        c = (self.radius - sign1 * other.radius) / d
+        if (c*c > 1.0): raise Exception("overlap")
+        h = math.sqrt(max(0.0, 1.0 - c**2))
+        for sign2 in (+1,-1):
+            nx = vx * c - sign2 * h * vy
+            ny = vy * c + sign2 * h * vx
+            res.append(Line( \
+                Point(self.pt.x + self.radius * nx,self.pt.y + self.radius * ny),
+                Point(other.pt.x + sign1 * other.radius * nx,other.pt.y + sign1 * other.radius * ny)))
+        return tuple(res)
 
 class RoadMaker(zpr.GLZPR):
     MARK, INNER, OUTER = 0.01, 0.03, 0.09
@@ -169,73 +136,47 @@ class RoadMaker(zpr.GLZPR):
         glScale(.8,.8,.8)        
         glDisable(GL_DEPTH_TEST)
         self.ground.draw()
+        glLineWidth(2)
         if self.end_point is not None:
-            # draw a cross
-            glColor(1,0,0,1)
-            glPushMatrix()
-            glTranslate(*self.end_point)
-            glRotate(45,0,1,0)
-            glScale(.1,.1,.1)
-            glBegin(GL_QUADS)
-            glVertex(-.2,0,-1)
-            glVertex(-.2,0,1)
-            glVertex(.2,0,1)
-            glVertex(.2,0,-1)
-            glVertex(-1,0,.2)
-            glVertex(-1,0,-.2)
-            glVertex(1,0,-.2)
-            glVertex(1,0,.2)
-            glEnd()
-            glPopMatrix()
+            self.end_point.circle(0.01).draw(1,0,0)
         if len(self.path) > 1:
-            def draw_left(a,b):
-                glColor(0,0.5,1)
-                glBegin(GL_LINES)
-                glVertex(*a)
-                glVertex(*b)
-                glEnd()
-            def draw_right(a,b):
-                glColor(0,1,0.5)
-                glBegin(GL_LINES)
-                glVertex(*a)
-                glVertex(*b)
-                glEnd()
-            glLineWidth(2)
-            path = quad_line(self.path[0],self.path[1],self.OUTER-self.INNER)
-            prev = self.path[0]
-            draw_circle(prev,self.MARK,1,0.6,0.4)
-            l,r = path[0],path[3]
-            prev_to_left = True
-            for i in xrange(1,len(self.path)-1):
-                pt = self.path[i]
-                tan_outer = tangents(prev,self.OUTER,pt,self.OUTER)
-                draw_circle(pt,self.MARK,1,0.6,0.4)
-                draw_circle(pt,self.INNER,0,0.6,0.4)
-                next = self.path[i+1]
-                to_left = distance_line_to_point((prev,next),tan_outer[1]) > \
-                    distance_line_to_point((prev,next),tan_outer[3])
-                if to_left:
-                    draw_circle(pt,self.OUTER,0,0.6,0.4)
-                    idx = 1
-                else:
-                    draw_circle(pt,self.OUTER,1,0.6,0.4)
-                    idx = 3
-                tan_inner = tangents(prev,self.INNER,pt,self.INNER)
-                left = tan_inner[idx]
-                right = tan_outer[idx]
-                if prev_to_left != to_left:
-                    left, right = right, left
-                    prev_to_left = to_left
-                tan_inner = tangents(pt,self.INNER,next,self.INNER)
-                tan_outer = tangents(pt,self.OUTER,next,self.OUTER)
-                next_left = tan_inner[idx-1]
-                next_right = tan_outer[idx-1]
-                draw_left(l,left)
-                draw_right(r,right)
-                l, r, prev = next_left, next_right, pt
-            path = quad_line([(p+q)/2. for p,q in zip(l,r)],self.path[-1],self.OUTER-self.INNER)
-            draw_left(path[0],path[1])
-            draw_right(path[3],path[2])
+            pivots = []
+            for pt in self.path:
+                pt.circle(self.MARK).draw(0.8,0.8,1)
+            for i in xrange(1,len(self.path)):
+                self.path[i].line(self.path[i-1]).draw(0.8,0.8,0.8)
+            # compute pivots
+            pivot = self.path[0].circle((self.OUTER-self.INNER)/2.)
+            pivots.append((pivot,pivot))
+            for p in xrange(1,len(self.path)-1):
+                prev = self.path[p-1]
+                next = self.path[p+1]
+                p = self.path[p]
+                pivot = Line(p,prev.line(next).closest(p))
+                pivot = pivot.interpolate(((self.INNER+self.OUTER)/2.) / pivot.length())
+                pivots.append((pivot.circle(self.INNER),pivot.circle(self.OUTER)))
+            pivot = self.path[-1].circle((self.OUTER-self.INNER)/2.)
+            pivots.append((pivot,pivot))
+            # compute winding
+            LEFT, RIGHT = "L", "R"
+            OBTRUSE, ACUTE = "Ob", "Ac"
+            sides = [(LEFT,OBTRUSE)]
+            for p in xrange(1,len(self.path)-1):
+                prev, pt, next = self.path[p-1:p+2]
+                obtruse = (prev.distance(pt) < prev.distance(next)) and \
+                    (next.distance(pt) < prev.distance(next))
+                angle = OBTRUSE if obtruse else ACUTE
+                side = LEFT
+                sides.append((side,angle))
+            sides.append((LEFT,OBTRUSE))
+            # draw pivots
+            for p in xrange(1,len(self.path)):
+                (from_inner,from_outer),(from_side,from_angle) = (pivots[p-1],sides[p-1])
+                (to_inner,to_outer),(to_side,to_angle) = (pivots[p],sides[p])
+                rgb = (.6,.6,1) if to_angle==OBTRUSE else (1,.6,.6)
+                to_outer.draw(*rgb)
+                rgb = (.5,.5,1) if to_side==LEFT else (1,.5,.5)
+                to_inner.draw(*rgb)
         if self.info:
             self.info = False
             print len(self.path),"points"
@@ -252,15 +193,22 @@ class RoadMaker(zpr.GLZPR):
         ray[1] -= ray[0]
         point = self.ground.pick(ray)
         while (point is not None):
+            assert point[2] == 0
+            point = Point(point[0],point[1])
             selected = error = None
             for i,pt in enumerate(self.path):
-                if math.sqrt(sum((p-q)**2 for p,q in zip(point,pt))) <= (self.OUTER*2):
+                d = pt.distance(point)
+                if d <= self.OUTER:
                     if selected is not None:
                         print "ARGH"
                         error = True
                         break
                     else:
                         selected = i
+                elif d <= (self.OUTER*2):
+                    print "OGH"
+                    error = True
+                    break
             if error: break
             if selected:
                 self.path[selected] = point
