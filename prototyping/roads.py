@@ -153,38 +153,28 @@ class RoadMaker(zpr.GLZPR):
                 pt.circle(self.MARK).draw(0.8,0.8,1)
             # compute pivots
             pivot = self.path[0].circle((self.OUTER-self.INNER)/2.)
-            pivots.append((pivot,pivot))
-            for p in xrange(1,len(self.path)-1):
-                prev = self.path[p-1]
-                next = self.path[p+1]
-                p = self.path[p]
-                pivot = Line(p,Line(p.line(prev).normal().b,p.line(next).normal().b).interpolate(.5))
-                pivot = pivot.interpolate(((self.INNER+self.OUTER)/2.) / pivot.length())
-                pivots.append((pivot.circle(self.INNER),pivot.circle(self.OUTER)))
-            pivot = self.path[-1].circle((self.OUTER-self.INNER)/2.)
-            pivots.append((pivot,pivot))
-            # compute winding
             LEFT, ON, RIGHT = "L", "-", "R"
-            OBTRUSE, ACUTE = "Ob", "Ac"
-            sides = [(ON,OBTRUSE)]
-            for p in xrange(1,len(self.path)-1):
-                prev, pt, next = self.path[p-1:p+2]
-                pivot = pivots[p][0].pt
-                obtruse = (prev.distance(pt) < prev.distance(next)) and \
-                    (next.distance(pt) < prev.distance(next))
-                angle = OBTRUSE if obtruse else ACUTE
-                side = Line(prev,pt).side(pivot)
-                side = LEFT if side > 0. else ON if side == 0. else RIGHT
-                sides.append((side,angle))
-            sides.append((ON,OBTRUSE))
-            # draw pivots
+            pivots.append((ON,pivot,None))
             for p in xrange(1,len(self.path)):
-                (from_inner,from_outer),(from_side,from_angle) = (pivots[p-1],sides[p-1])
-                (to_inner,to_outer),(to_side,to_angle) = (pivots[p],sides[p])
-                rgb = (.6,.6,1) if to_angle==OBTRUSE else (1,.6,.6)
-                to_outer.draw(*rgb)
-                rgb = (.5,.5,1) if to_side==LEFT else (1,.5,.5)
-                to_inner.draw(*rgb)
+                from_side, from_inner, from_outer = pivots[-1]
+                prev = self.path[p-1]
+                pt = self.path[p]
+                if p == len(self.path)-1: #last one?
+                    pivot = self.path[-1].circle((self.OUTER-self.INNER)/2.)
+                    pivots.append((ON,pivot,None))
+                else:
+                    next = self.path[p+1]
+                    pivot = Line(pt,Line(pt.line(prev).normal().b,pt.line(next).normal().b).interpolate(.5))
+                    pivot = pivot.interpolate(((self.INNER+self.OUTER)/2.) / pivot.length())
+                    side = Line(prev,pt).side(pivot)
+                    side = LEFT if side > 0. else ON if side == 0. else RIGHT
+                    inner = pivot.circle(self.INNER)
+                    outer = pivot.circle(self.OUTER) if side is not ON else None
+                    pivots.append((side,inner,outer))
+                to_side, to_inner, to_outer = pivots[-1]
+                # draw it
+                to_inner.draw(.7,.7,.7)
+                if to_outer is not None: to_outer.draw(.7,.7,.7)
                 left = right = None
                 if (from_side == LEFT) and (to_side == LEFT):
                     left = from_inner.outer_tangents(to_inner)[1]
