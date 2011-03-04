@@ -91,22 +91,26 @@ class Line:
         glEnd()
     
 class Circle:
+    num_segments = 4*4
+    theta = 2.0 * 3.1415926 / float(num_segments)
+    c = math.cos(theta)
+    s = math.sin(theta)
     def __init__(self,pt,radius):
         self.pt = pt
         self.radius = radius
+    def advance(self,pt):
+        x = self.c * pt.x - self.s * pt.y
+        y = self.s * pt.x + self.c * pt.y
+        return Point(x,y)
     def draw(self,*rgb):
         glColor(*rgb)
-        num_segments = 4*4
-        theta = 2.0 * 3.1415926 / float(num_segments)
-        c = math.cos(theta)
-        s = math.sin(theta)
         x, y = self.radius, 0
         glBegin(GL_LINE_LOOP)
-        for i in xrange(num_segments):
+        for i in xrange(self.num_segments):
             glVertex(x + self.pt.x, y + self.pt.y) 
             t = x
-            x = c * x - s * y
-            y = s * t + c * y
+            x = self.c * x - self.s * y
+            y = self.s * t + self.c * y
         glEnd()
     def outer_tangents(self,other):
         return self._tangents(other,+1)
@@ -131,7 +135,10 @@ class Circle:
         return tuple(res)
 
 class RoadMaker(zpr.GLZPR):
-    MARK, INNER, OUTER = 0.01, 0.03, 0.09
+    MARK = .01
+    INNER = .01
+    WIDTH = .05
+    OUTER = INNER + WIDTH
     def __init__(self):
         zpr.GLZPR.__init__(self)
         self.ground = Ground()
@@ -152,24 +159,25 @@ class RoadMaker(zpr.GLZPR):
             for pt in self.path:
                 pt.circle(self.MARK).draw(0.8,0.8,1)
             # compute pivots
-            pivot = self.path[0].circle((self.OUTER-self.INNER)/2.)
             LEFT, ON, RIGHT = "L", "-", "R"
+            OUTER,INNER = self.OUTER,self.INNER
+            pivot = self.path[0].circle((OUTER-INNER)/2.)
             pivots.append((ON,pivot,None))
             for p in xrange(1,len(self.path)):
                 from_side, from_inner, from_outer = pivots[-1]
                 prev = self.path[p-1]
                 pt = self.path[p]
                 if p == len(self.path)-1: #last one?
-                    pivot = self.path[-1].circle((self.OUTER-self.INNER)/2.)
+                    pivot = self.path[-1].circle((OUTER-INNER)/2.)
                     pivots.append((ON,pivot,None))
                 else:
                     next = self.path[p+1]
                     pivot = Line(pt,Line(pt.line(prev).normal().b,pt.line(next).normal().b).interpolate(.5))
-                    pivot = pivot.interpolate(((self.INNER+self.OUTER)/2.) / pivot.length())
+                    pivot = pivot.interpolate(((INNER+OUTER)/2.) / pivot.length())
                     side = Line(prev,pt).side(pivot)
                     side = LEFT if side > 0. else ON if side == 0. else RIGHT
-                    inner = pivot.circle(self.INNER)
-                    outer = pivot.circle(self.OUTER) if side is not ON else None
+                    inner = pivot.circle(INNER)
+                    outer = pivot.circle(OUTER) if side is not ON else None
                     pivots.append((side,inner,outer))
                 to_side, to_inner, to_outer = pivots[-1]
                 # draw it
@@ -177,36 +185,48 @@ class RoadMaker(zpr.GLZPR):
                 if to_outer is not None: to_outer.draw(.7,.7,.7)
                 left = right = None
                 if (from_side == LEFT) and (to_side == LEFT):
-                    left = from_inner.outer_tangents(to_inner)[1]
-                    right = from_outer.outer_tangents(to_outer)[1]
+                    left = (INNER,OUTER,INNER,1)
+                    right = (OUTER,OUTER,OUTER,1)
                 elif (from_side == RIGHT) and (to_side == RIGHT):
-                    left = from_outer.outer_tangents(to_outer)[0]
-                    right = from_inner.outer_tangents(to_inner)[0]
+                    left = (OUTER,OUTER,OUTER,0)
+                    right = (INNER,OUTER,INNER,0)
                 elif (from_side == LEFT) and (to_side == RIGHT):
-                    left = from_inner.inner_tangents(to_outer)[1]
-                    right = from_outer.inner_tangents(to_inner)[1]
+                    left = (INNER,INNER,OUTER,1)
+                    right = (OUTER,INNER,INNER,1)
                 elif (from_side == RIGHT) and (to_side == LEFT):
-                    left = from_outer.inner_tangents(to_inner)[0]
-                    right = from_inner.inner_tangents(to_outer)[0]
+                    left = (OUTER,INNER,INNER,0)
+                    right = (INNER,INNER,OUTER,0)
                 elif (from_side == ON) and (to_side == LEFT):
-                    left = from_inner.inner_tangents(to_inner)[0]
-                    right = from_inner.outer_tangents(to_outer)[1]
+                    left = (INNER,INNER,INNER,0)
+                    right = (INNER,OUTER,OUTER,1)
                 elif (from_side == ON) and (to_side == RIGHT):
-                    left = from_inner.outer_tangents(to_outer)[0]
-                    right = from_inner.inner_tangents(to_inner)[1]
+                    left = (INNER,OUTER,OUTER,0)
+                    right = (INNER,INNER,INNER,1)
                 elif (from_side == LEFT) and (to_side == ON):
-                    left = from_inner.inner_tangents(to_inner)[1]
-                    right = from_outer.outer_tangents(to_inner)[1]
+                    left = (INNER,INNER,INNER,1)
+                    right = (OUTER,OUTER,INNER,1)
                 elif (from_side == RIGHT) and (to_side == ON):
-                    left = from_outer.outer_tangents(to_inner)[0]
-                    right = from_inner.inner_tangents(to_inner)[0]
+                    left = (OUTER,OUTER,INNER,0)
+                    right = (INNER,INNER,INNER,0)
                 elif (from_side == ON) and (to_side == ON):
-                    left = from_inner.outer_tangents(to_inner)[0]
-                    right = from_inner.outer_tangents(to_inner)[1]
+                    left = (INNER,OUTER,INNER,0)
+                    right = (INNER,OUTER,INNER,1)
                 else:
-                    self.path[p].line(self.path[p-1]).draw(0.8,0.8,0.8)
-                if left is not None: left.draw(1,1,1)
-                if right is not None: right.draw(1,.4,1)
+                    assert False
+                # do left
+                fr, tan, to, idx = left
+                fr = from_inner if fr == INNER else from_outer
+                tan = fr.inner_tangents if tan == INNER else fr.outer_tangents
+                to = to_inner if to == INNER else to_outer
+                left = tan(to)[idx]
+                left.draw(1,1,1)
+                # do right
+                fr, tan, to, idx = right
+                fr = from_inner if fr == INNER else from_outer
+                tan = fr.inner_tangents if tan == INNER else fr.outer_tangents
+                to = to_inner if to == INNER else to_outer
+                right = tan(to)[idx]
+                right.draw(0,1,1)
         if self.info:
             self.info = False
             print len(self.path),"points"
