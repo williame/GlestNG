@@ -10,6 +10,32 @@ import numpy, math
 
 import zpr
 
+def load_texture(filename):
+    texture = glGenTextures(1)
+    try:
+        import Image
+        image = Image.open(filename)
+        w, h = image.size
+        try:
+            img = image.tostring("raw","RGBA",0,-1)
+            mode = GL_RGBA
+        except Exception as e:
+            img = image.tostring("raw","RGB",0,-1)
+            mode = GL_RGB
+        image = img
+        glPixelStorei(GL_UNPACK_ALIGNMENT,1)
+        glBindTexture(GL_TEXTURE_2D,texture)
+        glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP)
+        glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP)
+        glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
+        glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR)
+        glTexImage2D(GL_TEXTURE_2D,0,mode,w,h,0,mode,GL_UNSIGNED_BYTE,image)
+        return (texture,w,h)
+    except Exception,e:
+        print "Could not load texture",filename
+        print e
+        return (0,1024,1024)
+
 class Ground:
     def __init__(self):
         self.triangles = numpy.array((((-1,-1,0),(-1,1,0),(1,1,0)),
@@ -165,6 +191,7 @@ class RoadMaker(zpr.GLZPR):
     WIDTH = .05
     CURVE = .02
     OUTER = INNER + WIDTH
+    
     def __init__(self):
         zpr.GLZPR.__init__(self)
         self.ground = Ground()
@@ -178,8 +205,8 @@ class RoadMaker(zpr.GLZPR):
             glEnable(GL_MULTISAMPLE_ARB)
         except Exception as e:
             print "Error initializing multisampling:",e
-        else:
-            print "Enabled multisampling"
+        self.texture, self.texture_w, self.texture_h = \
+            load_texture("../data/Glest/tilesets/meadow/textures/surface4b.bmp")
     def draw(self,event):
         glClearColor(1,1,1,0)
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
@@ -198,6 +225,8 @@ class RoadMaker(zpr.GLZPR):
             pivot = self.path[0].circle((OUTER-INNER)/2.)
             from_side, from_inner, from_outer = ON,pivot,None
             from_left = from_right = None
+            tile = 0.
+            tiles = 1
             for p in xrange(1,len(self.path)):
                 prev = self.path[p-1]
                 pt = self.path[p]
@@ -262,34 +291,41 @@ class RoadMaker(zpr.GLZPR):
                     l = Line(from_left,left.a)
                     r = Line(from_right,right.a)
                     def curve(l,r,part):
-                        if (l.length() > self.CURVE) or (r.length() > self.CURVE):
+                        length = max(l.length(),r.length())
+                        if (length > self.CURVE):
                             lmid = left_fr.interpolate(l)
                             rmid = right_fr.interpolate(r)
                             curve(l.a.line(lmid),r.a.line(rmid),False)
                             curve(lmid.line(l.b),rmid.line(r.b),True)
                         if not part:
-                            quads.append((l.b,r.b))
+                            quads.append((l.b,r.b,(0.,0.),(0.,1.)))
                     curve(l,r,False)
-                quads.append((left.a,right.a))
-                quads.append((left.b,right.b))
+                quads.append((left.a,right.a,(0.,0.),(0.,1.)))
+                quads.append((left.b,right.b,(0.,1.),(1.,1.)))
                 # for next
                 from_side, from_inner, from_outer = to_side, to_inner, to_outer
                 from_left, from_right = left.b, right.b
             # draw it
             glColor(.3,.7,1)
+            glEnable(GL_TEXTURE_2D)
+            glBindTexture(GL_TEXTURE_2D,self.texture)
+            glColor(1,1,1,1)
             glBegin(GL_QUADS)
             prev = quads[0]
-            for i,quad in enumerate(quads[1:]):
-                if i&1: glColor(1,0,0)
-                else: glColor(1,1,0)
-                a,b = prev
+            for quad in quads[1:]:
+                a,b,ta,tb = prev
+                glTexCoord(*ta)
                 glVertex(*a.to_3d())
+                glTexCoord(*tb)
                 glVertex(*b.to_3d())
-                b,a = quad
+                b,a,tb,ta = quad
+                glTexCoord(*ta)
                 glVertex(*a.to_3d())
+                glTexCoord(*tb)
                 glVertex(*b.to_3d())
                 prev = quad
             glEnd()
+            glBindTexture(GL_TEXTURE_2D,0)
             for pt in self.path:
                 pt.circle(self.MARK).draw(1,.3,.3)
         if self.info:
