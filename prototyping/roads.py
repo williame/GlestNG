@@ -75,6 +75,14 @@ class Line:
         return self.a.distance(self.b)
     def interpolate(self,U):
         return Point(self.a.x + U * self.dx,self.a.y + U * self.dy)
+    def normal(self):
+        U = self.length()
+        x = (self.b.x-self.a.x) / U
+        y = (self.b.y-self.a.y) / U
+        return Line(self.a,Point(self.a.x+x,self.a.y+y))
+    def side(self,pt):
+        """0 = on, <0 = right, >0 = left"""
+        return (pt.y-self.a.y)*self.dx-(pt.x-self.a.x)*self.dy
     def draw(self,*rgb):
         glColor(*rgb)
         glBegin(GL_LINES)
@@ -143,8 +151,6 @@ class RoadMaker(zpr.GLZPR):
             pivots = []
             for pt in self.path:
                 pt.circle(self.MARK).draw(0.8,0.8,1)
-            for i in xrange(1,len(self.path)):
-                self.path[i].line(self.path[i-1]).draw(0.8,0.8,0.8)
             # compute pivots
             pivot = self.path[0].circle((self.OUTER-self.INNER)/2.)
             pivots.append((pivot,pivot))
@@ -152,23 +158,25 @@ class RoadMaker(zpr.GLZPR):
                 prev = self.path[p-1]
                 next = self.path[p+1]
                 p = self.path[p]
-                pivot = Line(p,prev.line(next).closest(p))
+                pivot = Line(p,Line(p.line(prev).normal().b,p.line(next).normal().b).interpolate(.5))
                 pivot = pivot.interpolate(((self.INNER+self.OUTER)/2.) / pivot.length())
                 pivots.append((pivot.circle(self.INNER),pivot.circle(self.OUTER)))
             pivot = self.path[-1].circle((self.OUTER-self.INNER)/2.)
             pivots.append((pivot,pivot))
             # compute winding
-            LEFT, RIGHT = "L", "R"
+            LEFT, ON, RIGHT = "L", "-", "R"
             OBTRUSE, ACUTE = "Ob", "Ac"
-            sides = [(LEFT,OBTRUSE)]
+            sides = [(ON,OBTRUSE)]
             for p in xrange(1,len(self.path)-1):
                 prev, pt, next = self.path[p-1:p+2]
+                pivot = pivots[p][0].pt
                 obtruse = (prev.distance(pt) < prev.distance(next)) and \
                     (next.distance(pt) < prev.distance(next))
                 angle = OBTRUSE if obtruse else ACUTE
-                side = LEFT
+                side = Line(prev,pt).side(pivot)
+                side = LEFT if side > 0. else ON if side == 0. else RIGHT
                 sides.append((side,angle))
-            sides.append((LEFT,OBTRUSE))
+            sides.append((ON,OBTRUSE))
             # draw pivots
             for p in xrange(1,len(self.path)):
                 (from_inner,from_outer),(from_side,from_angle) = (pivots[p-1],sides[p-1])
@@ -177,11 +185,56 @@ class RoadMaker(zpr.GLZPR):
                 to_outer.draw(*rgb)
                 rgb = (.5,.5,1) if to_side==LEFT else (1,.5,.5)
                 to_inner.draw(*rgb)
+                left = right = None
+                if (from_side == LEFT) and (to_side == LEFT):
+                    left = from_inner.outer_tangents(to_inner)[1]
+                    right = from_outer.outer_tangents(to_outer)[1]
+                elif (from_side == RIGHT) and (to_side == RIGHT):
+                    left = from_outer.outer_tangents(to_outer)[0]
+                    right = from_inner.outer_tangents(to_inner)[0]
+                elif (from_side == LEFT) and (to_side == RIGHT):
+                    left = from_inner.inner_tangents(to_outer)[1]
+                    right = from_outer.inner_tangents(to_inner)[1]
+                elif (from_side == RIGHT) and (to_side == LEFT):
+                    left = from_outer.inner_tangents(to_inner)[0]
+                    right = from_inner.inner_tangents(to_outer)[0]
+                elif (from_side == ON) and (to_side == LEFT):
+                    left = from_inner.inner_tangents(to_inner)[0]
+                    right = from_inner.outer_tangents(to_outer)[1]
+                elif (from_side == ON) and (to_side == RIGHT):
+                    left = from_inner.outer_tangents(to_outer)[0]
+                    right = from_inner.inner_tangents(to_inner)[1]
+                elif (from_side == LEFT) and (to_side == ON):
+                    left = from_inner.inner_tangents(to_inner)[1]
+                    right = from_outer.outer_tangents(to_inner)[1]
+                elif (from_side == RIGHT) and (to_side == ON):
+                    left = from_outer.outer_tangents(to_inner)[0]
+                    right = from_inner.inner_tangents(to_inner)[0]
+                elif (from_side == ON) and (to_side == ON):
+                    left = from_inner.outer_tangents(to_inner)[0]
+                    right = from_inner.outer_tangents(to_inner)[1]
+                else:
+                    self.path[p].line(self.path[p-1]).draw(0.8,0.8,0.8)
+                if left is not None: left.draw(1,1,1)
+                if right is not None: right.draw(1,.4,1)
         if self.info:
             self.info = False
             print len(self.path),"points"
         glEnable(GL_DEPTH_TEST)
-            
+        
+    def keyPress(self,event):
+        if event.keyval == gtk.keysyms.Escape:
+            gtk.main_quit()
+            return
+        if event.keyval > 255:
+            print "cannot handle key",event.keyval,"- type H for help"
+            return
+        key = chr(event.keyval)
+        if key in "sS":
+            self.screenshot("roads.png")
+        else:
+            print "cannot handle key",key,"(%d)"%ord(key)
+           
     def _pick(self,x,y,dx,dy,event):
         glScale(.8,.8,.8)
         modelview = numpy.matrix(glGetDoublev(GL_MODELVIEW_MATRIX))

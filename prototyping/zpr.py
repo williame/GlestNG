@@ -84,6 +84,7 @@ class GLZPR(gtkgl.DrawingArea):
         self._mouseX = self._mouseY = 0
         self._dragPosX = self._dragPosY = self._dragPosZ = 0.
         self._mouseRotate = self._mouseZoom = self._mousePan = False
+        self._screenshot = None
         
     class _Context:
         def __init__(self,widget):
@@ -224,6 +225,10 @@ class GLZPR(gtkgl.DrawingArea):
         glTranslatef(*self._zprReferencePoint[0:3])
         func(*args)
         glTranslatef(*map(lambda x:-x,self._zprReferencePoint[0:3]))
+        
+    def screenshot(self,filename):
+        self._screenshot = filename
+        self.queue_draw()
 
     def _mouseScroll(self,widget,event):
         assert(self == widget)       
@@ -332,6 +337,15 @@ class GLZPR(gtkgl.DrawingArea):
             with self.open_context() as ctx:
                 glMatrixMode(GL_MODELVIEW)
                 self.draw(event) ### implemented by subclasses
+                if self._screenshot is not None:
+                    _,_,w,h = self.get_allocation()
+                    pixels = glReadPixels(0,0,w,h,GL_RGB,GL_UNSIGNED_BYTE)
+                    import Image
+                    img = Image.frombuffer('RGB',(w,h),pixels,'raw','RGB',0,1)
+                    img = img.transpose(Image.FLIP_TOP_BOTTOM)
+                    img.save(self._screenshot)
+                    print "saved screenshot to",self._screenshot
+                    self._screenshot = None
                 if ctx.surface.is_double_buffered():
                     ctx.surface.swap_buffers()
                 else:
