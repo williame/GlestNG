@@ -48,11 +48,11 @@ class Point:
         self.x /= n
         self.y /= n
     def __sub__(self,rhs):
-        if isinstance(other,rhs):
+        if isinstance(rhs,Point):
             return Point(self.x-rhs.x,self.y-rhs.y)
         return Point(self.x-rhs,self.y-rhs)
     def __add__(self,rhs):
-        if isinstance(other,rhs):
+        if isinstance(rhs,Point):
             return Point(self.x+rhs.x,self.y+rhs.y)
         return Point(self.x+rhs,self.y+rhs)
     def __mul__(self,rhs):
@@ -87,11 +87,16 @@ class Line:
         return self.a.distance(self.b)
     def interpolate(self,U):
         return Point(self.a.x + U * self.dx,self.a.y + U * self.dy)
+    def __div__(self,rhs):
+        x = self.dx / rhs
+        y = self.dy / rhs
+        return Line(self.a,self.a+Point(x,y))
+    def __mul__(self,rhs):
+        x = self.dx * rhs
+        y = self.dy * rhs
+        return Line(self.a,self.a+Point(x,y))
     def normal(self):
-        U = self.length()
-        x = (self.b.x-self.a.x) / U
-        y = (self.b.y-self.a.y) / U
-        return Line(self.a,Point(self.a.x+x,self.a.y+y))
+        return self / self.length()
     def side(self,pt):
         """0 = on, <0 = right, >0 = left"""
         return (pt.y-self.a.y)*self.dx-(pt.x-self.a.x)*self.dy
@@ -117,11 +122,11 @@ class Circle:
         x = self.c * pt.x - self.s * pt.y
         y = self.s * pt.x + self.c * pt.y
         return Point(x,y)
-    def interpolate(self,a,b):
-        assert feq(a.distance(self.pt) == self.radius)
-        assert feq(b.distance(self.pt) == self.radius)
-        mid = Line(self.pt,Line(a,b).interpolate(.5)).normal()
-        return (mid * self.radius)
+    def interpolate(self,line,U=.5):
+        assert feq(line.a.distance(self.pt),self.radius)
+        assert feq(line.b.distance(self.pt),self.radius)
+        mid = Line(self.pt,line.interpolate(U)).normal()
+        return (mid * self.radius).b
     def draw(self,*rgb):
         glColor(*rgb)
         x, y = self.radius, 0
@@ -156,8 +161,9 @@ class Circle:
 
 class RoadMaker(zpr.GLZPR):
     MARK = .01
-    INNER = .01
+    INNER = .05
     WIDTH = .05
+    CURVE = .02
     OUTER = INNER + WIDTH
     def __init__(self):
         zpr.GLZPR.__init__(self)
@@ -165,6 +171,15 @@ class RoadMaker(zpr.GLZPR):
         self.path = []
         self.end_point = None
         self.info = False
+    def init(self):
+        zpr.GLZPR.init(self)
+        try:
+            from OpenGL.GL.ARB.multisample import GL_MULTISAMPLE_ARB
+            glEnable(GL_MULTISAMPLE_ARB)
+        except Exception as e:
+            print "Error initializing multisampling:",e
+        else:
+            print "Enabled multisampling"
     def draw(self,event):
         glClearColor(1,1,1,0)
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
@@ -174,18 +189,19 @@ class RoadMaker(zpr.GLZPR):
         glLineWidth(2)
         if self.end_point is not None:
             self.end_point.circle(0.01).draw(1,0,0)
+        quads = []
         if len(self.path) > 1:
             pivots = []
-            for pt in self.path:
-                pt.circle(self.MARK).draw(0.8,0.8,1)
             # compute pivots
             LEFT, ON, RIGHT = "L", "-", "R"
             OUTER,INNER = self.OUTER,self.INNER
             pivot = self.path[0].circle((OUTER-INNER)/2.)
             from_side, from_inner, from_outer = ON,pivot,None
+            from_left = from_right = None
             for p in xrange(1,len(self.path)):
                 prev = self.path[p-1]
                 pt = self.path[p]
+                # which side to go on this new point
                 if p == len(self.path)-1: #last one?
                     pivot = self.path[-1].circle((OUTER-INNER)/2.)
                     to_side, to_inner, to_outer = ON,pivot,None
@@ -198,10 +214,7 @@ class RoadMaker(zpr.GLZPR):
                     inner = pivot.circle(INNER)
                     outer = pivot.circle(OUTER) if side is not ON else None
                     to_side, to_inner, to_outer = side,inner,outer
-                # draw it
-                to_inner.draw(.7,.7,.7)
-                if to_outer is not None: to_outer.draw(.7,.7,.7)
-                left = right = None
+                # compute where to go from and to
                 if (from_side == LEFT) and (to_side == LEFT):
                     left = (INNER,OUTER,INNER,1)
                     right = (OUTER,OUTER,OUTER,1)
@@ -231,25 +244,58 @@ class RoadMaker(zpr.GLZPR):
                     right = (INNER,OUTER,INNER,1)
                 else:
                     assert False
-                # do left
-                fr, tan, to, idx = left
-                fr = from_inner if fr == INNER else from_outer
-                tan = fr.inner_tangents if tan == INNER else fr.outer_tangents
+                # decode left
+                left_fr, tan, to, idx = left
+                left_fr = from_inner if left_fr == INNER else from_outer
+                tan = left_fr.inner_tangents if tan == INNER else left_fr.outer_tangents
                 to = to_inner if to == INNER else to_outer
                 left = tan(to)[idx]
                 left.draw(1,1,1)
-                # do right
-                fr, tan, to, idx = right
-                fr = from_inner if fr == INNER else from_outer
-                tan = fr.inner_tangents if tan == INNER else fr.outer_tangents
+                # decode right
+                right_fr, tan, to, idx = right
+                right_fr = from_inner if right_fr == INNER else from_outer
+                tan = right_fr.inner_tangents if tan == INNER else right_fr.outer_tangents
                 to = to_inner if to == INNER else to_outer
                 right = tan(to)[idx]
-                right.draw(0,1,1)
+                # turn it into quad strip
+                if from_left is not None:
+                    l = Line(from_left,left.a)
+                    r = Line(from_right,right.a)
+                    def curve(l,r,part):
+                        if (l.length() > self.CURVE) or (r.length() > self.CURVE):
+                            lmid = left_fr.interpolate(l)
+                            rmid = right_fr.interpolate(r)
+                            curve(l.a.line(lmid),r.a.line(rmid),False)
+                            curve(lmid.line(l.b),rmid.line(r.b),True)
+                        if not part:
+                            quads.append((l.b,r.b))
+                    curve(l,r,False)
+                quads.append((left.a,right.a))
+                quads.append((left.b,right.b))
                 # for next
                 from_side, from_inner, from_outer = to_side, to_inner, to_outer
+                from_left, from_right = left.b, right.b
+            # draw it
+            glColor(.3,.7,1)
+            glBegin(GL_QUADS)
+            prev = quads[0]
+            for i,quad in enumerate(quads[1:]):
+                if i&1: glColor(1,0,0)
+                else: glColor(1,1,0)
+                a,b = prev
+                glVertex(*a.to_3d())
+                glVertex(*b.to_3d())
+                b,a = quad
+                glVertex(*a.to_3d())
+                glVertex(*b.to_3d())
+                prev = quad
+            glEnd()
+            for pt in self.path:
+                pt.circle(self.MARK).draw(1,.3,.3)
         if self.info:
             self.info = False
             print len(self.path),"points"
+            print "  ->",len(quads),"quads"
         glEnable(GL_DEPTH_TEST)
         
     def keyPress(self,event):

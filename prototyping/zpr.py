@@ -60,7 +60,10 @@ def ray_triangle(ray_origin,ray_dir,T):
 class GLZPR(gtkgl.DrawingArea):
     def __init__(self,w=640,h=480):
         try:
-            glconfig = gdkgl.Config(mode = (gdkgl.MODE_RGB|gdkgl.MODE_DOUBLE|gdkgl.MODE_DEPTH))
+            try:
+                glconfig = gdkgl.Config(mode = (gdkgl.MODE_RGB|gdkgl.MODE_DOUBLE|gdkgl.MODE_DEPTH|gdkgl.MODE_MULTISAMPLE))
+            except gtk.gdkgl.NoMatches:
+                glconfig = gdkgl.Config(mode = (gdkgl.MODE_RGB|gdkgl.MODE_DOUBLE|gdkgl.MODE_DEPTH))
         except gtk.gdkgl.NoMatches:
             glconfig = gdkgl.Config(mode = (gdkgl.MODE_RGB|gdkgl.MODE_DEPTH))
         gtkgl.DrawingArea.__init__(self,glconfig)
