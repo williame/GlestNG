@@ -47,6 +47,18 @@ class Point:
     def __div__(self,n):
         self.x /= n
         self.y /= n
+    def __sub__(self,rhs):
+        if isinstance(other,rhs):
+            return Point(self.x-rhs.x,self.y-rhs.y)
+        return Point(self.x-rhs,self.y-rhs)
+    def __add__(self,rhs):
+        if isinstance(other,rhs):
+            return Point(self.x+rhs.x,self.y+rhs.y)
+        return Point(self.x+rhs,self.y+rhs)
+    def __mul__(self,rhs):
+        if isinstance(rhs,Point):
+            return Point(self.x*rhs.x,self.y*rhs.y)
+        return Point(self.x*rhs,self.y*rhs)
     def distance(self,other):
         return math.sqrt(self.distance_sqrd(other))
     def distance_sqrd(self,other):
@@ -89,6 +101,9 @@ class Line:
         glVertex(*self.a.to_3d())
         glVertex(*self.b.to_3d())
         glEnd()
+        
+def feq(a,b):
+    return abs(a-b) < 0.000001
     
 class Circle:
     num_segments = 4*4
@@ -102,6 +117,11 @@ class Circle:
         x = self.c * pt.x - self.s * pt.y
         y = self.s * pt.x + self.c * pt.y
         return Point(x,y)
+    def interpolate(self,a,b):
+        assert feq(a.distance(self.pt) == self.radius)
+        assert feq(b.distance(self.pt) == self.radius)
+        mid = Line(self.pt,Line(a,b).interpolate(.5)).normal()
+        return (mid * self.radius)
     def draw(self,*rgb):
         glColor(*rgb)
         x, y = self.radius, 0
@@ -162,14 +182,13 @@ class RoadMaker(zpr.GLZPR):
             LEFT, ON, RIGHT = "L", "-", "R"
             OUTER,INNER = self.OUTER,self.INNER
             pivot = self.path[0].circle((OUTER-INNER)/2.)
-            pivots.append((ON,pivot,None))
+            from_side, from_inner, from_outer = ON,pivot,None
             for p in xrange(1,len(self.path)):
-                from_side, from_inner, from_outer = pivots[-1]
                 prev = self.path[p-1]
                 pt = self.path[p]
                 if p == len(self.path)-1: #last one?
                     pivot = self.path[-1].circle((OUTER-INNER)/2.)
-                    pivots.append((ON,pivot,None))
+                    to_side, to_inner, to_outer = ON,pivot,None
                 else:
                     next = self.path[p+1]
                     pivot = Line(pt,Line(pt.line(prev).normal().b,pt.line(next).normal().b).interpolate(.5))
@@ -178,8 +197,7 @@ class RoadMaker(zpr.GLZPR):
                     side = LEFT if side > 0. else ON if side == 0. else RIGHT
                     inner = pivot.circle(INNER)
                     outer = pivot.circle(OUTER) if side is not ON else None
-                    pivots.append((side,inner,outer))
-                to_side, to_inner, to_outer = pivots[-1]
+                    to_side, to_inner, to_outer = side,inner,outer
                 # draw it
                 to_inner.draw(.7,.7,.7)
                 if to_outer is not None: to_outer.draw(.7,.7,.7)
@@ -227,6 +245,8 @@ class RoadMaker(zpr.GLZPR):
                 to = to_inner if to == INNER else to_outer
                 right = tan(to)[idx]
                 right.draw(0,1,1)
+                # for next
+                from_side, from_inner, from_outer = to_side, to_inner, to_outer
         if self.info:
             self.info = False
             print len(self.path),"points"
