@@ -206,7 +206,7 @@ class RoadMaker(zpr.GLZPR):
         except Exception as e:
             print "Error initializing multisampling:",e
         self.texture, self.texture_w, self.texture_h = \
-            load_texture("../data/Glest/tilesets/meadow/textures/surface4b.bmp")
+            load_texture("../data/egypt_stone.png")
     def draw(self,event):
         glClearColor(1,1,1,0)
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
@@ -346,9 +346,6 @@ class RoadMaker(zpr.GLZPR):
             glColor(1,1,1,1)
             glBegin(GL_QUADS)
             for i,(a,d,ta,td,b,c,tb,tc) in enumerate(quads):
-                #if i&1: glColor(1,0,0)
-                #else: glColor(0,0,1)
-                #glBegin(GL_LINE_LOOP)
                 glTexCoord(*ta)
                 glVertex(*a.to_3d())
                 glTexCoord(*tb)
@@ -357,7 +354,6 @@ class RoadMaker(zpr.GLZPR):
                 glVertex(*c.to_3d())
                 glTexCoord(*td)
                 glVertex(*d.to_3d())
-                #glEnd()
             glEnd()
             glBindTexture(GL_TEXTURE_2D,0)
             for pt in self.path:
