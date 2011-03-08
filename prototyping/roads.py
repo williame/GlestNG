@@ -151,10 +151,12 @@ class Circle:
         y = self.s * pt.x + self.c * pt.y
         return Point(x,y)
     def interpolate(self,line,U=.5):
+        line = Line(self.snap(line.a),self.snap(line.b))
         assert feq(line.a.distance(self.pt),self.radius)
         assert feq(line.b.distance(self.pt),self.radius)
-        mid = Line(self.pt,line.interpolate(U)).normal()
-        return (mid * self.radius).b
+        return self.snap(line.interpolate(U))
+    def snap(self,pt):
+        return (Line(self.pt,pt).normal() * self.radius).b
     def draw(self,*rgb):
         glColor(*rgb)
         x, y = self.radius, 0
