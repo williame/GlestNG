@@ -217,11 +217,12 @@ class RoadMaker(zpr.GLZPR):
         if self.end_point is not None:
             self.end_point.circle(0.01).draw(1,0,0)
         quads = []
+        edges = []
         if len(self.path) > 1:
             pivots = []
             # compute pivots
             LEFT, ON, RIGHT = "L", "-", "R"
-            OUTER,INNER = self.OUTER,self.INNER
+            OUTER,INNER = self.OUTER,self.INNER # tidier naming
             pivot = self.path[0].circle((OUTER-INNER)/2.)
             from_side, from_inner, from_outer = ON,pivot,None
             from_left = from_right = None
@@ -279,7 +280,6 @@ class RoadMaker(zpr.GLZPR):
                 tan = left_fr.inner_tangents if tan == INNER else left_fr.outer_tangents
                 to = to_inner if to == INNER else to_outer
                 left = tan(to)[idx]
-                left.draw(1,1,1)
                 # decode right
                 right_fr, tan, to, idx = right
                 right_fr = from_inner if right_fr == INNER else from_outer
@@ -298,32 +298,66 @@ class RoadMaker(zpr.GLZPR):
                             curve(l.a.line(lmid),r.a.line(rmid),False)
                             curve(lmid.line(l.b),rmid.line(r.b),True)
                         if not part:
-                            quads.append((l.b,r.b,(0.,0.),(0.,1.)))
+                            edges.append((l.b,r.b))
                     curve(l,r,False)
-                quads.append((left.a,right.a,(0.,0.),(0.,1.)))
-                quads.append((left.b,right.b,(0.,1.),(1.,1.)))
+                edges.append((left.a,right.a))
+                edges.append((left.b,right.b))
                 # for next
                 from_side, from_inner, from_outer = to_side, to_inner, to_outer
                 from_left, from_right = left.b, right.b
+            # tessellate with edges
+            tiles = 0.
+            TILE_SIZE = self.WIDTH
+            left_prev, right_prev = edges[0]
+            for left, right in edges[1:]:
+                left = left_prev.line(left)
+                right = right_prev.line(right)
+                if left.length() > right.length():
+                    left_scale = 1.
+                    right_scale = right.length() / left.length()
+                    length = left.length()
+                elif (left.length() == 0.):
+                    continue
+                else:
+                    left_scale = left.length() / right.length()
+                    right_scale = 1.
+                    length = right.length()
+                l = 0
+                while l < length:
+                    remaining = min(TILE_SIZE-tiles,length-l)
+                    tx1 = tiles/TILE_SIZE
+                    tx2 = (tiles+remaining)/TILE_SIZE
+                    quads.append(( \
+                        left.interpolate((l*left_scale)/left.length()),
+                        right.interpolate((l*right_scale)/right.length()),
+                        (tx1,0.),(tx1,1.),
+                        left.interpolate(((l+remaining)*left_scale)/left.length()),
+                        right.interpolate(((l+remaining)*right_scale)/right.length()),
+                        (tx2,0.),(tx2,1.)))
+                    tiles += remaining
+                    if tiles >= TILE_SIZE:
+                        tiles = 0
+                    l += remaining
+                left_prev, right_prev = left.b, right.b
             # draw it
             glColor(.3,.7,1)
             glEnable(GL_TEXTURE_2D)
             glBindTexture(GL_TEXTURE_2D,self.texture)
             glColor(1,1,1,1)
             glBegin(GL_QUADS)
-            prev = quads[0]
-            for quad in quads[1:]:
-                a,b,ta,tb = prev
+            for i,(a,d,ta,td,b,c,tb,tc) in enumerate(quads):
+                #if i&1: glColor(1,0,0)
+                #else: glColor(0,0,1)
+                #glBegin(GL_LINE_LOOP)
                 glTexCoord(*ta)
                 glVertex(*a.to_3d())
                 glTexCoord(*tb)
                 glVertex(*b.to_3d())
-                b,a,tb,ta = quad
-                glTexCoord(*ta)
-                glVertex(*a.to_3d())
-                glTexCoord(*tb)
-                glVertex(*b.to_3d())
-                prev = quad
+                glTexCoord(*tc)
+                glVertex(*c.to_3d())
+                glTexCoord(*td)
+                glVertex(*d.to_3d())
+                #glEnd()
             glEnd()
             glBindTexture(GL_TEXTURE_2D,0)
             for pt in self.path:
@@ -331,6 +365,7 @@ class RoadMaker(zpr.GLZPR):
         if self.info:
             self.info = False
             print len(self.path),"points"
+            print "  ->",len(edges),"edges"
             print "  ->",len(quads),"quads"
         glEnable(GL_DEPTH_TEST)
         
