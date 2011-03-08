@@ -146,14 +146,10 @@ class Circle:
     def __init__(self,pt,radius):
         self.pt = pt
         self.radius = radius
-    def advance(self,pt):
-        x = self.c * pt.x - self.s * pt.y
-        y = self.s * pt.x + self.c * pt.y
-        return Point(x,y)
     def interpolate(self,line,U=.5):
-        line = Line(self.snap(line.a),self.snap(line.b))
-        assert feq(line.a.distance(self.pt),self.radius)
-        assert feq(line.b.distance(self.pt),self.radius)
+        if (line.a.distance_sqrd(self.pt) != self.radius**2) or \
+            (line.b.distance_sqrd(self.pt) != self.radius**2):
+            line = Line(self.snap(line.a),self.snap(line.b))
         return self.snap(line.interpolate(U))
     def snap(self,pt):
         return (Line(self.pt,pt).normal() * self.radius).b
@@ -208,8 +204,8 @@ class Path(list):
         # compute pivots
         LEFT, ON, RIGHT = "L", "-", "R"
         OUTER,INNER = self.OUTER,self.INNER # tidier naming
-        pivot = self.path[0].circle((OUTER-INNER)/2.)
-        from_side, from_inner, from_outer = ON,pivot,None
+        pivot = self.path[0]
+        from_side, from_inner, from_outer = ON,pivot.circle((OUTER-INNER)/2.),None
         from_left = from_right = None
         tile = 0.
         tiles = 1
@@ -218,8 +214,8 @@ class Path(list):
             pt = self.path[p]
             # which side to go on this new point
             if p == len(self.path)-1: #last one?
-                pivot = self.path[-1].circle((OUTER-INNER)/2.)
-                to_side, to_inner, to_outer = ON,pivot,None
+                pivot = self.path[-1]
+                to_side, to_inner, to_outer = ON,pivot.circle((OUTER-INNER)/2.),None
             else:
                 next = self.path[p+1]
                 pivot = Line(pt,Line(pt.line(prev).normal().b,pt.line(next).normal().b).interpolate(.5))
@@ -272,7 +268,7 @@ class Path(list):
             to = to_inner if to == INNER else to_outer
             right = tan(to)[idx]
             # turn it into edges
-            if from_left is not None:
+            if (from_left is not None) and (from_side != ON):
                 l = Line(from_left,left.a)
                 r = Line(from_right,right.a)
                 def curve(l,r,part):
@@ -284,7 +280,11 @@ class Path(list):
                         curve(lmid.line(l.b),rmid.line(r.b),True)
                     if not part:
                         self.edges.append((l.b,r.b))
-                curve(l,r,False)
+                mid = from_inner.pt+((from_inner.snap(prev)-from_inner.pt)*4)
+                lmid = left_fr.snap(mid)
+                rmid = right_fr.snap(mid)
+                curve(l.a.line(lmid),r.a.line(rmid),False)
+                curve(lmid.line(l.b),rmid.line(r.b),True)
             self.edges.append((left.a,right.a))
             self.edges.append((left.b,right.b))
             # for next
@@ -421,10 +421,8 @@ class RoadMaker(zpr.GLZPR):
                     break
             if error: break
             if selected:
-                print "changing",selected,self.path[selected],"to",point
                 self.path[selected] = point
             else:
-                print "adding",point
                 self.path.append(point)
             self.path.dirty()
             break
