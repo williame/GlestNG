@@ -95,6 +95,8 @@ class Point:
         return Line(self,to)
     def to_3d(self):
         return (self.x,self.y,0)
+    def __repr__(self):
+        return "<%f,%f>"%(self.x,self.y)
         
 class Line:
     def __init__(self,a,b):
@@ -184,130 +186,123 @@ class Circle:
                 Point(self.pt.x + self.radius * nx,self.pt.y + self.radius * ny),
                 Point(other.pt.x + sign1 * other.radius * nx,other.pt.y + sign1 * other.radius * ny)))
         return tuple(res)
+        
+class Path(list):
+    def __init__(self,inner,width,curve):
+        list.__init__(self)
+        self.path = self
+        self.INNER = inner
+        self.OUTER = inner+width
+        self.WIDTH = width
+        self.CURVE = curve
+        self.edges = None
+    def dirty(self):
+        self.edges = None # force recompute
+    def get_edges(self):
+        if self.edges is not None: return self.edges
+        self.edges = []
+        if len(self.path) < 2: return self.edges
+        pivots = []
+        # compute pivots
+        LEFT, ON, RIGHT = "L", "-", "R"
+        OUTER,INNER = self.OUTER,self.INNER # tidier naming
+        pivot = self.path[0].circle((OUTER-INNER)/2.)
+        from_side, from_inner, from_outer = ON,pivot,None
+        from_left = from_right = None
+        tile = 0.
+        tiles = 1
+        for p in xrange(1,len(self.path)):
+            prev = self.path[p-1]
+            pt = self.path[p]
+            # which side to go on this new point
+            if p == len(self.path)-1: #last one?
+                pivot = self.path[-1].circle((OUTER-INNER)/2.)
+                to_side, to_inner, to_outer = ON,pivot,None
+            else:
+                next = self.path[p+1]
+                pivot = Line(pt,Line(pt.line(prev).normal().b,pt.line(next).normal().b).interpolate(.5))
+                pivot = pivot.interpolate(((INNER+OUTER)/2.) / pivot.length())
+                side = Line(prev,pt).side(pivot)
+                side = LEFT if side > 0. else ON if side == 0. else RIGHT
+                inner = pivot.circle(INNER)
+                outer = pivot.circle(OUTER) if side is not ON else None
+                to_side, to_inner, to_outer = side,inner,outer
+            # compute where to go from and to
+            if (from_side == LEFT) and (to_side == LEFT):
+                left = (INNER,OUTER,INNER,1)
+                right = (OUTER,OUTER,OUTER,1)
+            elif (from_side == RIGHT) and (to_side == RIGHT):
+                left = (OUTER,OUTER,OUTER,0)
+                right = (INNER,OUTER,INNER,0)
+            elif (from_side == LEFT) and (to_side == RIGHT):
+                left = (INNER,INNER,OUTER,1)
+                right = (OUTER,INNER,INNER,1)
+            elif (from_side == RIGHT) and (to_side == LEFT):
+                left = (OUTER,INNER,INNER,0)
+                right = (INNER,INNER,OUTER,0)
+            elif (from_side == ON) and (to_side == LEFT):
+                left = (INNER,INNER,INNER,0)
+                right = (INNER,OUTER,OUTER,1)
+            elif (from_side == ON) and (to_side == RIGHT):
+                left = (INNER,OUTER,OUTER,0)
+                right = (INNER,INNER,INNER,1)
+            elif (from_side == LEFT) and (to_side == ON):
+                left = (INNER,INNER,INNER,1)
+                right = (OUTER,OUTER,INNER,1)
+            elif (from_side == RIGHT) and (to_side == ON):
+                left = (OUTER,OUTER,INNER,0)
+                right = (INNER,INNER,INNER,0)
+            elif (from_side == ON) and (to_side == ON):
+                left = (INNER,OUTER,INNER,0)
+                right = (INNER,OUTER,INNER,1)
+            else:
+                assert False
+            # decode left
+            left_fr, tan, to, idx = left
+            left_fr = from_inner if left_fr == INNER else from_outer
+            tan = left_fr.inner_tangents if tan == INNER else left_fr.outer_tangents
+            to = to_inner if to == INNER else to_outer
+            left = tan(to)[idx]
+            # decode right
+            right_fr, tan, to, idx = right
+            right_fr = from_inner if right_fr == INNER else from_outer
+            tan = right_fr.inner_tangents if tan == INNER else right_fr.outer_tangents
+            to = to_inner if to == INNER else to_outer
+            right = tan(to)[idx]
+            # turn it into edges
+            if from_left is not None:
+                l = Line(from_left,left.a)
+                r = Line(from_right,right.a)
+                def curve(l,r,part):
+                    length = max(l.length(),r.length())
+                    if (length > self.CURVE):
+                        lmid = left_fr.interpolate(l)
+                        rmid = right_fr.interpolate(r)
+                        curve(l.a.line(lmid),r.a.line(rmid),False)
+                        curve(lmid.line(l.b),rmid.line(r.b),True)
+                    if not part:
+                        self.edges.append((l.b,r.b))
+                curve(l,r,False)
+            self.edges.append((left.a,right.a))
+            self.edges.append((left.b,right.b))
+            # for next
+            from_side, from_inner, from_outer = to_side, to_inner, to_outer
+            from_left, from_right = left.b, right.b
+        return self.edges
 
-class RoadMaker(zpr.GLZPR):
-    MARK = .01
-    INNER = .05
-    WIDTH = .05
-    CURVE = .02
-    OUTER = INNER + WIDTH
-    
-    def __init__(self):
-        zpr.GLZPR.__init__(self)
-        self.ground = Ground()
-        self.path = []
-        self.end_point = None
-        self.info = False
+class Road:
+    def __init__(self,path):
+        self.path = path
     def init(self):
-        zpr.GLZPR.init(self)
-        try:
-            from OpenGL.GL.ARB.multisample import GL_MULTISAMPLE_ARB
-            glEnable(GL_MULTISAMPLE_ARB)
-        except Exception as e:
-            print "Error initializing multisampling:",e
         self.texture, self.texture_w, self.texture_h = \
             load_texture("../data/egypt_stone.png")
-    def draw(self,event):
-        glClearColor(1,1,1,0)
-        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
-        glScale(.8,.8,.8)        
-        glDisable(GL_DEPTH_TEST)
-        self.ground.draw()
-        glLineWidth(2)
-        if self.end_point is not None:
-            self.end_point.circle(0.01).draw(1,0,0)
-        quads = []
-        edges = []
-        if len(self.path) > 1:
-            pivots = []
-            # compute pivots
-            LEFT, ON, RIGHT = "L", "-", "R"
-            OUTER,INNER = self.OUTER,self.INNER # tidier naming
-            pivot = self.path[0].circle((OUTER-INNER)/2.)
-            from_side, from_inner, from_outer = ON,pivot,None
-            from_left = from_right = None
-            tile = 0.
-            tiles = 1
-            for p in xrange(1,len(self.path)):
-                prev = self.path[p-1]
-                pt = self.path[p]
-                # which side to go on this new point
-                if p == len(self.path)-1: #last one?
-                    pivot = self.path[-1].circle((OUTER-INNER)/2.)
-                    to_side, to_inner, to_outer = ON,pivot,None
-                else:
-                    next = self.path[p+1]
-                    pivot = Line(pt,Line(pt.line(prev).normal().b,pt.line(next).normal().b).interpolate(.5))
-                    pivot = pivot.interpolate(((INNER+OUTER)/2.) / pivot.length())
-                    side = Line(prev,pt).side(pivot)
-                    side = LEFT if side > 0. else ON if side == 0. else RIGHT
-                    inner = pivot.circle(INNER)
-                    outer = pivot.circle(OUTER) if side is not ON else None
-                    to_side, to_inner, to_outer = side,inner,outer
-                # compute where to go from and to
-                if (from_side == LEFT) and (to_side == LEFT):
-                    left = (INNER,OUTER,INNER,1)
-                    right = (OUTER,OUTER,OUTER,1)
-                elif (from_side == RIGHT) and (to_side == RIGHT):
-                    left = (OUTER,OUTER,OUTER,0)
-                    right = (INNER,OUTER,INNER,0)
-                elif (from_side == LEFT) and (to_side == RIGHT):
-                    left = (INNER,INNER,OUTER,1)
-                    right = (OUTER,INNER,INNER,1)
-                elif (from_side == RIGHT) and (to_side == LEFT):
-                    left = (OUTER,INNER,INNER,0)
-                    right = (INNER,INNER,OUTER,0)
-                elif (from_side == ON) and (to_side == LEFT):
-                    left = (INNER,INNER,INNER,0)
-                    right = (INNER,OUTER,OUTER,1)
-                elif (from_side == ON) and (to_side == RIGHT):
-                    left = (INNER,OUTER,OUTER,0)
-                    right = (INNER,INNER,INNER,1)
-                elif (from_side == LEFT) and (to_side == ON):
-                    left = (INNER,INNER,INNER,1)
-                    right = (OUTER,OUTER,INNER,1)
-                elif (from_side == RIGHT) and (to_side == ON):
-                    left = (OUTER,OUTER,INNER,0)
-                    right = (INNER,INNER,INNER,0)
-                elif (from_side == ON) and (to_side == ON):
-                    left = (INNER,OUTER,INNER,0)
-                    right = (INNER,OUTER,INNER,1)
-                else:
-                    assert False
-                # decode left
-                left_fr, tan, to, idx = left
-                left_fr = from_inner if left_fr == INNER else from_outer
-                tan = left_fr.inner_tangents if tan == INNER else left_fr.outer_tangents
-                to = to_inner if to == INNER else to_outer
-                left = tan(to)[idx]
-                # decode right
-                right_fr, tan, to, idx = right
-                right_fr = from_inner if right_fr == INNER else from_outer
-                tan = right_fr.inner_tangents if tan == INNER else right_fr.outer_tangents
-                to = to_inner if to == INNER else to_outer
-                right = tan(to)[idx]
-                # turn it into quad strip
-                if from_left is not None:
-                    l = Line(from_left,left.a)
-                    r = Line(from_right,right.a)
-                    def curve(l,r,part):
-                        length = max(l.length(),r.length())
-                        if (length > self.CURVE):
-                            lmid = left_fr.interpolate(l)
-                            rmid = right_fr.interpolate(r)
-                            curve(l.a.line(lmid),r.a.line(rmid),False)
-                            curve(lmid.line(l.b),rmid.line(r.b),True)
-                        if not part:
-                            edges.append((l.b,r.b))
-                    curve(l,r,False)
-                edges.append((left.a,right.a))
-                edges.append((left.b,right.b))
-                # for next
-                from_side, from_inner, from_outer = to_side, to_inner, to_outer
-                from_left, from_right = left.b, right.b
+    def draw(self):
+        edges = self.path.get_edges()
+        if len(edges) > 0: 
+            quads = []
             # tessellate with edges
             tiles = 0.
-            TILE_SIZE = self.WIDTH
+            TILE_SIZE = self.path.WIDTH # square
             left_prev, right_prev = edges[0]
             for left, right in edges[1:]:
                 left = left_prev.line(left)
@@ -340,7 +335,6 @@ class RoadMaker(zpr.GLZPR):
                     l += remaining
                 left_prev, right_prev = left.b, right.b
             # draw it
-            glColor(.3,.7,1)
             glEnable(GL_TEXTURE_2D)
             glBindTexture(GL_TEXTURE_2D,self.texture)
             glColor(1,1,1,1)
@@ -356,15 +350,33 @@ class RoadMaker(zpr.GLZPR):
                 glVertex(*d.to_3d())
             glEnd()
             glBindTexture(GL_TEXTURE_2D,0)
-            for pt in self.path:
-                pt.circle(self.MARK).draw(1,.3,.3)
-        if self.info:
-            self.info = False
-            print len(self.path),"points"
-            print "  ->",len(edges),"edges"
-            print "  ->",len(quads),"quads"
-        glEnable(GL_DEPTH_TEST)
-        
+        for pt in self.path:
+            pt.circle(self.path.WIDTH/3.).draw(1,.3,.3)
+
+class RoadMaker(zpr.GLZPR):
+    MARK = .01    
+    def __init__(self):
+        zpr.GLZPR.__init__(self)
+        self.ground = Ground()
+        self.path = Path(.03,.06,.02)
+        self.render = Road(self.path)
+    def init(self):
+        zpr.GLZPR.init(self)
+        try:
+            from OpenGL.GL.ARB.multisample import GL_MULTISAMPLE_ARB
+            glEnable(GL_MULTISAMPLE_ARB)
+        except Exception as e:
+            print "Error initializing multisampling:",e
+        self.render.init()
+        glDisable(GL_DEPTH_TEST)
+    def draw(self,event):
+        glClearColor(1,1,1,0)
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
+        glScale(.8,.8,.8)        
+        self.ground.draw()
+        glLineWidth(2)
+        self.render.draw()
+
     def keyPress(self,event):
         if event.keyval == gtk.keysyms.Escape:
             gtk.main_quit()
@@ -394,26 +406,25 @@ class RoadMaker(zpr.GLZPR):
             selected = error = None
             for i,pt in enumerate(self.path):
                 d = pt.distance(point)
-                if d <= self.OUTER:
+                if d <= self.path.OUTER:
                     if selected is not None:
                         print "ARGH"
                         error = True
                         break
                     else:
                         selected = i
-                elif d <= (self.OUTER*2):
+                elif d <= (self.path.OUTER*2):
                     print "OGH"
                     error = True
                     break
             if error: break
             if selected:
+                print "changing",selected,self.path[selected],"to",point
                 self.path[selected] = point
-                if selected == len(self.path)-1:
-                    self.end_point = point
             else:
-                self.end_point = point
-                self.path.append(self.end_point)
-            self.info = True
+                print "adding",point
+                self.path.append(point)
+            self.path.dirty()
             break
         return ((),())
     def pick(self,*args):
