@@ -51,7 +51,9 @@ class Ground:
         for triangle in self.triangles:
             I = zpr.ray_triangle(ray[0],ray[1],triangle)
             if I is not None:
-                return I
+                x,y,z = I
+                assert z == 0
+                return Point(x,y)
                 
 def HermiteInterpolate(y0,y1,y2,y3,mu,tension,bias):
     # from http://paulbourke.net/miscellaneous/interpolation/
@@ -327,17 +329,30 @@ class Path(list):
                         curve(lmid.line(l.b),rmid.line(r.b),True)
                     if not part:
                         self.edges.append((l.b,r.b))
-                mid = from_inner.pt+((from_inner.snap(prev)-from_inner.pt)*4)
-                lmid = left_fr.snap(mid)
-                rmid = right_fr.snap(mid)
+                # divide first using midpoints on outside of curve
+                # so that we go the right way around the curve!
+                lmid = left_fr.snap(prev)
+                rmid = right_fr.snap(prev)
                 curve(l.a.line(lmid),r.a.line(rmid),False)
                 curve(lmid.line(l.b),rmid.line(r.b),True)
+            # the actual straight bit
             self.edges.append((left.a,right.a))
             self.edges.append((left.b,right.b))
             # for next
             from_side, from_inner, from_outer = to_side, to_inner, to_outer
             from_left, from_right = left.b, right.b
         return self.edges
+    def pick(self,pt):
+        ret = []
+        for p in self:
+            if p.distance_sqrd(pt) < self.WIDTH**2:
+                ret.append(p)
+        return ret
+    def validate(self,pt):
+        for p in self:
+            if p.distance_sqrd(pt) <= self.OUTER**2:
+                return False
+        return True
 
 class Road:
     def __init__(self,path):
@@ -347,7 +362,7 @@ class Road:
             load_texture("../data/egypt_stone.png")
     def draw(self):
         edges = self.path.get_edges()
-        if len(edges) > 0: 
+        if len(edges) > 0:
             quads = []
             # tessellate with edges
             tiles = 0.
@@ -400,16 +415,17 @@ class Road:
             glEnd()
             glBindTexture(GL_TEXTURE_2D,0)
         for pt in self.path:
-            pt.circle(self.path.WIDTH/3.).draw(1,.3,.3)
+            pt.circle(max(.01,self.path.WIDTH/3.)).draw(1,.3,.3)
         HermiteSpline(self.path)
 
-class RoadMaker(zpr.GLZPR):
-    MARK = .01    
+class Editor(zpr.GLZPR):
     def __init__(self):
         zpr.GLZPR.__init__(self)
         self.ground = Ground()
-        self.path = Path(.03,.06,.02)
-        self.render = Road(self.path)
+        self.active_point = None
+        self.active_path = Path(.03,.06,.02)
+        self.paths = [self.active_path]
+        self.renderers = [Road(self.active_path)]
     def init(self):
         zpr.GLZPR.init(self)
         try:
@@ -417,7 +433,8 @@ class RoadMaker(zpr.GLZPR):
             glEnable(GL_MULTISAMPLE_ARB)
         except Exception as e:
             print "Error initializing multisampling:",e
-        self.render.init()
+        for renderer in self.renderers:
+            renderer.init()
         glDisable(GL_DEPTH_TEST)
     def draw(self,event):
         glClearColor(1,1,1,0)
@@ -425,8 +442,8 @@ class RoadMaker(zpr.GLZPR):
         glScale(.8,.8,.8)        
         self.ground.draw()
         glLineWidth(2)
-        self.render.draw()
-
+        for renderer in self.renderers:
+            renderer.draw()
     def keyPress(self,event):
         if event.keyval == gtk.keysyms.Escape:
             gtk.main_quit()
@@ -435,7 +452,7 @@ class RoadMaker(zpr.GLZPR):
             print "cannot handle key",event.keyval,"- type H for help"
             return
         key = chr(event.keyval)
-        if key in "sS":
+        if key in "eE":
             self.screenshot("roads.png")
         else:
             print "cannot handle key",key,"(%d)"%ord(key)
@@ -450,30 +467,19 @@ class RoadMaker(zpr.GLZPR):
             dtype=numpy.float32)
         ray[1] -= ray[0]
         point = self.ground.pick(ray)
-        while (point is not None):
-            assert point[2] == 0
-            point = Point(point[0],point[1])
-            selected = error = None
-            for i,pt in enumerate(self.path):
-                d = pt.distance(point)
-                if d <= self.path.OUTER:
-                    if selected is not None:
-                        print "ARGH"
-                        error = True
-                        break
-                    else:
-                        selected = i
-                elif d <= (self.path.OUTER*2):
-                    print "OGH"
-                    error = True
-                    break
-            if error: break
-            if selected:
-                self.path[selected] = point
-            else:
-                self.path.append(point)
-            self.path.dirty()
-            break
+        hits = []
+        for path in self.paths:
+            hits += path.pick(point)
+        if len(hits) > 1:
+            print "ambiguous click"
+        elif len(hits) == 0:
+            self.active_path.append(point)
+            self.active_path.dirty()
+        elif any(not p.validate(point) for p in self.paths):
+            print "ouch!",hits[0]
+        else:
+            print "click",hits[0]
+        self.queue_draw()
         return ((),())
     def pick(self,*args):
         pass
@@ -486,6 +492,6 @@ window.set_size_request(1024,768)
 window.connect("destroy",lambda event: gtk.main_quit())
 vbox = gtk.VBox(False, 0)
 window.add(vbox)
-vbox.pack_start(RoadMaker(),True,True)
+vbox.pack_start(Editor(),True,True)
 window.show_all()
 gtk.main()
