@@ -8,7 +8,7 @@ from OpenGL.GLUT import *
 from random import random
 import numpy, math
 
-import zpr
+import zpr, terrain
 
 def load_texture(filename):
     texture = glGenTextures(1)
@@ -111,67 +111,72 @@ def quad_line(p1,p2,width=0.05):
         )
 
 class Point:
-    def __init__(self,x,y):
+    def __init__(self,x,y,z):
         self.x = float(x)
         self.y = float(y)
+        self.z = float(z)
     def __div__(self,n):
         self.x /= n
         self.y /= n
     def __sub__(self,rhs):
         if isinstance(rhs,Point):
-            return Point(self.x-rhs.x,self.y-rhs.y)
-        return Point(self.x-rhs,self.y-rhs)
+            return Point(self.x-rhs.x,self.y-rhs.y,self.z-rhs.z)
+        return Point(self.x-rhs,self.y-rhs,self.z-rhs)
     def __add__(self,rhs):
         if isinstance(rhs,Point):
-            return Point(self.x+rhs.x,self.y+rhs.y)
-        return Point(self.x+rhs,self.y+rhs)
+            return Point(self.x+rhs.x,self.y+rhs.y,self.z+rhs.z)
+        return Point(self.x+rhs,self.y+rhs,self.z+rhs)
     def __mul__(self,rhs):
         if isinstance(rhs,Point):
-            return Point(self.x*rhs.x,self.y*rhs.y)
-        return Point(self.x*rhs,self.y*rhs)
+            return Point(self.x*rhs.x,self.y*rhs.y,self.z*rhs.z)
+        return Point(self.x*rhs,self.y*rhs,self.z*rhs)
     def distance(self,other):
         return math.sqrt(self.distance_sqrd(other))
     def distance_sqrd(self,other):
-        return (self.x-other.x)**2 + (self.y-other.y)**2
+        return (self.x-other.x)**2 + (self.y-other.y)**2 + (self.z-other.z)**2
     def circle(self,radius):
         return Circle(self,radius)
     def line(self,to):
         return Line(self,to)
     def to_3d(self):
-        return (self.x,self.y,0)
+        return (self.x,self.y,self.z)
     def __repr__(self):
-        return "<%f,%f>"%(self.x,self.y)
+        return "<%f,%f,%f>"%(self.x,self.y,self.z)
     def __getitem__(self,i):
         if i==0: return self.x
         if i==1: return self.y
-        if i==2: return 0.
-        raise Exception("index %s out of bounds"%i)
+        if i==2: return self.z
+        if not hasattr(self,"StopIteration"):
+            self.StopIteration = StopIteration()
+        raise self.StopIteration
         
 class Line:
     def __init__(self,a,b):
         self.a, self.b = a, b
-        self.dx, self.dy = (self.b.x - self.a.x), (self.b.y - self.a.y)
+        self.dx, self.dy, self.dz = (self.b.x-self.a.x), (self.b.y-self.a.y), (self.b.z-self.a.z)
     def closest(self,pt):
-        U = (pt.x-self.a.x)*self.dx + (pt.y-self.a.y)*self.dy
+        U = (pt.x-self.a.x)*self.dx + (pt.y-self.a.y)*self.dy + (pt.z-self.a.z)*self.dz
         U /= self.a.distance_sqrd(self.b)
         if U >= 1.: return self.b
         if U <= 0.: return self.a
         return self.interpolate(U)
     def distance(self,pt):
-        return abs((pt.x-self.a.x)*self.dy - self.dx*(pt.y-self.a.y)) / \
-            math.sqrt(self.dx**2 + self.dy**2)
+        return abs((pt.x-self.a.x)*self.dy - self.dx*(pt.y-self.a.y) - self.dz*(pt.z-self.a.z)) / \
+            math.sqrt(self.dx**2 + self.dy**2 + self.dz**2)
     def length(self):
         return self.a.distance(self.b)
     def interpolate(self,U):
-        return Point(self.a.x + U * self.dx,self.a.y + U * self.dy)
+        return Point(self.a.x + U * self.dx,self.a.y + U * self.dy,self.a.z + U * self.dz)
     def __div__(self,rhs):
         x = self.dx / rhs
         y = self.dy / rhs
-        return Line(self.a,self.a+Point(x,y))
+        z = self.dz / rhs
+        return Line(self.a,self.a+Point(x,y,z))
     def __mul__(self,rhs):
         x = self.dx * rhs
         y = self.dy * rhs
-        return Line(self.a,self.a+Point(x,y))
+        z = self.dz * rhs
+        return Line(self.a,self.a+Point(x,y,z))
     def normal(self):
         return self / self.length()
     def side(self,pt):
@@ -204,14 +209,10 @@ class Circle:
         return (Line(self.pt,pt).normal() * self.radius).b
     def draw(self,*rgb):
         glColor(*rgb)
-        x, y = self.radius, 0
-        glBegin(GL_LINE_LOOP)
-        for i in xrange(self.num_segments):
-            glVertex(x + self.pt.x, y + self.pt.y) 
-            t = x
-            x = self.c * x - self.s * y
-            y = self.s * t + self.c * y
-        glEnd()
+        glPushMatrix()
+        glTranslate(*self.pt)
+        glutSolidSphere(self.radius,20,20)
+        glPopMatrix()
     def outer_tangents(self,other):
         return self._tangents(other,+1)
     def inner_tangents(self,other):
@@ -230,8 +231,8 @@ class Circle:
             nx = vx * c - sign2 * h * vy
             ny = vy * c + sign2 * h * vx
             res.append(Line( \
-                Point(self.pt.x + self.radius * nx,self.pt.y + self.radius * ny),
-                Point(other.pt.x + sign1 * other.radius * nx,other.pt.y + sign1 * other.radius * ny)))
+                Point(self.pt.x + self.radius * nx,self.pt.y + self.radius * ny,self.pt.z),
+                Point(other.pt.x + sign1 * other.radius * nx,other.pt.y + sign1 * other.radius * ny, other.pt.z)))
         return tuple(res)
         
 class Path(list):
@@ -243,8 +244,11 @@ class Path(list):
         self.WIDTH = width
         self.CURVE = curve
         self.edges = None
+        self.renderer = None
     def dirty(self):
         self.edges = None # force recompute
+        if self.renderer is not None:
+            self.renderer.dirty()
     def get_edges(self):
         if self.edges is not None: return self.edges
         self.edges = []
@@ -355,55 +359,73 @@ class Path(list):
         return True
 
 class Road:
-    def __init__(self,path):
+    def __init__(self,terrain,path):
+        self.terrain = terrain
         self.path = path
+        self.quads = None
     def init(self):
         self.texture, self.texture_w, self.texture_h = \
             load_texture("../data/egypt_stone.png")
+    def dirty(self):
+        self.quads = None
     def draw(self):
-        edges = self.path.get_edges()
-        if len(edges) > 0:
-            quads = []
-            # tessellate with edges
-            tiles = 0.
-            TILE_SIZE = self.path.WIDTH # square
-            left_prev, right_prev = edges[0]
-            for left, right in edges[1:]:
-                left = left_prev.line(left)
-                right = right_prev.line(right)
-                if left.length() > right.length():
-                    left_scale = 1.
-                    right_scale = right.length() / left.length()
-                    length = left.length()
-                elif (left.length() == 0.):
-                    continue
+        if self.quads is None:
+            self.quads = []
+            edges = self.path.get_edges()
+            prev_terrain = [None,None]
+            def adjust(pt):
+                if prev_terrain[0] is not None:
+                    mesh, likely = prev_terrain
+                    I = self.terrain.find_face_for_point_with_guess(pt,*prev_terrain) 
                 else:
-                    left_scale = left.length() / right.length()
-                    right_scale = 1.
-                    length = right.length()
-                l = 0
-                while l < length:
-                    remaining = min(TILE_SIZE-tiles,length-l)
-                    tx1 = tiles/TILE_SIZE
-                    tx2 = (tiles+remaining)/TILE_SIZE
-                    quads.append(( \
-                        left.interpolate((l*left_scale)/left.length()),
-                        right.interpolate((l*right_scale)/right.length()),
-                        (tx1,0.),(tx1,1.),
-                        left.interpolate(((l+remaining)*left_scale)/left.length()),
-                        right.interpolate(((l+remaining)*right_scale)/right.length()),
-                        (tx2,0.),(tx2,1.)))
-                    tiles += remaining
-                    if tiles >= TILE_SIZE:
-                        tiles = 0
-                    l += remaining
-                left_prev, right_prev = left.b, right.b
-            # draw it
+                    I = self.terrain.find_face_for_point(pt)
+                if I is None: return pt
+                prev_terrain[0] = I[0]
+                prev_terrain[1] = I[2]
+                return Point(*I[1])
+            if len(edges) > 0:
+                # tessellate with edges
+                tiles = 0.
+                TILE_SIZE = self.path.WIDTH # square
+                left_prev, right_prev = edges[0]
+                for left, right in edges[1:]:
+                    left = left_prev.line(left)
+                    right = right_prev.line(right)
+                    if left.length() > right.length():
+                        left_scale = 1.
+                        right_scale = right.length() / left.length()
+                        length = left.length()
+                    elif (left.length() == 0.):
+                        continue
+                    else:
+                        left_scale = left.length() / right.length()
+                        right_scale = 1.
+                        length = right.length()
+                    l = 0
+                    while l < length:
+                        remaining = min(TILE_SIZE-tiles,length-l)
+                        tx1 = tiles/TILE_SIZE
+                        tx2 = (tiles+remaining)/TILE_SIZE
+                        self.quads.append(( \
+                            adjust(left.interpolate((l*left_scale)/left.length())),
+                            adjust(right.interpolate((l*right_scale)/right.length())),
+                            (tx1,0.),(tx1,1.),
+                            adjust(left.interpolate(((l+remaining)*left_scale)/left.length())),
+                            adjust(right.interpolate(((l+remaining)*right_scale)/right.length())),
+                            (tx2,0.),(tx2,1.)))
+                        tiles += remaining
+                        if tiles >= TILE_SIZE:
+                            tiles = 0
+                        l += remaining
+                    left_prev, right_prev = left.b, right.b
+        # draw it
+        if len(self.quads) > 0:
             glEnable(GL_TEXTURE_2D)
             glBindTexture(GL_TEXTURE_2D,self.texture)
             glColor(1,1,1,1)
+            glDisable(GL_LIGHTING)
             glBegin(GL_QUADS)
-            for i,(a,d,ta,td,b,c,tb,tc) in enumerate(quads):
+            for i,(a,d,ta,td,b,c,tb,tc) in enumerate(self.quads):
                 glTexCoord(*ta)
                 glVertex(*a.to_3d())
                 glTexCoord(*tb)
@@ -414,6 +436,7 @@ class Road:
                 glVertex(*d.to_3d())
             glEnd()
             glBindTexture(GL_TEXTURE_2D,0)
+            glEnable(GL_LIGHTING)
         for pt in self.path:
             pt.circle(max(.01,self.path.WIDTH/3.)).draw(1,.3,.3)
         HermiteSpline(self.path)
@@ -421,11 +444,13 @@ class Road:
 class Editor(zpr.GLZPR):
     def __init__(self):
         zpr.GLZPR.__init__(self)
-        self.ground = Ground()
+        self.terrain = terrain.Terrain()
+        self.terrain.create_ico(2)
         self.active_point = None
         self.active_path = Path(.03,.06,.02)
+        self.active_path.renderer = Road(self.terrain,self.active_path)
         self.paths = [self.active_path]
-        self.renderers = [Road(self.active_path)]
+        self.renderers = [self.active_path.renderer]
     def init(self):
         zpr.GLZPR.init(self)
         try:
@@ -433,14 +458,14 @@ class Editor(zpr.GLZPR):
             glEnable(GL_MULTISAMPLE_ARB)
         except Exception as e:
             print "Error initializing multisampling:",e
+        self.terrain.init_gl()
         for renderer in self.renderers:
             renderer.init()
         glDisable(GL_DEPTH_TEST)
     def draw(self,event):
         glClearColor(1,1,1,0)
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
-        glScale(.8,.8,.8)        
-        self.ground.draw()
+        self.terrain.draw_gl_ffp(event)
         glLineWidth(2)
         for renderer in self.renderers:
             renderer.draw()
@@ -458,15 +483,11 @@ class Editor(zpr.GLZPR):
             print "cannot handle key",key,"(%d)"%ord(key)
            
     def _pick(self,x,y,dx,dy,event):
-        glScale(.8,.8,.8)
-        modelview = numpy.matrix(glGetDoublev(GL_MODELVIEW_MATRIX))
-        projection = numpy.matrix(glGetDoublev(GL_PROJECTION_MATRIX))
-        viewport = glGetIntegerv(GL_VIEWPORT)
-        ray = numpy.array([gluUnProject(x,y,10,modelview,projection,viewport),
-            gluUnProject(x,y,-10,modelview,projection,viewport)],
-            dtype=numpy.float32)
-        ray[1] -= ray[0]
-        point = self.ground.pick(ray)
+        if not self.event_masked(event,gdk.SHIFT_MASK):
+            return ((),())
+        point = self.terrain.pick(x,y)
+        if point is None: return ((),())
+        point = Point(*point[1])
         hits = []
         for path in self.paths:
             hits += path.pick(point)
