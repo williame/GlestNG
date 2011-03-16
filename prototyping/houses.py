@@ -79,16 +79,24 @@ class Point:
         raise IndexError()
     def __repr__(self):
         return "P(%s,%s,%s)"%(self.x,self.y,self.z)
-    
+        
+class Weight:
+    def __init__(self,weight):
+        self.weight = weight
+    def __call__(self):
+        return self.weight    
+Weight.Half = Weight(.5)
+
 class Mix2:
     def __init__(self,p1,weight,p2):
         self.p1, self.weight, self.p2 = p1,weight,p2
     def __call__(self):
         p1, p2 = self.p1(), self.p2()
-        return p1 + (p2-p1) * self.weight
+        return p1 + (p2-p1) * self.weight()
         
 class Face:
-    def __init__(self,*mix):
+    def __init__(self,name,*mix):
+        self.name = name
         assert len(mix) > 2
         self.m = mix
         if len(mix) == 4:
@@ -105,8 +113,8 @@ class Face:
         I = zpr.ray_triangle(ray_origin,ray_dir,(v[0],v[1],v[2]))
         if (I is None) and (len(v) > 3):
             I = zpr.ray_triangle(ray_origin,ray_dir,(v[2],v[3],v[0]))
-        if I is not None:
-            return Point(*I)
+        if I is None: return ()
+        return ((Point(*I),self),)
     def draw(self,guide,outline):
         if guide: colour = (.4,.4,1.,.2) if outline else (.8,.8,1.,.2)
         else: colour = (1,0,0)
@@ -116,11 +124,58 @@ class Face:
         for pt in self.vertices():
             glVertex(*pt.xyz())
         glEnd()
+    def __repr__(self):
+        return "Face<%s,%d>"%(self.name,len(self.m))
+        
+class Faces:
+    def __init__(self):
+        self.faces = []
+    def draw(self,guide,outline):        
+        for face in self.faces:
+            face.draw(guide,outline)
+    def intersection(self,ray_origin,ray_dir):
+        hits = []
+        for face in self.faces:
+            hits.extend(face.intersection(ray_origin,ray_dir))
+        return hits
+        
+class Bounds(Faces):
+    def __init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb):
+        Faces.__init__(self)
+        self.name = name
+        self.tlf,self.tlb,self.blf,self.blb,self.trf,self.trb,self.brf,self.brb = \
+            tlf,tlb,blf,blb,trf,trb,brf,brb
+
+class Box(Bounds):
+    def __init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb,top):
+        Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
+        self.front = front = Face("%s_front"%name,tlf,blf,brf,trf)
+        self.back = back = Face("%s_back"%name,trb,brb,blb,tlb)
+        self.left = left = Face("%s_left"%name,tlb,blb,blf,tlf)
+        self.right = right = Face("%s_right"%name,trf,brf,brb,trb)
+        self.faces.extend((front,back,left,right))
+        if top:
+            self.top = top = Face("%s_top"%name,trf,trb,tlb,tlf)
+            self.faces.append(top)
+        
+class PitchRoof(Bounds):
+    def __init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb,left,right):
+        Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
+        self.front = front = Face("%s_front"%name,Mix2(tlf,Weight.Half,tlb),blf,brf,Mix2(trf,Weight.Half,trb))
+        self.back = back = Face("%s_back"%name,front.tr,brb,blb,front.tl)
+        self.faces.extend((front,back))
+        if left:
+            self.left = left = Face("%s_left"%name,front.tl,back.br,front.bl)
+            self.faces.append(left)
+        if right:
+            self.right = right = Face("%s_right"%name,front.tr,front.br,back.bl)
+            self.faces.append(right)
     
-class House:
+class House(Faces):
     FACE = "face"
     GUIDE = "guide"
     def __init__(self,mgr):
+        Faces.__init__(self)
         self.mgr = mgr
         self.pt = pt = (0.,0.,0.)
         self.w, self.h, self.d = w,h,d = 1.,1.,1.
@@ -133,26 +188,22 @@ class House:
         self.brf = brf = Point()
         self.brb = brb = Point()
         self.compute_corners()
+        # guides are inverted so faces face inwards
         self.guides = ( \
-            Face(tlf,trf,brf,blf), #,(0,0,-1)), # front
-            Face(trf,trb,brb,brf), #,(-1,0,0)), # right
-            Face(tlb,tlf,blf,blb), #,(1,0,0)), # left
-            Face(trb,trf,tlf,tlb), #,(0,-1,0)), # top
-            Face(blb,blf,brf,brb), #,(0,1,0)), # bottom
-            Face(trb,tlb,blb,brb)) #,(0,0,1))) # back
-        height = .6
-        self.front = front = Face(Mix2(blf,height,tlf),blf,
-           brf,Mix2(brf,height,trf))
-        self.back = back = Face(Mix2(brb,height,trb),brb,
-            blb,Mix2(blb,height,tlb))
-        self.roof_front = roof_front = Face(Mix2(Mix2(tlf,.5,tlb),.1,Mix2(blf,.5,blb)),
-            front.tl,front.tr,Mix2(Mix2(trf,.5,trb),.1,Mix2(brf,.5,brb)))
-        self.left = left = Face(back.tr,back.br,front.bl,front.tl)
-        self.gable_left = gable_left = Face(roof_front.tl,back.tr,roof_front.bl)
-        self.right = right = Face(front.tr,front.br,back.bl,back.tl)
-        self.roof_back = roof_back = Face(roof_front.tr,back.tl,back.tr,roof_front.tl)
-        self.gable_right = gable_right = Face(roof_front.tr,right.tl,right.tr)
-        self.faces = [front,roof_front,back,gable_left,left,right,roof_back,gable_right]
+            Face("guide_front",tlf,trf,brf,blf), #,(0,0,-1)), # front
+            Face("guide_right",trf,trb,brb,brf), #,(-1,0,0)), # right
+            Face("guide_left",tlb,tlf,blf,blb), #,(1,0,0)), # left
+            Face("guide_top",trb,trf,tlf,tlb), #,(0,-1,0)), # top
+            Face("guide_bottom",blb,blf,brf,brb), #,(0,1,0)), # bottom
+            Face("guide_back",trb,tlb,blb,brb)) #,(0,0,1))) # back
+        self.height = height = Weight(.6)
+        self.base = base = Box("base",Mix2(blf,height,tlf),Mix2(blb,height,tlb),
+            blf,blb,
+            Mix2(brf,height,trf),Mix2(brb,height,trb),
+            brf,brb,False)
+        self.roof = roof = PitchRoof("roof",tlf,tlb,base.tlf,base.tlb,
+            trf,trb,base.trf,base.trb,True,True)
+        self.faces = [base,roof]
     def compute_corners(self):
         pt = self.pt
         w, h, d = self.w,self.h,self.d
@@ -168,9 +219,8 @@ class House:
         hits = []
         for typ,faces in ((self.FACE,self.faces),(self.GUIDE,self.guides)):
             for face in faces:
-                I = face.intersection(ray_origin,ray_dir)
-                if I is not None:
-                    hits.append((I.distance(ray_origin),typ,face,I))
+                for pt,face in face.intersection(ray_origin,ray_dir):
+                    hits.append((pt.distance(ray_origin),typ,face,pt))
         return hits
     def draw(self,event):
         glEnable(GL_CULL_FACE)
@@ -180,8 +230,7 @@ class House:
             face.draw(True,True)
             face.draw(True,False)
         # draw model
-        for face in self.faces:
-            face.draw(False,False)
+        Faces.draw(self,False,False)
         # draw guide outlines again
         glLineWidth(2)
         for face in self.guides:
@@ -209,6 +258,11 @@ class Editor(zpr.GLZPR):
         key = chr(event.keyval)
         if key in "eE":
             self.screenshot("houses.png")
+        elif key in "qQxX":
+            gtk.main_quit()
+        elif (key in "cC") and self.event_masked(event,gdk.CONTROL_MASK):
+            print "BREAK!"
+            gtk.main_quit()
         else:
             print "cannot handle key",key,"(%d)"%ord(key)
            
@@ -216,8 +270,8 @@ class Editor(zpr.GLZPR):
         modelview = numpy.matrix(glGetDoublev(GL_MODELVIEW_MATRIX))
         projection = numpy.matrix(glGetDoublev(GL_PROJECTION_MATRIX))
         viewport = glGetIntegerv(GL_VIEWPORT)
-        R = numpy.array([gluUnProject(x,y,10,modelview,projection,viewport),
-            gluUnProject(x,y,-10,modelview,projection,viewport)],
+        R = numpy.array([gluUnProject(x,y,-10,modelview,projection,viewport),
+            gluUnProject(x,y,10,modelview,projection,viewport)],
             dtype=numpy.float32)
         ray_origin, ray_dir = R[0], R[1]-R[0]
         hits = self.model.pick(ray_origin,ray_dir)
