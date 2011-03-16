@@ -115,9 +115,10 @@ class Point:
         self.x = float(x)
         self.y = float(y)
         self.z = float(z)
-    def __div__(self,n):
-        self.x /= n
-        self.y /= n
+    def __div__(self,rhs):
+        if isinstance(rhs,Point):
+            return Point(self.x/rhs.x,self.y/rhs.y,self.z/rhs.z)
+        return Point(self.x/rhs,self.y/rhs,self.z/rhs)
     def __sub__(self,rhs):
         if isinstance(rhs,Point):
             return Point(self.x-rhs.x,self.y-rhs.y,self.z-rhs.z)
@@ -130,6 +131,14 @@ class Point:
         if isinstance(rhs,Point):
             return Point(self.x*rhs.x,self.y*rhs.y,self.z*rhs.z)
         return Point(self.x*rhs,self.y*rhs,self.z*rhs)
+    def cross(self,v):
+        return Point(self.y*v.z-self.z*v.y,self.z*v.x-self.x*v.z,self.x*v.y-self.y*v.x)
+    def dot(self,v):
+        return self.x*v.x + self.y*v.y + self.z*v.z
+    def normalise(self):
+        return self / self.magnitude()
+    def magnitude(self):
+        return self.x**2 + self.y**2 + self.z**2
     def distance(self,other):
         return math.sqrt(self.distance_sqrd(other))
     def distance_sqrd(self,other):
@@ -181,6 +190,7 @@ class Line:
         return self / self.length()
     def side(self,pt):
         """0 = on, <0 = right, >0 = left"""
+        return self.a.cross(self.b).dot(pt)
         return (pt.y-self.a.y)*self.dx-(pt.x-self.a.x)*self.dy
     def draw(self,*rgb):
         glColor(*rgb)
@@ -245,19 +255,28 @@ class Path(list):
         self.CURVE = curve
         self.edges = None
         self.renderer = None
+        self.pivots = []
     def dirty(self):
         self.edges = None # force recompute
         if self.renderer is not None:
             self.renderer.dirty()
     def get_edges(self):
+        def adjustz(pt):
+            I = self.renderer.terrain.find_face_for_point(pt)
+            if I is not None:
+                return Point(*I[1])
+            return pt
+        def adjustl(l):
+            return Line(adjustz(l.a),adjustz(l.b))
         if self.edges is not None: return self.edges
         self.edges = []
         if len(self.path) < 2: return self.edges
-        pivots = []
+        self.pivots = []
         # compute pivots
         LEFT, ON, RIGHT = "L", "-", "R"
         OUTER,INNER = self.OUTER,self.INNER # tidier naming
         pivot = self.path[0]
+        self.pivots.append(pivot)
         from_side, from_inner, from_outer = ON,pivot.circle((OUTER-INNER)/2.),None
         from_left = from_right = None
         tile = 0.
@@ -272,12 +291,13 @@ class Path(list):
             else:
                 next = self.path[p+1]
                 pivot = Line(pt,Line(pt.line(prev).normal().b,pt.line(next).normal().b).interpolate(.5))
-                pivot = pivot.interpolate(((INNER+OUTER)/2.) / pivot.length())
+                pivot = adjustz(pivot.interpolate(((INNER+OUTER)/2.) / pivot.length()))
                 side = Line(prev,pt).side(pivot)
                 side = LEFT if side > 0. else ON if side == 0. else RIGHT
                 inner = pivot.circle(INNER)
                 outer = pivot.circle(OUTER) if side is not ON else None
                 to_side, to_inner, to_outer = side,inner,outer
+            self.pivots.append(pivot)
             # compute where to go from and to
             if (from_side == LEFT) and (to_side == LEFT):
                 left = (INNER,OUTER,INNER,1)
@@ -313,30 +333,30 @@ class Path(list):
             left_fr = from_inner if left_fr == INNER else from_outer
             tan = left_fr.inner_tangents if tan == INNER else left_fr.outer_tangents
             to = to_inner if to == INNER else to_outer
-            left = tan(to)[idx]
+            left = adjustl(tan(to)[idx])
             # decode right
             right_fr, tan, to, idx = right
             right_fr = from_inner if right_fr == INNER else from_outer
             tan = right_fr.inner_tangents if tan == INNER else right_fr.outer_tangents
             to = to_inner if to == INNER else to_outer
-            right = tan(to)[idx]
+            right = adjustl(tan(to)[idx])
             # turn it into edges
-            if (from_left is not None) and (from_side != ON):
+            if False and (from_left is not None) and (from_side != ON):
                 l = Line(from_left,left.a)
                 r = Line(from_right,right.a)
                 def curve(l,r,part):
                     length = max(l.length(),r.length())
                     if (length > self.CURVE):
-                        lmid = left_fr.interpolate(l)
-                        rmid = right_fr.interpolate(r)
+                        lmid = adjustz(left_fr.interpolate(l).normalise())
+                        rmid = adjustz(right_fr.interpolate(r).normalise())
                         curve(l.a.line(lmid),r.a.line(rmid),False)
                         curve(lmid.line(l.b),rmid.line(r.b),True)
                     if not part:
                         self.edges.append((l.b,r.b))
                 # divide first using midpoints on outside of curve
                 # so that we go the right way around the curve!
-                lmid = left_fr.snap(prev)
-                rmid = right_fr.snap(prev)
+                lmid = adjustz(left_fr.snap(prev))
+                rmid = adjustz(right_fr.snap(prev))
                 curve(l.a.line(lmid),r.a.line(rmid),False)
                 curve(lmid.line(l.b),rmid.line(r.b),True)
             # the actual straight bit
@@ -419,11 +439,12 @@ class Road:
                         l += remaining
                     left_prev, right_prev = left.b, right.b
         # draw it
+        glDisable(GL_LIGHTING)
         if len(self.quads) > 0:
             glEnable(GL_TEXTURE_2D)
             glBindTexture(GL_TEXTURE_2D,self.texture)
             glColor(1,1,1,1)
-            glDisable(GL_LIGHTING)
+            glDisable(GL_DEPTH_TEST)
             glBegin(GL_QUADS)
             for i,(a,d,ta,td,b,c,tb,tc) in enumerate(self.quads):
                 glTexCoord(*ta)
@@ -436,10 +457,12 @@ class Road:
                 glVertex(*d.to_3d())
             glEnd()
             glBindTexture(GL_TEXTURE_2D,0)
-            glEnable(GL_LIGHTING)
+            glEnable(GL_DEPTH_TEST)
         for pt in self.path:
             pt.circle(max(.01,self.path.WIDTH/3.)).draw(1,.3,.3)
-        HermiteSpline(self.path)
+        for pt in self.path.pivots:
+            pt.circle(max(.01,self.path.WIDTH/3.)).draw(.3,.3,1)
+        glEnable(GL_LIGHTING)
 
 class Editor(zpr.GLZPR):
     def __init__(self):
@@ -461,7 +484,6 @@ class Editor(zpr.GLZPR):
         self.terrain.init_gl()
         for renderer in self.renderers:
             renderer.init()
-        glDisable(GL_DEPTH_TEST)
     def draw(self,event):
         glClearColor(1,1,1,0)
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)

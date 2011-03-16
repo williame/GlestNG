@@ -164,7 +164,7 @@ class GLZPR(gtkgl.DrawingArea):
         glEnable(GL_LIGHT0)
         glDepthFunc(GL_LEQUAL)
         glEnable(GL_DEPTH_TEST)
-        glEnable(GL_NORMALIZE)
+        #glEnable(GL_NORMALIZE)
         glEnable(GL_COLOR_MATERIAL)
         
     def _reshape(self,widget,event):
