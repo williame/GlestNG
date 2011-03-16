@@ -80,19 +80,28 @@ class Point:
     def __repr__(self):
         return "P(%s,%s,%s)"%(self.x,self.y,self.z)
         
-class Weight:
-    def __init__(self,weight):
-        self.weight = weight
+def call(c):
+    if callable(c): c = c()
+    return c
+    
+def Ofs:
+    def __init__(self,x,y,z):
+        self.x,self.y,self.z = x,y,z
     def __call__(self):
-        return self.weight    
-Weight.Half = Weight(.5)
+        return Point(call(self.x),call(self.y),call(self.z))
+
+class Rel:
+    def __init__(self,anchor,ofs):
+        self.anchor, self.ofs = anchor, ofs
+    def __call__(self):
+        return call(self.anchor) + call(self.ofs)
 
 class Mix2:
     def __init__(self,p1,weight,p2):
         self.p1, self.weight, self.p2 = p1,weight,p2
     def __call__(self):
-        p1, p2 = self.p1(), self.p2()
-        return p1 + (p2-p1) * self.weight()
+        p1, p2 = call(self.p1), call(self.p2)
+        return p1 + (p2-p1) * call(self.weight)
         
 class Face:
     def __init__(self,name,*mix):
@@ -107,7 +116,7 @@ class Face:
         v = self.m[2]()-m0
         return u.cross(v).normal()
     def vertices(self):
-        return [m() for m in self.m]
+        return [call(m) for m in self.m]
     def intersection(self,ray_origin,ray_dir):
         v = [v.numpy() for v in self.vertices()]
         I = zpr.ray_triangle(ray_origin,ray_dir,(v[0],v[1],v[2]))
@@ -128,6 +137,7 @@ class Face:
         return "Face<%s,%d>"%(self.name,len(self.m))
         
 class Faces:
+    """an arbitrary list of faces (or Faces)"""
     def __init__(self):
         self.faces = []
     def draw(self,guide,outline):        
@@ -140,6 +150,7 @@ class Faces:
         return hits
         
 class Bounds(Faces):
+    """defines a quad, does not fill it with sides"""
     def __init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb):
         Faces.__init__(self)
         self.name = name
@@ -147,6 +158,7 @@ class Bounds(Faces):
             tlf,tlb,blf,blb,trf,trb,brf,brb
 
 class Box(Bounds):
+    """four sided box, optionally with a closed top"""
     def __init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb,top):
         Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
         self.front = front = Face("%s_front"%name,tlf,blf,brf,trf)
@@ -159,9 +171,10 @@ class Box(Bounds):
             self.faces.append(top)
         
 class PitchRoof(Bounds):
+    """a pitched roof i.e. an equal roof"""
     def __init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb,left,right):
         Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
-        self.front = front = Face("%s_front"%name,Mix2(tlf,Weight.Half,tlb),blf,brf,Mix2(trf,Weight.Half,trb))
+        self.front = front = Face("%s_front"%name,Mix2(tlf,.5,tlb),blf,brf,Mix2(trf,.5,trb))
         self.back = back = Face("%s_back"%name,front.tr,brb,blb,front.tl)
         self.faces.extend((front,back))
         if left:
@@ -170,7 +183,26 @@ class PitchRoof(Bounds):
         if right:
             self.right = right = Face("%s_right"%name,front.tr,front.br,back.bl)
             self.faces.append(right)
-    
+
+class Chim(Bounds):
+    def __init__(self,name,w,d,anchor,height):
+        self.w, self.d, self.anchor = w,d,anchor
+        x,z = w*.4,d*.4
+        tlf = Rel(anchor,Ofs(-x/2,height,-z/2))
+        tlb = Rel(anchor,Ofs(-x/2,height,z/2))
+        blf = Rel(anchor,Ofs(-x/2,0,-z/2))
+        blb = Rel(anchor,Ofs(-x/2,0,z/2))          
+        trf = Rel(anchor,Ofs(x/2,height,-z/2))
+        trb = Rel(anchor,Ofs(x/2,height,z/2))
+        brf = Rel(anchor,Ofs(x/2,0,-z/2))
+        brb = Rel(anchor,Ofs(x/2,0,z/2))
+        Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
+        self.height = height = Weight(.8)
+        self.base = base = Box("_base"%name,        
+            Mix2(blf,height,tlf),Mix2(blb,height,tlb),blf,blb,
+            Mix2(brf,height,trf),Mix2(brb,height,trb),brf,brb,True)
+        self.faces.append(base)
+
 class House(Faces):
     FACE = "face"
     GUIDE = "guide"
@@ -197,13 +229,13 @@ class House(Faces):
             Face("guide_bottom",blb,blf,brf,brb), #,(0,1,0)), # bottom
             Face("guide_back",trb,tlb,blb,brb)) #,(0,0,1))) # back
         self.height = height = Weight(.6)
-        self.base = base = Box("base",Mix2(blf,height,tlf),Mix2(blb,height,tlb),
-            blf,blb,
-            Mix2(brf,height,trf),Mix2(brb,height,trb),
-            brf,brb,False)
+        self.base = base = Box("base",
+            Mix2(blf,height,tlf),Mix2(blb,height,tlb),blf,blb,
+            Mix2(brf,height,trf),Mix2(brb,height,trb),brf,brb,False)
         self.roof = roof = PitchRoof("roof",tlf,tlb,base.tlf,base.tlb,
             trf,trb,base.trf,base.trb,True,True)
-        self.faces = [base,roof]
+        self.chim = chim = Chim("chim",1,2,Mix2(roof.front.bl,.3,roof.back.bl),height)
+        self.faces = [base,roof,chim]
     def compute_corners(self):
         pt = self.pt
         w, h, d = self.w,self.h,self.d
