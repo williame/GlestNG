@@ -84,7 +84,7 @@ def call(c):
     if callable(c): c = c()
     return c
     
-def Ofs:
+class Ofs:
     def __init__(self,x,y,z):
         self.x,self.y,self.z = x,y,z
     def __call__(self):
@@ -102,6 +102,12 @@ class Mix2:
     def __call__(self):
         p1, p2 = call(self.p1), call(self.p2)
         return p1 + (p2-p1) * call(self.weight)
+        
+class Weight:
+    def __init__(self,weight):
+        self.weight = weight
+    def __call__(self):
+        return call(self.weight)
         
 class Face:
     def __init__(self,name,*mix):
@@ -187,18 +193,18 @@ class PitchRoof(Bounds):
 class Chim(Bounds):
     def __init__(self,name,w,d,anchor,height):
         self.w, self.d, self.anchor = w,d,anchor
-        x,z = w*.4,d*.4
-        tlf = Rel(anchor,Ofs(-x/2,height,-z/2))
-        tlb = Rel(anchor,Ofs(-x/2,height,z/2))
-        blf = Rel(anchor,Ofs(-x/2,0,-z/2))
-        blb = Rel(anchor,Ofs(-x/2,0,z/2))          
-        trf = Rel(anchor,Ofs(x/2,height,-z/2))
-        trb = Rel(anchor,Ofs(x/2,height,z/2))
-        brf = Rel(anchor,Ofs(x/2,0,-z/2))
-        brb = Rel(anchor,Ofs(x/2,0,z/2))
+        x,z = w*.1,d*.1
+        tlf = Rel(anchor,Ofs(x/2,height,-z/2))
+        tlb = Rel(anchor,Ofs(x/2,height,z/2))
+        blf = Rel(anchor,Ofs(x/2,0,-z/2))
+        blb = Rel(anchor,Ofs(x/2,0,z/2))          
+        trf = Rel(anchor,Ofs(-x/2,height,-z/2))
+        trb = Rel(anchor,Ofs(-x/2,height,z/2))
+        brf = Rel(anchor,Ofs(-x/2,0,-z/2))
+        brb = Rel(anchor,Ofs(-x/2,0,z/2))
         Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
         self.height = height = Weight(.8)
-        self.base = base = Box("_base"%name,        
+        self.base = base = Box("%s_base"%name,        
             Mix2(blf,height,tlf),Mix2(blb,height,tlb),blf,blb,
             Mix2(brf,height,trf),Mix2(brb,height,trb),brf,brb,True)
         self.faces.append(base)
