@@ -82,49 +82,37 @@ class Point:
     
 class Mix2:
     def __init__(self,p1,weight,p2):
-        assert isinstance(p1,Point)
-        assert isinstance(p2,Point)
-        self.o = p1
-        self.d = p2-p1
-        self.w = weight
+        self.p1, self.weight, self.p2 = p1,weight,p2
     def __call__(self):
-        return self.o + self.d * self.w
+        p1, p2 = self.p1(), self.p2()
+        return p1 + (p2-p1) * self.weight
         
-class Quad:
+class Face:
     def __init__(self,*mix):
-        assert len(mix) in (4,5,6)
-        self.m = mix[:4]
-        if len(mix) > 4:
-            self.n = mix[4]
-            if self.n is not None and not isinstance(self.n,Point):
-                self.n = Point(*self.n)
-        else:
-            self.n = None
-        if len(mix) > 5:
-            self.c = mix[5]
-        else:
-            self.c = None
+        assert len(mix) > 2
+        self.m = mix
+        if len(mix) == 4:
+            self.tl, self.bl, self.br, self.tr = self.m
     def normal(self):
-        if self.n is not None: return self.n
         m0 = self.m[0]()
         u = self.m[1]()-m0
-        v = self.m[3]()-m0
+        v = self.m[2]()-m0
         return u.cross(v).normal()
     def vertices(self):
-        return (self.m[0](),self.m[1](),self.m[2](),self.m[3]())
+        return [m() for m in self.m]
     def intersection(self,ray_origin,ray_dir):
         v = [v.numpy() for v in self.vertices()]
         I = zpr.ray_triangle(ray_origin,ray_dir,(v[0],v[1],v[2]))
-        if I is None:
+        if (I is None) and (len(v) > 3):
             I = zpr.ray_triangle(ray_origin,ray_dir,(v[2],v[3],v[0]))
         if I is not None:
             return Point(*I)
-    def draw(self,selected,guide,outline):
+    def draw(self,guide,outline):
         if guide: colour = (.4,.4,1.,.2) if outline else (.8,.8,1.,.2)
-        else: colour = (1,0,0) if selected else (0,1,0)
+        else: colour = (1,0,0)
         glColor(*colour)
         glNormal(*self.normal())
-        glBegin(GL_LINE_LOOP if outline else GL_QUADS)
+        glBegin(GL_LINE_LOOP if outline else GL_POLYGON)
         for pt in self.vertices():
             glVertex(*pt.xyz())
         glEnd()
@@ -146,15 +134,25 @@ class House:
         self.brb = brb = Point()
         self.compute_corners()
         self.guides = ( \
-            Quad(tlf,trf,brf,blf), #,(0,0,-1)), # front
-            Quad(trf,trb,brb,brf), #,(-1,0,0)), # right
-            Quad(tlb,tlf,blf,blb), #,(1,0,0)), # left
-            Quad(trb,trf,tlf,tlb), #,(0,-1,0)), # top
-            Quad(blb,blf,brf,brb), #,(0,1,0)), # bottom
-            Quad(trb,tlb,blb,brb)) #,(0,0,1))) # back
-        self.selected = Quad(Mix2(tlf,.2,blb),Mix2(blf,.2,tlb),
-            Mix2(brf,.2,trb),Mix2(trf,.2,brb),None,(1.,.4,.4))
-        self.faces = [self.selected]
+            Face(tlf,trf,brf,blf), #,(0,0,-1)), # front
+            Face(trf,trb,brb,brf), #,(-1,0,0)), # right
+            Face(tlb,tlf,blf,blb), #,(1,0,0)), # left
+            Face(trb,trf,tlf,tlb), #,(0,-1,0)), # top
+            Face(blb,blf,brf,brb), #,(0,1,0)), # bottom
+            Face(trb,tlb,blb,brb)) #,(0,0,1))) # back
+        height = .6
+        self.front = front = Face(Mix2(blf,height,tlf),blf,
+           brf,Mix2(brf,height,trf))
+        self.back = back = Face(Mix2(brb,height,trb),brb,
+            blb,Mix2(blb,height,tlb))
+        self.roof_front = roof_front = Face(Mix2(Mix2(tlf,.5,tlb),.1,Mix2(blf,.5,blb)),
+            front.tl,front.tr,Mix2(Mix2(trf,.5,trb),.1,Mix2(brf,.5,brb)))
+        self.left = left = Face(back.tr,back.br,front.bl,front.tl)
+        self.gable_left = gable_left = Face(roof_front.tl,back.tr,roof_front.bl)
+        self.right = right = Face(front.tr,front.br,back.bl,back.tl)
+        self.roof_back = roof_back = Face(roof_front.tr,back.tl,back.tr,roof_front.tl)
+        self.gable_right = gable_right = Face(roof_front.tr,right.tl,right.tr)
+        self.faces = [front,roof_front,back,gable_left,left,right,roof_back,gable_right]
     def compute_corners(self):
         pt = self.pt
         w, h, d = self.w,self.h,self.d
@@ -179,15 +177,15 @@ class House:
         # draw guides
         glLineWidth(1)
         for face in self.guides:
-            face.draw(False,True,True)
-            face.draw(False,True,False)
+            face.draw(True,True)
+            face.draw(True,False)
         # draw model
         for face in self.faces:
-            face.draw(face == self.selected,False,False)
+            face.draw(False,False)
         # draw guide outlines again
         glLineWidth(2)
         for face in self.guides:
-            face.draw(False,True,True)
+            face.draw(True,True)
 
 class Editor(zpr.GLZPR):
     def __init__(self):
