@@ -5,10 +5,10 @@ import gtk, gtk.gdk as gdk, gtk.gtkgl as gtkgl, gtk.gdkgl as gdkgl, gobject
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
-from random import random
-import numpy, math
+import random, numpy, math
 
 import zpr
+from roads import load_texture
 
 def is_vec(a):
     return isinstance(a,tuple) and (len(a)==3)
@@ -80,7 +80,29 @@ class Point:
 
 def lerp(p1,weight,p2):
     return p1 + (p2-p1) * weight
-     
+    
+class Rnd:
+    def __init__(self,low,high):
+        self.low,self.high = low,high
+    def __call__(self):
+        return random.uniform(self.low,self.high)
+        
+class Roulette:
+    def __init__(self,*choices):
+        self.weight = 0.
+        self.choices = []
+        for weight,choice in choices:
+            self.weight += weight
+            self.choices.append((weight,choice))
+    def __call__(self):
+        throw = random.uniform(0.,self.weight)
+        for weight,choice in self.choices:
+            throw -= weight
+            if throw <= 0:
+                return choice
+        raise Exception("bad roulette!")
+        return choice[0]
+
 class Face:
     def __init__(self,name,*mix):
         self.name = name
@@ -89,15 +111,20 @@ class Face:
         if len(mix) == 4:
             self.tl, self.bl, self.br, self.tr = self.m
         self.colour = None
+        self.texture = 0
+        self.texture_coords = [(0,0)]*len(mix)
     def normal(self):
         m0 = self.m[0]
         u = self.m[1]-self.m[0]
         v = self.m[2]-self.m[0]
         return u.cross(v).normal()
-    def vertices(self):
-        return self.m
+    def set_texture_quad(self,texture,w,h):
+        assert len(self.m) == 4
+        self.texture = texture
+        self.texture_coords = ((0,h),(0,0),(w,0),(w,h)) # flip y
+        self.colour = (1,1,1)
     def intersection(self,ray_origin,ray_dir):
-        v = [v.numpy() for v in self.vertices()]
+        v = [v.numpy() for v in self.m]
         I = zpr.ray_triangle(ray_origin,ray_dir,(v[0],v[1],v[2]))
         if (I is None) and (len(v) > 3):
             I = zpr.ray_triangle(ray_origin,ray_dir,(v[2],v[3],v[0]))
@@ -106,12 +133,15 @@ class Face:
     def draw(self,guide,outline):
         if guide: colour = (.4,.4,1.,.2) if outline else (.8,.8,1.,.2)
         else: colour = self.colour if self.colour is not None else (1,0,0)
+        glBindTexture(GL_TEXTURE_2D,self.texture)
         glColor(*colour)
         glNormal(*self.normal())
         glBegin(GL_LINE_LOOP if outline else GL_POLYGON)
-        for pt in self.vertices():
+        for tx,pt in zip(self.texture_coords,self.m):
+            glTexCoord(*tx)
             glVertex(*pt.xyz())
         glEnd()
+        glBindTexture(GL_TEXTURE_2D,0)
     def __repr__(self):
         return "Face<%s,%d>"%(self.name,len(self.m))
         
@@ -136,15 +166,15 @@ class Bounds(Faces):
         self.tlf,self.tlb,self.blf,self.blb,self.trf,self.trb,self.brf,self.brb = \
             tlf,tlb,blf,blb,trf,trb,brf,brb
     def sub(self,left,right,front,back,top,bottom):
+        x,y,z = [abs(d) for d in self.brb-self.tlf]
+        left *= x; right *= -x
+        front *= -z; back *= z
+        top *= -y; bottom *= y
         return Bounds(None,
-            self.tlf+Point(left,front,top),
-            self.tlb+Point(left,-back,top),
-            self.blf+Point(left,front,-bottom),
-            self.blb+Point(left,-back,-bottom),
-            self.trf+Point(-right,front,top),
-            self.trb+Point(-right,-back,top),
-            self.brf+Point(-right,front,-bottom),
-            self.brb+Point(-right,-back,-bottom))
+            self.tlf+Point(left,top,front),self.tlb+Point(left,top,back),
+            self.blf+Point(left,bottom,front),self.blb+Point(left,bottom,back),
+            self.trf+Point(right,top,front),self.trb+Point(right,top,back),
+            self.brf+Point(right,bottom,front),self.brb+Point(right,bottom,back))
     def __getitem__(self,i):
         return (self.tlf,self.tlb,self.blf,self.blb,self.trf,self.trb,self.brf,self.brb)[i]
 
@@ -202,20 +232,55 @@ class Column(Bounds):
             for x,z in xz:
                 glVertex(x,top,z)
             glEnd()
+            
+ROOF_TEXTURES = Roulette((1,"textures/gray_pebble_tiles.jpg"),(1,"textures/fancy_tiles.jpg"))
         
 class PitchRoof(Bounds):
-    """a pitched roof i.e. an equal roof"""
-    def __init__(self,name,left,right,tlf,tlb,blf,blb,trf,trb,brf,brb):
+    def __init__(self,name,house,left,right,blf,blb,brf,brb,pitch=2,hip=False):
+        self.house = house
+        self.height = height = abs(blf.z-brb.z)/pitch
+        top = Point(0,height,0)
+        tlf,tlb,trf,trb = blf+top,blb+top,brf+top,brb+top
         Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
-        self.front = front = Face("%s_front"%name,lerp(tlf,.5,tlb),blf,brf,lerp(trf,.5,trb))
+        l = Point(height,0,0) if (left and hip) else 0
+        r = Point(height,0,0) if (right and hip) else 0
+        self.front = front = Face("%s_front"%name,lerp(tlf,.5,tlb)+l,blf,brf,lerp(trf,.5,trb)-r)
         self.back = back = Face("%s_back"%name,front.tr,brb,blb,front.tl)
-        front.colour = back.colour = (.3,.3,.2)
+        self.texture = texture = load_texture(ROOF_TEXTURES())[0]
+        front.set_texture_quad(texture,(front.tl-front.br).magnitude(),(front.tl-front.bl).magnitude())
+        back.set_texture_quad(texture,(back.tl-back.br).magnitude(),(back.tl-back.bl).magnitude())
         self.faces.extend((front,back))
         if left:
             self.left = left = Face("%s_left"%name,front.tl,back.br,front.bl)
             self.faces.append(left)
         if right:
             self.right = right = Face("%s_right"%name,front.tr,front.br,back.bl)
+            self.faces.append(right)
+
+def HipRoof(name,house,left,right,blf,blb,brf,brb,pitch=2):
+    return PitchRoof(name,house,left,right,blf,blb,brf,brb,pitch,True)
+
+class GambrelRoof(Bounds):
+    TOP = Roulette((1,PitchRoof),(1,HipRoof))
+    def __init__(self,name,house,left,right,blf,blb,brf,brb):
+        self.house = house
+        self.height = height = house.floor_height
+        top = Point(0,height,0)
+        tlf,tlb,trf,trb = blf+top,blb+top,brf+top,brb+top
+        Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
+        pitch = 2.5
+        self.front = front = Face("%s_front"%name,tlf+Point(0,0,-height/pitch),blf,brf,trf+Point(0,0,-height/pitch))
+        self.back = back = Face("%s_back"%name,trb+Point(0,0,height/pitch),brb,blb,tlb+Point(0,0,height/pitch))
+        self.top = top = self.TOP()("%s_top"%name,house,left,right,front.tl,back.tr,front.tr,back.tl,4)
+        self.texture = texture = top.texture
+        front.set_texture_quad(texture,(front.tl-front.br).magnitude(),(front.tl-front.bl).magnitude())
+        back.set_texture_quad(texture,(back.tl-back.br).magnitude(),(back.tl-back.bl).magnitude())
+        self.faces.extend((front,back,top))
+        if left:
+            self.left = left = Face("%s_left"%name,front.tl,back.tr,back.br,front.bl)
+            self.faces.append(left)
+        if right:
+            self.right = right = Face("%s_right"%name,front.tr,front.br,back.bl,back.tl)
             self.faces.append(right)
 
 class Chimney(Bounds):
@@ -238,6 +303,8 @@ class Chimney(Bounds):
         self.faces.append(pot)
 
 class House(Faces):
+    FLOOR_HEIGHT = Rnd(.2,.3)
+    ROOF_TYPE = Roulette((1,GambrelRoof),(.4,PitchRoof))
     FACE = "face"
     GUIDE = "guide"
     def __init__(self,mgr):
@@ -263,9 +330,13 @@ class House(Faces):
             Face("guide_bottom",blb,blf,brf,brb), #,(0,1,0)), # bottom
             Face("guide_back",trb,tlb,blb,brb)) #,(0,0,1))) # back
         self.height = height = .6
+        self.floor_height = floor_height = self.FLOOR_HEIGHT()
+        self.num_floors = num_floors = random.randint(1,int(math.floor(height/floor_height)))
+        self.height = height = floor_height*num_floors
+        print "floor height:",floor_height,"num floors:",num_floors,"height:",height
         inner = Bounds(None,tlf,tlb,blf,blb,trf,trb,brf,brb).sub(.1,.1,.1,.1,0,0)
-        self.base = base = Box("base",False,*inner.sub(0,0,0,0,.4,0))
-        self.roof = roof = PitchRoof("roof",True,True,*inner.sub(0,0,0,0,.1,.6))
+        self.base = base = Box("base",False,*inner.sub(0,0,0,0,1-height,0))
+        self.roof = roof = self.ROOF_TYPE()("roof",self,True,True,base.tlf,base.tlb,base.trf,base.trb)
         self.chimney_pos = chimney_pos = .2
         self.chimney = chimney = Chimney("chimney",1,2,
             lerp(inner.tlf,chimney_pos,inner.trb),lerp(roof.blf,chimney_pos,roof.brb))
@@ -305,11 +376,12 @@ class House(Faces):
 class Editor(zpr.GLZPR):
     def __init__(self):
         zpr.GLZPR.__init__(self)
-        self.model = House(self)
     def init(self):
         zpr.GLZPR.init(self)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA)
+        glEnable(GL_TEXTURE_2D)
+        self.model = House(self)
     def draw(self,event):
         glClearColor(.8,.8,.7,0)
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
@@ -324,6 +396,9 @@ class Editor(zpr.GLZPR):
         key = chr(event.keyval)
         if key in "eE":
             self.screenshot("houses.png")
+        elif key == " ":
+            self.model = House(self)
+            self.queue_draw()
         elif key in "qQxX":
             gtk.main_quit()
         elif (key in "cC") and self.event_masked(event,gdk.CONTROL_MASK):
@@ -348,15 +423,16 @@ class Editor(zpr.GLZPR):
     def pick(self,*args):
         pass
 
-glutInit(())
-gtk.gdk.threads_init()
-window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-window.set_title("GlestNG Houses Prototyping")
-window.set_size_request(1024,768)
-window.connect("destroy",lambda event: gtk.main_quit())
-vbox = gtk.VBox(False, 0)
-window.add(vbox)
-vbox.pack_start(Editor(),True,True)
-window.show_all()
-gtk.main()
+if __name__ == '__main__':
+    glutInit(())
+    gtk.gdk.threads_init()
+    window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+    window.set_title("GlestNG Houses Prototyping")
+    window.set_size_request(1024,768)
+    window.connect("destroy",lambda event: gtk.main_quit())
+    vbox = gtk.VBox(False, 0)
+    window.add(vbox)
+    vbox.pack_start(Editor(),True,True)
+    window.show_all()
+    gtk.main()
 

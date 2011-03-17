@@ -10,31 +10,34 @@ import numpy, math
 
 import zpr, terrain
 
+_textures = {}
 def load_texture(filename):
-    texture = glGenTextures(1)
-    try:
-        import Image
-        image = Image.open(filename)
-        w, h = image.size
+    if filename not in _textures:
         try:
-            img = image.tostring("raw","RGBA",0,-1)
-            mode = GL_RGBA
-        except Exception as e:
-            img = image.tostring("raw","RGB",0,-1)
-            mode = GL_RGB
-        image = img
-        glPixelStorei(GL_UNPACK_ALIGNMENT,1)
-        glBindTexture(GL_TEXTURE_2D,texture)
-        glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP)
-        glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP)
-        glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
-        glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR)
-        glTexImage2D(GL_TEXTURE_2D,0,mode,w,h,0,mode,GL_UNSIGNED_BYTE,image)
-        return (texture,w,h)
-    except Exception,e:
-        print "Could not load texture",filename
-        print e
-        return (0,1024,1024)
+            texture = glGenTextures(1)
+            import Image
+            image = Image.open(filename)
+            w, h = image.size
+            try:
+                img = image.tostring("raw","RGBA",0,-1)
+                mode = GL_RGBA
+            except Exception as e:
+                img = image.tostring("raw","RGB",0,-1)
+                mode = GL_RGB
+            image = img
+            glPixelStorei(GL_UNPACK_ALIGNMENT,1)
+            glBindTexture(GL_TEXTURE_2D,texture)
+            glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP)
+            glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP)
+            glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
+            glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR)
+            glTexImage2D(GL_TEXTURE_2D,0,mode,w,h,0,mode,GL_UNSIGNED_BYTE,image)
+            _textures[filename] = (texture,w,h)
+        except Exception,e:
+            print "Could not load texture",filename
+            print e
+            return (0,1024,1024)
+    return _textures[filename]
 
 class Ground:
     def __init__(self):
@@ -527,14 +530,16 @@ class Editor(zpr.GLZPR):
     def pick(self,*args):
         pass
 
-glutInit(())
-gtk.gdk.threads_init()
-window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-window.set_title("GlestNG Roads Prototyping")
-window.set_size_request(1024,768)
-window.connect("destroy",lambda event: gtk.main_quit())
-vbox = gtk.VBox(False, 0)
-window.add(vbox)
-vbox.pack_start(Editor(),True,True)
-window.show_all()
-gtk.main()
+if __name__ == '__main__':
+    glutInit(())
+    gtk.gdk.threads_init()
+    window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+    window.set_title("GlestNG Roads Prototyping")
+    window.set_size_request(1024,768)
+    window.connect("destroy",lambda event: gtk.main_quit())
+    vbox = gtk.VBox(False, 0)
+    window.add(vbox)
+    vbox.pack_start(Editor(),True,True)
+    window.show_all()
+    gtk.main()
+
