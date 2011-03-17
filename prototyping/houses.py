@@ -66,8 +66,6 @@ class Point:
         return Point(self.x/p,self.y/p,self.z/p)
     def __neg__(self):
         return Point(-self.x,-self.y,-self.z)
-    def __call__(self):
-        return self
     def numpy(self):
         return numpy.array((self.x,self.y,self.z),dtype=numpy.float32)
     def xyz(self):
@@ -79,48 +77,10 @@ class Point:
         raise IndexError()
     def __repr__(self):
         return "P(%s,%s,%s)"%(self.x,self.y,self.z)
-        
-def call(c):
-    if callable(c): c = c()
-    return c
-    
-class Ofs:
-    def __init__(self,x,y,z):
-        self.x,self.y,self.z = x,y,z
-    def __call__(self):
-        return Point(call(self.x),call(self.y),call(self.z))
 
-class Rel:
-    def __init__(self,anchor,ofs):
-        self.anchor, self.ofs = anchor, ofs
-    def __call__(self):
-        return call(self.anchor) + call(self.ofs)
-        
-class Sub:
-    def __init__(self,anchor,ofs):
-        self.anchor, self.ofs = anchor, ofs
-    def __call__(self):
-        return call(self.anchor) - call(self.ofs)
-
-class Mix2:
-    def __init__(self,p1,weight,p2):
-        self.p1, self.weight, self.p2 = p1,weight,p2
-    def __call__(self):
-        p1, p2 = call(self.p1), call(self.p2)
-        return p1 + (p2-p1) * call(self.weight)
-        
-class Axis:
-    def __init__(self,pt,axis):
-        self.pt, self.axis = pt, axis
-    def __call__(self):
-        return call(self.pt)[call(self.axis)]
-
-class Weight:
-    def __init__(self,weight):
-        self.weight = weight
-    def __call__(self):
-        return call(self.weight)
-        
+def lerp(p1,weight,p2):
+    return p1 + (p2-p1) * weight
+     
 class Face:
     def __init__(self,name,*mix):
         self.name = name
@@ -130,12 +90,12 @@ class Face:
             self.tl, self.bl, self.br, self.tr = self.m
         self.colour = None
     def normal(self):
-        m0 = self.m[0]()
-        u = self.m[1]()-m0
-        v = self.m[2]()-m0
+        m0 = self.m[0]
+        u = self.m[1]-self.m[0]
+        v = self.m[2]-self.m[0]
         return u.cross(v).normal()
     def vertices(self):
-        return [call(m) for m in self.m]
+        return self.m
     def intersection(self,ray_origin,ray_dir):
         v = [v.numpy() for v in self.vertices()]
         I = zpr.ray_triangle(ray_origin,ray_dir,(v[0],v[1],v[2]))
@@ -176,28 +136,28 @@ class Bounds(Faces):
         self.tlf,self.tlb,self.blf,self.blb,self.trf,self.trb,self.brf,self.brb = \
             tlf,tlb,blf,blb,trf,trb,brf,brb
     def _front(self,front):
-        tlf, blf = Mix2(self.tlf,front,self.tlb), Mix2(self.blf,front,self.blb)
-        trf, brf = Mix2(self.trf,front,self.trb), Mix2(self.brf,front,self.brb)
+        tlf, blf = lerp(self.tlf,front,self.tlb), lerp(self.blf,front,self.blb)
+        trf, brf = lerp(self.trf,front,self.trb), lerp(self.brf,front,self.brb)
         return Bounds(None,tlf,self.tlb,blf,self.blb,trf,self.trb,brf,self.brb)
     def _back(self,back):
-        tlb, blb = Mix2(self.tlb,back,self.tlf), Mix2(self.blb,back,self.blf)
-        trb, brb = Mix2(self.trb,back,self.trf), Mix2(self.brb,back,self.brf)
+        tlb, blb = lerp(self.tlb,back,self.tlf), lerp(self.blb,back,self.blf)
+        trb, brb = lerp(self.trb,back,self.trf), lerp(self.brb,back,self.brf)
         return Bounds(None,self.tlf,tlb,self.blf,blb,self.trf,trb,self.brf,brb)
     def _left(self,left):
-        tlf, tlb = Mix2(self.tlf,left,self.trf), Mix2(self.tlb,left,self.trb)
-        blf, blb = Mix2(self.blf,left,self.brf), Mix2(self.blb,left,self.brb)
+        tlf, tlb = lerp(self.tlf,left,self.trf), lerp(self.tlb,left,self.trb)
+        blf, blb = lerp(self.blf,left,self.brf), lerp(self.blb,left,self.brb)
         return Bounds(None,tlf,tlb,blf,blb,self.trf,self.trb,self.brf,self.brb)
     def _right(self,right):
-        trf, trb = Mix2(self.trf,right,self.tlf), Mix2(self.trb,right,self.tlb)
-        brf, brb = Mix2(self.brf,right,self.blf), Mix2(self.brb,right,self.blb)
+        trf, trb = lerp(self.trf,right,self.tlf), lerp(self.trb,right,self.tlb)
+        brf, brb = lerp(self.brf,right,self.blf), lerp(self.brb,right,self.blb)
         return Bounds(None,self.tlf,self.tlb,self.blf,self.blb,trf,trb,brf,brb)
     def _top(self,top):
-        tlf, tlb = Mix2(self.tlf,top,self.blf), Mix2(self.tlb,top,self.blb)
-        trf, trb = Mix2(self.trf,top,self.brf), Mix2(self.trb,top,self.brb)
+        tlf, tlb = lerp(self.tlf,top,self.blf), lerp(self.tlb,top,self.blb)
+        trf, trb = lerp(self.trf,top,self.brf), lerp(self.trb,top,self.brb)
         return Bounds(None,tlf,tlb,self.blf,self.blb,trf,trb,self.brf,self.brb)
     def _bottom(self,bottom):
-        blf, blb = Mix2(self.blf,bottom,self.tlf), Mix2(self.blb,bottom,self.tlb)
-        brf, brb = Mix2(self.brf,bottom,self.trf), Mix2(self.brb,bottom,self.trb)
+        blf, blb = lerp(self.blf,bottom,self.tlf), lerp(self.blb,bottom,self.tlb)
+        brf, brb = lerp(self.brf,bottom,self.trf), lerp(self.brb,bottom,self.trb)
         return Bounds(None,self.tlf,self.tlb,blf,blb,self.trf,self.trb,brf,brb)
     def sub(self,left,right,front,back,top,bottom):
         b = self
@@ -232,11 +192,10 @@ class Column(Bounds):
         self.colour = None
     def draw(self,guide,outline):
         # compute the xz
-        tlf = call(self.tlf)
-        centre = (tlf+call(self.trb))/2.
+        centre = (self.tlf+self.trb)/2.
         top = centre.y
-        bottom = ((call(self.blf)+call(self.brb))/2.).y
-        r = min(*(centre-tlf))
+        bottom = ((self.blf+self.brb)/2.).y
+        r = min(*(centre-self.tlf))
         num_segments = 10
         theta = 2. * 3.1415926 / float(num_segments)
         c = math.cos(theta)
@@ -271,7 +230,7 @@ class PitchRoof(Bounds):
     """a pitched roof i.e. an equal roof"""
     def __init__(self,name,left,right,tlf,tlb,blf,blb,trf,trb,brf,brb):
         Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
-        self.front = front = Face("%s_front"%name,Mix2(tlf,.5,tlb),blf,brf,Mix2(trf,.5,trb))
+        self.front = front = Face("%s_front"%name,lerp(tlf,.5,tlb),blf,brf,lerp(trf,.5,trb))
         self.back = back = Face("%s_back"%name,front.tr,brb,blb,front.tl)
         front.colour = back.colour = (.3,.3,.2)
         self.faces.extend((front,back))
@@ -286,14 +245,14 @@ class Chimney(Bounds):
     def __init__(self,name,w,d,top,bottom):
         self.w, self.d, self.top, self.bottom = w,d,top,bottom
         x,z = (w*.1)/2,(d*.1)/2
-        tlf = Rel(top,Ofs(x,0,-z))
-        tlb = Rel(top,Ofs(x,0,z))
-        blf = Rel(bottom,Ofs(x,0,-z))
-        blb = Rel(bottom,Ofs(x,0,z))
-        trf = Rel(top,Ofs(-x,0,-z))
-        trb = Rel(top,Ofs(-x,0,z))
-        brf = Rel(bottom,Ofs(-x,0,-z))
-        brb = Rel(bottom,Ofs(-x,0,z))
+        tlf = top+Point(x,0,-z)
+        tlb = top+Point(x,0,z)
+        blf = bottom+Point(x,0,-z)
+        blb = bottom+Point(x,0,z)
+        trf = top+Point(-x,0,-z)
+        trb = top+Point(-x,0,z)
+        brf = bottom+Point(-x,0,-z)
+        brb = bottom+Point(-x,0,z)
         Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
         self.base = base = Box("%s_base"%name,True,*self.sub(0,0,0,0,.2,0))
         self.faces.append(base)
@@ -326,13 +285,13 @@ class House(Faces):
             Face("guide_top",trb,trf,tlf,tlb), #,(0,-1,0)), # top
             Face("guide_bottom",blb,blf,brf,brb), #,(0,1,0)), # bottom
             Face("guide_back",trb,tlb,blb,brb)) #,(0,0,1))) # back
-        self.height = height = Weight(.6)
+        self.height = height = .6
         inner = Bounds(None,tlf,tlb,blf,blb,trf,trb,brf,brb).sub(.1,.1,.1,.1,0,0)
         self.base = base = Box("base",False,*inner.sub(0,0,0,0,.4,0))
         self.roof = roof = PitchRoof("roof",True,True,*inner.sub(0,0,0,0,.1,.6))
-        self.chimney_pos = chimney_pos = Weight(.2)
+        self.chimney_pos = chimney_pos = .2
         self.chimney = chimney = Chimney("chimney",1,2,
-            Mix2(inner.tlf,chimney_pos,inner.trb),Mix2(roof.blf,chimney_pos,roof.brb))
+            lerp(inner.tlf,chimney_pos,inner.trb),lerp(roof.blf,chimney_pos,roof.brb))
         self.faces = [base,roof,chimney]
     def compute_corners(self):
         pt = self.pt
