@@ -5,7 +5,7 @@ import gtk, gtk.gdk as gdk, gtk.gtkgl as gtkgl, gtk.gdkgl as gdkgl, gobject
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
-import random, numpy, math
+import random, numpy, math, itertools
 
 import zpr
 from roads import load_texture
@@ -108,7 +108,9 @@ class Face:
         self.name = name
         assert len(mix) > 2
         self.m = mix
-        if len(mix) == 4:
+        if len(mix) == 3:
+            self.tl, self.bl, self.br = self.m
+        elif len(mix) == 4:
             self.tl, self.bl, self.br, self.tr = self.m
         self.colour = None
         self.texture = 0
@@ -118,11 +120,25 @@ class Face:
         u = self.m[1]-self.m[0]
         v = self.m[2]-self.m[0]
         return u.cross(v).normal()
-    def set_texture_quad(self,texture,w,h):
-        assert len(self.m) == 4
+    def set_texture(self,texture,uv_p,uv_q):
         self.texture = texture
-        self.texture_coords = ((0,h),(0,0),(w,0),(w,h)) # flip y
         self.colour = (1,1,1)
+        # p and q are the second and third points in m
+        p, q = self.m[1:3]
+        u_p, v_p = uv_p
+        u_q, v_q = uv_q
+        d_sqrd = p.distance_sqrd(q)
+        tx = []
+        def calc(r):
+            tr = (r-p).dot(q-p)/d_sqrd
+            u = (1.-tr)*u_p + tr*u_q
+            v = (1.-tr)*v_p + tr*v_q
+            tx.append((u,v))
+        calc(self.m[0])
+        tx.extend((uv_p,uv_q))
+        for r in self.m[3:]:
+            calc(r)
+        self.texture_coords = tx
     def intersection(self,ray_origin,ray_dir):
         v = [v.numpy() for v in self.m]
         I = zpr.ray_triangle(ray_origin,ray_dir,(v[0],v[1],v[2]))
@@ -247,8 +263,8 @@ class PitchRoof(Bounds):
         self.front = front = Face("%s_front"%name,lerp(tlf,.5,tlb)+l,blf,brf,lerp(trf,.5,trb)-r)
         self.back = back = Face("%s_back"%name,front.tr,brb,blb,front.tl)
         self.texture = texture = load_texture(ROOF_TEXTURES())[0]
-        front.set_texture_quad(texture,(front.tl-front.br).magnitude(),(front.tl-front.bl).magnitude())
-        back.set_texture_quad(texture,(back.tl-back.br).magnitude(),(back.tl-back.bl).magnitude())
+        front.set_texture(texture,(.2,.2),(.8,.8))
+        back.set_texture(texture,(.2,.2),(.8,.8))
         self.faces.extend((front,back))
         if left:
             self.left = left = Face("%s_left"%name,front.tl,back.br,front.bl)
@@ -273,8 +289,8 @@ class GambrelRoof(Bounds):
         self.back = back = Face("%s_back"%name,trb+Point(0,0,height/pitch),brb,blb,tlb+Point(0,0,height/pitch))
         self.top = top = self.TOP()("%s_top"%name,house,left,right,front.tl,back.tr,front.tr,back.tl,4)
         self.texture = texture = top.texture
-        front.set_texture_quad(texture,(front.tl-front.br).magnitude(),(front.tl-front.bl).magnitude())
-        back.set_texture_quad(texture,(back.tl-back.br).magnitude(),(back.tl-back.bl).magnitude())
+        front.set_texture(texture,(.2,.2),(.8,.8))
+        back.set_texture(texture,(.2,.2),(.8,.8))
         self.faces.extend((front,back,top))
         if left:
             self.left = left = Face("%s_left"%name,front.tl,back.tr,back.br,front.bl)
