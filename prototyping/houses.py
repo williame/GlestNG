@@ -135,39 +135,16 @@ class Bounds(Faces):
         self.name = name
         self.tlf,self.tlb,self.blf,self.blb,self.trf,self.trb,self.brf,self.brb = \
             tlf,tlb,blf,blb,trf,trb,brf,brb
-    def _front(self,front):
-        tlf, blf = lerp(self.tlf,front,self.tlb), lerp(self.blf,front,self.blb)
-        trf, brf = lerp(self.trf,front,self.trb), lerp(self.brf,front,self.brb)
-        return Bounds(None,tlf,self.tlb,blf,self.blb,trf,self.trb,brf,self.brb)
-    def _back(self,back):
-        tlb, blb = lerp(self.tlb,back,self.tlf), lerp(self.blb,back,self.blf)
-        trb, brb = lerp(self.trb,back,self.trf), lerp(self.brb,back,self.brf)
-        return Bounds(None,self.tlf,tlb,self.blf,blb,self.trf,trb,self.brf,brb)
-    def _left(self,left):
-        tlf, tlb = lerp(self.tlf,left,self.trf), lerp(self.tlb,left,self.trb)
-        blf, blb = lerp(self.blf,left,self.brf), lerp(self.blb,left,self.brb)
-        return Bounds(None,tlf,tlb,blf,blb,self.trf,self.trb,self.brf,self.brb)
-    def _right(self,right):
-        trf, trb = lerp(self.trf,right,self.tlf), lerp(self.trb,right,self.tlb)
-        brf, brb = lerp(self.brf,right,self.blf), lerp(self.brb,right,self.blb)
-        return Bounds(None,self.tlf,self.tlb,self.blf,self.blb,trf,trb,brf,brb)
-    def _top(self,top):
-        tlf, tlb = lerp(self.tlf,top,self.blf), lerp(self.tlb,top,self.blb)
-        trf, trb = lerp(self.trf,top,self.brf), lerp(self.trb,top,self.brb)
-        return Bounds(None,tlf,tlb,self.blf,self.blb,trf,trb,self.brf,self.brb)
-    def _bottom(self,bottom):
-        blf, blb = lerp(self.blf,bottom,self.tlf), lerp(self.blb,bottom,self.tlb)
-        brf, brb = lerp(self.brf,bottom,self.trf), lerp(self.brb,bottom,self.trb)
-        return Bounds(None,self.tlf,self.tlb,blf,blb,self.trf,self.trb,brf,brb)
     def sub(self,left,right,front,back,top,bottom):
-        b = self
-        if left != 0: b = b._left(left)
-        if right != 0: b = b._right(right/(1.-left))
-        if front != 0: b = b._front(front)
-        if back != 0: b = b._back(back/(1.-front))
-        if top != 0: b = b._top(top)
-        if bottom != 0: b = b._bottom(bottom/(1.-top))
-        return b
+        return Bounds(None,
+            self.tlf+Point(left,front,top),
+            self.tlb+Point(left,-back,top),
+            self.blf+Point(left,front,-bottom),
+            self.blb+Point(left,-back,-bottom),
+            self.trf+Point(-right,front,top),
+            self.trb+Point(-right,-back,top),
+            self.brf+Point(-right,front,-bottom),
+            self.brb+Point(-right,-back,-bottom))
     def __getitem__(self,i):
         return (self.tlf,self.tlb,self.blf,self.blb,self.trf,self.trb,self.brf,self.brb)[i]
 
