@@ -121,6 +121,8 @@ class Face:
         v = self.m[2]-self.m[0]
         return u.cross(v).normal()
     def set_texture(self,texture,uv_p,uv_q):
+        self.texture, self.colour = 0, (.2,.2,.3)
+        return ###
         self.texture = texture
         self.colour = (1,1,1)
         # p and q are the second and third points in m
