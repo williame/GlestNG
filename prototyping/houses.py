@@ -181,7 +181,7 @@ class Bounds(Faces):
         self.name = name
         self.tlf,self.tlb,self.blf,self.blb,self.trf,self.trb,self.brf,self.brb = \
             tlf,tlb,blf,blb,trf,trb,brf,brb
-    def sub(self,left,right,front,back,top,bottom):
+    def scale(self,left,right,front,back,top,bottom):
         x,y,z = [abs(d) for d in self.brb-self.tlf]
         left *= x; right *= -x
         front *= -z; back *= z
@@ -191,6 +191,18 @@ class Bounds(Faces):
             self.blf+Point(left,bottom,front),self.blb+Point(left,bottom,back),
             self.trf+Point(right,top,front),self.trb+Point(right,top,back),
             self.brf+Point(right,bottom,front),self.brb+Point(right,bottom,back))
+    def resize(self,**kwargs):
+        b = Bounds(None,*self)
+        if "width" in kwargs:
+            p = Point(kwargs["width"],0,0)
+            b.trf, b.trb, b.brf, b.brb = b.tlf+p, b.tlb+p, b.blf+p, b.blb+p
+        if "height" in kwargs:
+            p = Point(0,kwargs["height"],0)
+            b.tlf, b.tlb, b.trf, b.trb = b.blf+p, b.blb+p, b.brf+p, b.brb+p
+        if "depth" in kwargs:
+            p = Point(0,0,-kwargs["depth"])
+            b.tlb, b.blb, b.trb, b.brb = b.tlf+p, b.blf+p, b.trf+p, b.brf+p
+        return b
     def __getitem__(self,i):
         return (self.tlf,self.tlb,self.blf,self.blb,self.trf,self.trb,self.brf,self.brb)[i]
 
@@ -252,6 +264,9 @@ class Column(Bounds):
 ROOF_TEXTURES = Roulette((1,"textures/gray_pebble_tiles.jpg"),(1,"textures/fancy_tiles.jpg"))
         
 class PitchRoof(Bounds):
+    @classmethod
+    def DEPTH(cls,floor_height,num_floors):
+        return random.randint(2,3)
     def __init__(self,name,house,left,right,blf,blb,brf,brb,pitch=2,hip=False):
         self.house = house
         self.height = height = abs(blf.z-brb.z)/pitch
@@ -268,25 +283,33 @@ class PitchRoof(Bounds):
         self.faces.extend((front,back))
         if left:
             self.left = left = Face("%s_left"%name,front.tl,back.br,front.bl)
+            if hip: left.set_texture(texture,(.2,.2),(.8,.8))
             self.faces.append(left)
         if right:
             self.right = right = Face("%s_right"%name,front.tr,front.br,back.bl)
+            if hip: right.set_texture(texture,(.2,.2),(.8,.8))
             self.faces.append(right)
 
-def HipRoof(name,house,left,right,blf,blb,brf,brb,pitch=2):
-    return PitchRoof(name,house,left,right,blf,blb,brf,brb,pitch,True)
+class HipRoof(PitchRoof):
+    def __init__(self,name,house,left,right,blf,blb,brf,brb,pitch=2):
+       PitchRoof.__init__(self,name,house,left,right,blf,blb,brf,brb,pitch,True)
 
 class GambrelRoof(Bounds):
+    @classmethod
+    def DEPTH(cls,floor_height,num_floors):
+        return 3 if num_floors > 2 else 2
     TOP = Roulette((1,PitchRoof),(1,HipRoof))
-    def __init__(self,name,house,left,right,blf,blb,brf,brb):
+    def __init__(self,name,house,left,right,blf,blb,brf,brb,mansard=False):
         self.house = house
         self.height = height = house.floor_height
         top = Point(0,height,0)
         tlf,tlb,trf,trb = blf+top,blb+top,brf+top,brb+top
         Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
-        pitch = 2.5
-        self.front = front = Face("%s_front"%name,tlf+Point(0,0,-height/pitch),blf,brf,trf+Point(0,0,-height/pitch))
-        self.back = back = Face("%s_back"%name,trb+Point(0,0,height/pitch),brb,blb,tlb+Point(0,0,height/pitch))
+        slope = height/2.5
+        l = Point(slope if (left and mansard) else 0,0,0)
+        r = Point(slope if (right and mansard) else 0,0,0)
+        self.front = front = Face("%s_front"%name,tlf+Point(0,0,-slope)+l,blf,brf,trf+Point(0,0,-slope)-r)
+        self.back = back = Face("%s_back"%name,trb+Point(0,0,slope)-l,brb,blb,tlb+Point(0,0,slope)+r)
         self.top = top = self.TOP()("%s_top"%name,house,left,right,front.tl,back.tr,front.tr,back.tl,4)
         self.texture = texture = top.texture
         front.set_texture(texture,(.2,.2),(.8,.8))
@@ -294,10 +317,16 @@ class GambrelRoof(Bounds):
         self.faces.extend((front,back,top))
         if left:
             self.left = left = Face("%s_left"%name,front.tl,back.tr,back.br,front.bl)
+            if mansard: left.set_texture(texture,(.2,.2),(.8,.8))
             self.faces.append(left)
         if right:
             self.right = right = Face("%s_right"%name,front.tr,front.br,back.bl,back.tl)
+            if mansard: right.set_texture(texture,(.2,.2),(.8,.8))
             self.faces.append(right)
+
+class MansardRoof(GambrelRoof):
+    def __init__(self,name,house,left,right,blf,blb,brf,brb):
+        GambrelRoof.__init__(self,name,house,left,right,blf,blb,brf,brb,True)
 
 class Chimney(Bounds):
     def __init__(self,name,w,d,top,bottom):
@@ -312,15 +341,15 @@ class Chimney(Bounds):
         brf = bottom+Point(-x,0,-z)
         brb = bottom+Point(-x,0,z)
         Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
-        self.base = base = Box("%s_base"%name,True,*self.sub(0,0,0,0,.2,0))
+        self.base = base = Box("%s_base"%name,True,*self.scale(0,0,0,0,.2,0))
         self.faces.append(base)
-        self.pot = pot = Column("%s_pot"%name,True,*self.sub(0,0,0,0,0,.8))
+        self.pot = pot = Column("%s_pot"%name,True,*self.scale(0,0,0,0,0,.8))
         pot.colour = (.3,.3,.2)
         self.faces.append(pot)
 
 class House(Faces):
     FLOOR_HEIGHT = Rnd(.2,.3)
-    ROOF_TYPE = Roulette((1,GambrelRoof),(.4,PitchRoof))
+    ROOF_TYPE = Roulette((1,GambrelRoof),(.4,PitchRoof),(1,MansardRoof))
     FACE = "face"
     GUIDE = "guide"
     def __init__(self,mgr):
@@ -345,17 +374,22 @@ class House(Faces):
             Face("guide_top",trb,trf,tlf,tlb), #,(0,-1,0)), # top
             Face("guide_bottom",blb,blf,brf,brb), #,(0,1,0)), # bottom
             Face("guide_back",trb,tlb,blb,brb)) #,(0,0,1))) # back
-        self.height = height = .6
+        height = .6
         self.floor_height = floor_height = self.FLOOR_HEIGHT()
         self.num_floors = num_floors = random.randint(1,int(math.floor(height/floor_height)))
         self.height = height = floor_height*num_floors
-        print "floor height:",floor_height,"num floors:",num_floors,"height:",height
-        inner = Bounds(None,tlf,tlb,blf,blb,trf,trb,brf,brb).sub(.1,.1,.1,.1,0,0)
-        self.base = base = Box("base",False,*inner.sub(0,0,0,0,1-height,0))
-        self.roof = roof = self.ROOF_TYPE()("roof",self,True,True,base.tlf,base.tlb,base.trf,base.trb)
+        roof = self.ROOF_TYPE()
+        depth = roof.DEPTH(floor_height,num_floors)
+        self.sz = sz = (depth*2,num_floors,depth)
+        unit_width = floor_height
+        inner = Bounds(None,tlf,tlb,blf,blb,trf,trb,brf,brb). \
+            resize(width=sz[0]*unit_width,height=sz[1]*floor_height,depth=sz[2]*unit_width)
+        self.base = base = Box("base",False,*inner)
+        self.roof = roof = roof("roof",self,True,True,base.tlf,base.tlb,base.trf,base.trb)
         self.chimney_pos = chimney_pos = .2
+        chimney = roof.resize(height=roof.tlf.distance(roof.blf)*1.2)
         self.chimney = chimney = Chimney("chimney",1,2,
-            lerp(inner.tlf,chimney_pos,inner.trb),lerp(roof.blf,chimney_pos,roof.brb))
+            lerp(chimney.tlf,chimney_pos,chimney.trb),lerp(chimney.blf,chimney_pos,chimney.brb))
         self.faces = [base,roof,chimney]
     def compute_corners(self):
         pt = self.pt
