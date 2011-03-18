@@ -7,6 +7,8 @@ from OpenGL.GLU import *
 from OpenGL.GLUT import *
 import random, numpy, math, itertools
 
+from gameobjects.matrix44 import Matrix44 as Matrix
+
 import zpr
 from roads import load_texture
 
@@ -104,7 +106,8 @@ class Roulette:
         return choice[0]
 
 class Face:
-    def __init__(self,name,*mix):
+    def __init__(self,matrix,name,*mix):
+        self.matrix = matrix.copy()
         self.name = name
         assert len(mix) > 2
         self.m = mix
@@ -142,22 +145,23 @@ class Face:
             calc(r)
         self.texture_coords = tx
     def intersection(self,ray_origin,ray_dir):
-        v = [v.numpy() for v in self.m]
+        v = [Point(*self.matrix.transform(v)).numpy() for v in self.m]
         I = zpr.ray_triangle(ray_origin,ray_dir,(v[0],v[1],v[2]))
         if (I is None) and (len(v) > 3):
             I = zpr.ray_triangle(ray_origin,ray_dir,(v[2],v[3],v[0]))
         if I is None: return ()
         return ((Point(*I),self),)
     def draw(self,guide,outline):
+        t = self.matrix.transform
         if guide: colour = (.4,.4,1.,.2) if outline else (.8,.8,1.,.2)
         else: colour = self.colour if self.colour is not None else (1,0,0)
         glBindTexture(GL_TEXTURE_2D,self.texture)
         glColor(*colour)
-        glNormal(*self.normal())
+        glNormal(*t(self.normal()))
         glBegin(GL_LINE_LOOP if outline else GL_POLYGON)
         for tx,pt in zip(self.texture_coords,self.m):
             glTexCoord(*tx)
-            glVertex(*pt.xyz())
+            glVertex(*t(pt.xyz()))
         glEnd()
         glBindTexture(GL_TEXTURE_2D,0)
     def __repr__(self):
@@ -210,21 +214,22 @@ class Bounds(Faces):
 
 class Box(Bounds):
     """four sided box, optionally with a closed top"""
-    def __init__(self,name,top,tlf,tlb,blf,blb,trf,trb,brf,brb):
+    def __init__(self,matrix,name,top,tlf,tlb,blf,blb,trf,trb,brf,brb):
         Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
-        self.front = front = Face("%s_front"%name,tlf,blf,brf,trf)
-        self.back = back = Face("%s_back"%name,trb,brb,blb,tlb)
-        self.left = left = Face("%s_left"%name,tlb,blb,blf,tlf)
-        self.right = right = Face("%s_right"%name,trf,brf,brb,trb)
+        self.front = front = Face(matrix,"%s_front"%name,tlf,blf,brf,trf)
+        self.back = back = Face(matrix,"%s_back"%name,trb,brb,blb,tlb)
+        self.left = left = Face(matrix,"%s_left"%name,tlb,blb,blf,tlf)
+        self.right = right = Face(matrix,"%s_right"%name,trf,brf,brb,trb)
         self.faces.extend((front,back,left,right))
         if top:
-            self.top = top = Face("%s_top"%name,trf,trb,tlb,tlf)
+            self.top = top = Face(matrix,"%s_top"%name,trf,trb,tlb,tlf)
             self.faces.append(top)
             
 class Column(Bounds):
     MAX = 0.03
-    def __init__(self,name,top,tlf,tlb,blf,blb,trf,trb,brf,brb):
+    def __init__(self,matrix,name,top,tlf,tlb,blf,blb,trf,trb,brf,brb):
         Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
+        self.matrix = matrix.copy()
         self.top = top
         self.colour = None
     def draw(self,guide,outline):
@@ -246,21 +251,22 @@ class Column(Bounds):
             xz.append((x+centre.x,z+centre.z))
         xz.reverse()
         # draw it
+        t = self.matrix.transform
         glColor(*self.colour if self.colour is not None else (0,1,0))
         glBegin(GL_QUAD_STRIP)
         for x,z in xz:
             p = Point(x,top,z)
-            glNormal(*-(p-centre).normal())
-            glVertex(*p)
+            glNormal(*t(-(p-centre).normal()))
+            glVertex(*t(p))
             p = Point(x,bottom,z)
-            glNormal(*-(p-centre).normal())
-            glVertex(*p)
+            glNormal(*t(-(p-centre).normal()))
+            glVertex(*t(p))
         glEnd()
         glNormal(0,1,0)
         if self.top:
             glBegin(GL_POLYGON)
             for x,z in xz:
-                glVertex(x,top,z)
+                glVertex(*t((x,top,z)))
             glEnd()
             
 ROOF_TEXTURES = Roulette((1,"textures/gray_pebble_tiles.jpg"),(1,"textures/fancy_tiles.jpg"))
@@ -269,7 +275,7 @@ class PitchRoof(Bounds):
     @classmethod
     def DEPTH(cls,floor_height,num_floors):
         return random.randint(2,3)
-    def __init__(self,name,house,left,right,blf,blb,brf,brb,pitch=2,hip=False):
+    def __init__(self,matrix,name,house,left,right,blf,blb,brf,brb,pitch=2,hip=False):
         self.house = house
         self.height = height = abs(blf.z-brb.z)/pitch
         top = Point(0,height,0)
@@ -277,31 +283,31 @@ class PitchRoof(Bounds):
         Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
         l = Point(height,0,0) if (left and hip) else 0
         r = Point(height,0,0) if (right and hip) else 0
-        self.front = front = Face("%s_front"%name,lerp(tlf,.5,tlb)+l,blf,brf,lerp(trf,.5,trb)-r)
-        self.back = back = Face("%s_back"%name,front.tr,brb,blb,front.tl)
+        self.front = front = Face(matrix,"%s_front"%name,lerp(tlf,.5,tlb)+l,blf,brf,lerp(trf,.5,trb)-r)
+        self.back = back = Face(matrix,"%s_back"%name,front.tr,brb,blb,front.tl)
         self.texture = texture = load_texture(ROOF_TEXTURES())[0]
         front.set_texture(texture,(.2,.2),(.8,.8))
         back.set_texture(texture,(.2,.2),(.8,.8))
         self.faces.extend((front,back))
         if left:
-            self.left = left = Face("%s_left"%name,front.tl,back.br,front.bl)
+            self.left = left = Face(matrix,"%s_left"%name,front.tl,back.br,front.bl)
             if hip: left.set_texture(texture,(.2,.2),(.8,.8))
             self.faces.append(left)
         if right:
-            self.right = right = Face("%s_right"%name,front.tr,front.br,back.bl)
+            self.right = right = Face(matrix,"%s_right"%name,front.tr,front.br,back.bl)
             if hip: right.set_texture(texture,(.2,.2),(.8,.8))
             self.faces.append(right)
 
 class HipRoof(PitchRoof):
-    def __init__(self,name,house,left,right,blf,blb,brf,brb,pitch=2):
-       PitchRoof.__init__(self,name,house,left,right,blf,blb,brf,brb,pitch,True)
+    def __init__(self,matrix,name,house,left,right,blf,blb,brf,brb,pitch=2):
+       PitchRoof.__init__(self,matrix,name,house,left,right,blf,blb,brf,brb,pitch,True)
 
 class GambrelRoof(Bounds):
     @classmethod
     def DEPTH(cls,floor_height,num_floors):
         return 3 if num_floors > 2 else 2
     TOP = Roulette((1,PitchRoof),(1,HipRoof))
-    def __init__(self,name,house,left,right,blf,blb,brf,brb,mansard=False):
+    def __init__(self,matrix,name,house,left,right,blf,blb,brf,brb,mansard=False):
         self.house = house
         self.height = height = house.floor_height
         top = Point(0,height,0)
@@ -310,28 +316,28 @@ class GambrelRoof(Bounds):
         slope = height/2.5
         l = Point(slope if (left and mansard) else 0,0,0)
         r = Point(slope if (right and mansard) else 0,0,0)
-        self.front = front = Face("%s_front"%name,tlf+Point(0,0,-slope)+l,blf,brf,trf+Point(0,0,-slope)-r)
-        self.back = back = Face("%s_back"%name,trb+Point(0,0,slope)-l,brb,blb,tlb+Point(0,0,slope)+r)
-        self.top = top = self.TOP()("%s_top"%name,house,left,right,front.tl,back.tr,front.tr,back.tl,4)
+        self.front = front = Face(matrix,"%s_front"%name,tlf+Point(0,0,-slope)+l,blf,brf,trf+Point(0,0,-slope)-r)
+        self.back = back = Face(matrix,"%s_back"%name,trb+Point(0,0,slope)-l,brb,blb,tlb+Point(0,0,slope)+r)
+        self.top = top = self.TOP()(matrix,"%s_top"%name,house,left,right,front.tl,back.tr,front.tr,back.tl,4)
         self.texture = texture = top.texture
         front.set_texture(texture,(.2,.2),(.8,.8))
         back.set_texture(texture,(.2,.2),(.8,.8))
         self.faces.extend((front,back,top))
         if left:
-            self.left = left = Face("%s_left"%name,front.tl,back.tr,back.br,front.bl)
+            self.left = left = Face(matrix,"%s_left"%name,front.tl,back.tr,back.br,front.bl)
             if mansard: left.set_texture(texture,(.2,.2),(.8,.8))
             self.faces.append(left)
         if right:
-            self.right = right = Face("%s_right"%name,front.tr,front.br,back.bl,back.tl)
+            self.right = right = Face(matrix,"%s_right"%name,front.tr,front.br,back.bl,back.tl)
             if mansard: right.set_texture(texture,(.2,.2),(.8,.8))
             self.faces.append(right)
 
 class MansardRoof(GambrelRoof):
-    def __init__(self,name,house,left,right,blf,blb,brf,brb):
-        GambrelRoof.__init__(self,name,house,left,right,blf,blb,brf,brb,True)
+    def __init__(self,matrix,name,house,left,right,blf,blb,brf,brb):
+        GambrelRoof.__init__(self,matrix,name,house,left,right,blf,blb,brf,brb,True)
 
 class Chimney(Bounds):
-    def __init__(self,name,w,d,top,bottom):
+    def __init__(self,matrix,name,w,d,top,bottom):
         self.w, self.d, self.top, self.bottom = w,d,top,bottom
         x,z = (w*.1)/2,(d*.1)/2
         tlf = top+Point(x,0,-z)
@@ -343,9 +349,9 @@ class Chimney(Bounds):
         brf = bottom+Point(-x,0,-z)
         brb = bottom+Point(-x,0,z)
         Bounds.__init__(self,name,tlf,tlb,blf,blb,trf,trb,brf,brb)
-        self.base = base = Box("%s_base"%name,True,*self.scale(0,0,0,0,.2,0))
+        self.base = base = Box(matrix,"%s_base"%name,True,*self.scale(0,0,0,0,.2,0))
         self.faces.append(base)
-        self.pot = pot = Column("%s_pot"%name,True,*self.scale(0,0,0,0,0,.8))
+        self.pot = pot = Column(matrix,"%s_pot"%name,True,*self.scale(0,0,0,0,0,.8))
         pot.colour = (.3,.3,.2)
         self.faces.append(pot)
 
@@ -368,14 +374,16 @@ class House(Faces):
         self.brf = brf = Point()
         self.brb = brb = Point()
         self.compute_corners()
+        self.matrix = matrix = Matrix()
         # guides are inverted so faces face inwards
         self.guides = ( \
-            Face("guide_front",tlf,trf,brf,blf), #,(0,0,-1)), # front
-            Face("guide_right",trf,trb,brb,brf), #,(-1,0,0)), # right
-            Face("guide_left",tlb,tlf,blf,blb), #,(1,0,0)), # left
-            Face("guide_top",trb,trf,tlf,tlb), #,(0,-1,0)), # top
-            Face("guide_bottom",blb,blf,brf,brb), #,(0,1,0)), # bottom
-            Face("guide_back",trb,tlb,blb,brb)) #,(0,0,1))) # back
+            Face(matrix,"guide_front",tlf,trf,brf,blf), #,(0,0,-1)), # front
+            Face(matrix,"guide_right",trf,trb,brb,brf), #,(-1,0,0)), # right
+            Face(matrix,"guide_left",tlb,tlf,blf,blb), #,(1,0,0)), # left
+            Face(matrix,"guide_top",trb,trf,tlf,tlb), #,(0,-1,0)), # top
+            Face(matrix,"guide_bottom",blb,blf,brf,brb), #,(0,1,0)), # bottom
+            Face(matrix,"guide_back",trb,tlb,blb,brb)) #,(0,0,1))) # back
+        matrix.make_x_rotation(.5)
         height = .6
         self.floor_height = floor_height = self.FLOOR_HEIGHT()
         self.num_floors = num_floors = random.randint(1,int(math.floor(height/floor_height)))
@@ -386,11 +394,11 @@ class House(Faces):
         unit_width = floor_height
         inner = Bounds(None,tlf,tlb,blf,blb,trf,trb,brf,brb). \
             resize(width=sz[0]*unit_width,height=sz[1]*floor_height,depth=sz[2]*unit_width)
-        self.base = base = Box("base",False,*inner)
-        self.roof = roof = roof("roof",self,True,True,base.tlf,base.tlb,base.trf,base.trb)
+        self.base = base = Box(matrix,"base",False,*inner)
+        self.roof = roof = roof(matrix,"roof",self,True,True,base.tlf,base.tlb,base.trf,base.trb)
         self.chimney_pos = chimney_pos = .2
         chimney = roof.resize(height=roof.tlf.distance(roof.blf)*1.2)
-        self.chimney = chimney = Chimney("chimney",1,2,
+        self.chimney = chimney = Chimney(matrix,"chimney",1,2,
             lerp(chimney.tlf,chimney_pos,chimney.trb),lerp(chimney.blf,chimney_pos,chimney.brb))
         self.faces = [base,roof,chimney]
     def compute_corners(self):
