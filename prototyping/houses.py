@@ -12,6 +12,9 @@ from gameobjects.matrix44 import Matrix44 as Matrix
 import zpr
 from roads import load_texture
 
+uv_a, uv_b = (0.,1.), (1.,1.)
+SELECTED = None
+
 def is_vec(a):
     return isinstance(a,tuple) and (len(a)==3)
 def vec_cross(a,b):
@@ -123,27 +126,25 @@ class Face:
         u = self.m[1]-self.m[0]
         v = self.m[2]-self.m[0]
         return u.cross(v).normal()
-    def set_texture(self,texture,uv_p,uv_q):
-        self.texture, self.colour = 0, (.2,.2,.3)
-        return ###
+    def set_texture(self,texture,a_ofs,a,b):
         self.texture = texture
         self.colour = (1,1,1)
-        # p and q are the second and third points in m
-        p, q = self.m[1:3]
-        u_p, v_p = uv_p
-        u_q, v_q = uv_q
-        d_sqrd = p.distance_sqrd(q)
-        tx = []
-        def calc(r):
-            tr = (r-p).dot(q-p)/d_sqrd
-            u = (1.-tr)*u_p + tr*u_q
-            v = (1.-tr)*v_p + tr*v_q
-            tx.append((u,v))
-        calc(self.m[0])
-        tx.extend((uv_p,uv_q))
-        for r in self.m[3:]:
-            calc(r)
-        self.texture_coords = tx
+        self.texture_coords = tx = []
+        A, B = self.m[a_ofs:a_ofs+2]
+        for P in self.m:
+            if P == A:
+                tx.append(a)
+            elif P == B:
+                tx.append(b)
+            else:
+                scale = P.distance(A)/B.distance(A)
+                theta = (P-A).dot((B-A)/(P.distance(A)*B.distance(A)))
+                theta = math.acos(theta)
+                x, y = a[0]-b[0], a[1]-b[1]
+                x, y = x*math.cos(theta) - y*math.sin(theta), \
+                    x*math.sin(theta) + y*math.cos(theta)
+                x, y = a[0]+ x*scale, a[1]+ y*scale
+                tx.append((x,y))
     def intersection(self,ray_origin,ray_dir):
         v = [Point(*self.matrix.transform(v)).numpy() for v in self.m]
         I = zpr.ray_triangle(ray_origin,ray_dir,(v[0],v[1],v[2]))
@@ -164,6 +165,17 @@ class Face:
             glVertex(*t(pt.xyz()))
         glEnd()
         glBindTexture(GL_TEXTURE_2D,0)
+        if self == SELECTED:
+            glPushMatrix()
+            glTranslate(*self.m[1])
+            glColor(1,0,0)
+            glutSolidSphere(.02,20,20)
+            glPopMatrix()
+            glPushMatrix()
+            glTranslate(*self.m[2])
+            glColor(0,1,0)
+            glutSolidSphere(.02,20,20)
+            glPopMatrix()
     def __repr__(self):
         return "Face<%s,%d>"%(self.name,len(self.m))
         
@@ -246,8 +258,7 @@ class Column(Bounds):
         xz = [(x+centre.x,z+centre.z)]
         for i in xrange(num_segments):
             t = x
-            x = c * x - s * z
-            z = s * t + c * z
+            x, z = c * x - s * z, s * x + c * z
             xz.append((x+centre.x,z+centre.z))
         xz.reverse()
         # draw it
@@ -286,16 +297,16 @@ class PitchRoof(Bounds):
         self.front = front = Face(matrix,"%s_front"%name,lerp(tlf,.5,tlb)+l,blf,brf,lerp(trf,.5,trb)-r)
         self.back = back = Face(matrix,"%s_back"%name,front.tr,brb,blb,front.tl)
         self.texture = texture = load_texture(ROOF_TEXTURES())[0]
-        front.set_texture(texture,(.2,.2),(.8,.8))
-        back.set_texture(texture,(.2,.2),(.8,.8))
+        front.set_texture(texture,1,uv_a,uv_b)
+        back.set_texture(texture,1,uv_a,uv_b)
         self.faces.extend((front,back))
         if left:
             self.left = left = Face(matrix,"%s_left"%name,front.tl,back.br,front.bl)
-            if hip: left.set_texture(texture,(.2,.2),(.8,.8))
+            if hip: left.set_texture(texture,1,uv_a,uv_b)
             self.faces.append(left)
         if right:
             self.right = right = Face(matrix,"%s_right"%name,front.tr,front.br,back.bl)
-            if hip: right.set_texture(texture,(.2,.2),(.8,.8))
+            if hip: right.set_texture(texture,1,uv_a,uv_b)
             self.faces.append(right)
 
 class HipRoof(PitchRoof):
@@ -320,16 +331,16 @@ class GambrelRoof(Bounds):
         self.back = back = Face(matrix,"%s_back"%name,trb+Point(0,0,slope)-l,brb,blb,tlb+Point(0,0,slope)+r)
         self.top = top = self.TOP()(matrix,"%s_top"%name,house,left,right,front.tl,back.tr,front.tr,back.tl,4)
         self.texture = texture = top.texture
-        front.set_texture(texture,(.2,.2),(.8,.8))
-        back.set_texture(texture,(.2,.2),(.8,.8))
+        front.set_texture(texture,1,uv_a,uv_b)
+        back.set_texture(texture,1,uv_a,uv_b)
         self.faces.extend((front,back,top))
         if left:
             self.left = left = Face(matrix,"%s_left"%name,front.tl,back.tr,back.br,front.bl)
-            if mansard: left.set_texture(texture,(.2,.2),(.8,.8))
+            if mansard: left.set_texture(texture,1,uv_a,uv_b)
             self.faces.append(left)
         if right:
             self.right = right = Face(matrix,"%s_right"%name,front.tr,front.br,back.bl,back.tl)
-            if mansard: right.set_texture(texture,(.2,.2),(.8,.8))
+            if mansard: right.set_texture(texture,1,uv_a,uv_b)
             self.faces.append(right)
 
 class MansardRoof(GambrelRoof):
@@ -383,7 +394,7 @@ class House(Faces):
             Face(matrix,"guide_top",trb,trf,tlf,tlb), #,(0,-1,0)), # top
             Face(matrix,"guide_bottom",blb,blf,brf,brb), #,(0,1,0)), # bottom
             Face(matrix,"guide_back",trb,tlb,blb,brb)) #,(0,0,1))) # back
-        matrix.make_x_rotation(.5)
+        #matrix.make_x_rotation(.5)
         height = .6
         self.floor_height = floor_height = self.FLOOR_HEIGHT()
         self.num_floors = num_floors = random.randint(1,int(math.floor(height/floor_height)))
@@ -441,6 +452,10 @@ class Editor(zpr.GLZPR):
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA)
         glEnable(GL_TEXTURE_2D)
+        glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT)
+        glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT)
+        glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
+        glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR)
         self.model = House(self)
     def draw(self,event):
         glClearColor(.8,.8,.7,0)
@@ -479,6 +494,13 @@ class Editor(zpr.GLZPR):
         if len(hits) == 0: return ((),())
         hits.sort()
         print x,y,"\n\t","\n\t".join(str(h) for h in hits)
+        global SELECTED
+        SELECTED = None
+        for dist,typ,face,pt in hits:
+            if typ == House.FACE:
+                SELECTED = face
+                self.queue_draw()
+                break
         return ((),())
     def pick(self,*args):
         pass
