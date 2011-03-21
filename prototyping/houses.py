@@ -12,7 +12,7 @@ from gameobjects.matrix44 import Matrix44 as Matrix
 import zpr
 from roads import load_texture
 
-uv_a, uv_b = (0.,1.), (1.,1.)
+uv_a, uv_b = (0.,0.), (1.,0.)
 SELECTED = None
 
 def is_vec(a):
@@ -81,7 +81,7 @@ class Point:
         if i == 2: return self.z
         raise IndexError()
     def __repr__(self):
-        return "P(%s,%s,%s)"%(self.x,self.y,self.z)
+        return "P(%0.05f,%0.05f,%0.05f)"%(self.x,self.y,self.z)
 
 def lerp(p1,weight,p2):
     return p1 + (p2-p1) * weight
@@ -140,7 +140,7 @@ class Face:
                 scale = P.distance(A)/B.distance(A)
                 theta = (P-A).dot((B-A)/(P.distance(A)*B.distance(A)))
                 theta = math.acos(theta)
-                x, y = a[0]-b[0], a[1]-b[1]
+                x, y = b[0]-a[0], b[1]-a[1]
                 x, y = x*math.cos(theta) - y*math.sin(theta), \
                     x*math.sin(theta) + y*math.cos(theta)
                 x, y = a[0]+ x*scale, a[1]+ y*scale
@@ -336,7 +336,7 @@ class GambrelRoof(Bounds):
         self.faces.extend((front,back,top))
         if left:
             self.left = left = Face(matrix,"%s_left"%name,front.tl,back.tr,back.br,front.bl)
-            if mansard: left.set_texture(texture,1,uv_a,uv_b)
+            if mansard: left.set_texture(texture,2,uv_a,uv_b)
             self.faces.append(left)
         if right:
             self.right = right = Face(matrix,"%s_right"%name,front.tr,front.br,back.bl,back.tl)
