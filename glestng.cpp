@@ -418,16 +418,21 @@ int main(int argc,char** args) {
 		xml_settings->set_as_settings();
 		std::auto_ptr<graphics_t::mgr_t> graphics_mgr(graphics_t::create());
 		std::auto_ptr<fonts_t> fonts(fonts_t::create());
-		std::auto_ptr<fs_t> fs(fs_t::create("data/Glest"));
+		std::auto_ptr<fs_t> fs;
+		try {
+			fs.reset(fs_t::create("data/Glest"));
+			if(false) {
+				fs_file_t::ptr_t logo_file(fs_settings->get("logo.g3d"));
+				istream_t::ptr_t logostream(logo_file->reader());
+				logo = std::auto_ptr<model_g3d_t>(new model_g3d_t(*logostream));
+			}
+			load(*fs);
+		} catch(glest_exception_t* e) {
+			std::cerr << "cannot load glest data: " << e << std::endl;
+			delete e;
+		}
 		std::auto_ptr<ui_mgr_t> ui_(ui_mgr());
 		std::auto_ptr<mod_ui_t> mod_ui(mod_ui_t::create());
-		if(false) {
-			fs_file_t::ptr_t logo_file(fs_settings->get("logo.g3d"));
-			istream_t::ptr_t logostream(logo_file->reader());
-			logo = std::auto_ptr<model_g3d_t>(new model_g3d_t(*logostream));
-		}
-
-		load(*fs);
 		
 		std::auto_ptr<terrain_t> terrain(terrain_t::gen_planet(5,500,3));
 		//world()->dump(std::cout);
@@ -487,7 +492,7 @@ int main(int argc,char** args) {
 					break;
 				case SDL_MOUSEBUTTONUP:
 					if(selection)
-						std::cout << "selection stopped"<<std::endl;
+						std::cout << "selection stopped" << std::endl;
 					selection = false;
 					break;
 				case SDL_KEYDOWN:
@@ -504,6 +509,10 @@ int main(int argc,char** args) {
 						quit = true;
 						break;
 					case SDLK_m: // MODDING MODE
+						if(!fs.get()) {
+							std::cerr << "(modding menu triggered but mod not loaded)" << std::endl;
+							break;
+						}
 						if(mod_ui->is_shown())
 							mod_ui->hide();
 						else

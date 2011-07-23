@@ -22,7 +22,7 @@ enum type_t {
 	BUILDING = 0x02,
 	UNIT = 0x04,
 	// these are masks by category
-	FIXED = TERRAIN|BUILDING,
+	STATIONARY = TERRAIN|BUILDING,
 	MOVING = UNIT,
 };
 

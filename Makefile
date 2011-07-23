@@ -13,7 +13,7 @@ OPTIMISATIONS = # -O9 -fomit-frame-pointer -fno-rtti -march=native # etc -fprofi
 
 ifeq ($(shell uname),windows32)
 	LIB_CFLAGS =  -I/usr/include/SDL `sdl-config --cflags`
-	LIB_LDFLAGS =  -L/usr/lib -static -lglew32s `sdl-config --libs` -dynamic -lopengl32 -lglu32 
+	LIB_LDFLAGS =  -L/usr/lib -static -lglew32s `sdl-config --static-libs` -dynamic -lopengl32 -lglu32 
 	EXE_EXT = .exe
 else
 	LIB_CFLAGS = `pkg-config --cflags sdl gl glew`

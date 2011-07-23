@@ -106,11 +106,13 @@ private:
 };
 
 struct fs_t::pimpl_t {
-	pimpl_t(const std::string& dd): data_directory(dd) {}
+	pimpl_t(fs_t& fs_,const std::string& dd): fs(fs_), data_directory(dd) {}
+	fs_t& fs;
 	const std::string data_directory;
 	typedef std::map<std::string,std::string> resolve_t;
 	resolve_t resolved;
 	std::string resolve(const std::string& path);
+	strings_t list(const std::string& path,bool (*test)(const char*));
 };
 
 static bool _starts_with(const std::string& str,const std::string& sub) {
@@ -132,6 +134,36 @@ std::string fs_t::pimpl_t::resolve(const std::string& path) {
 		panic("expecting "<<path<<" to be in "<<data_directory);
 	resolve_t::iterator i=resolved.find(path);
 	data_error(path << " does not exist!");
+}
+
+#ifndef WIN32
+static int _one(const struct dirent64 *d) { return 1; }
+#endif
+
+strings_t fs_t::pimpl_t::list(const std::string& path,bool (*test)(const char*)) {
+	strings_t list;
+#ifdef WIN32
+	if(DIR *dir = opendir(path.c_str())) {
+		while(dirent* entry = readdir(dir)) {
+			if((entry->d_name[0] != '.') && test(fs.join(path,entry->d_name).c_str()))
+				list.push_back(entry->d_name);
+		}
+		closedir(dir);
+	} else
+		data_error("list_dirs("<<path<<"): cannot open");
+#else
+	struct dirent64 **eps;
+	if(int n = scandir64(path.c_str(),&eps,_one,alphasort64)) {
+		if(-1 == n) c_error("list_dirs("<<path<<")");
+		for(int i=0; i<n; i++) {
+			if((eps[i]->d_name[0] != '.') && test(fs.join(path,eps[i]->d_name).c_str()))
+				list.push_back(eps[i]->d_name);
+			free(eps[i]);
+		}
+		free(eps);
+	}
+#endif
+	return list;
 }
 
 std::string fs_t::canocial(const std::string& path) const {
@@ -162,9 +194,16 @@ std::string fs_t::canocial(const std::string& path) const {
 }
 
 static bool _stat(const char* path,struct stat& s) {
+	std::string tmp;
+	if(path && *path && (path[strlen(path)-1] == '/')) { // trim any trailing / - win32 requires this
+		tmp = path;
+		tmp[strlen(path)-1] = 0;
+		path = tmp.c_str();
+	}
 	if(stat(path,&s)) {
 		if((ENOENT != errno)&&(ENOTDIR != errno))
 			c_error("stat("<<path<<")");
+		c_error("stat("<<path<<")");
 		return false;
 	}
 	return true;
@@ -218,39 +257,15 @@ std::string fs_t::get_body(const std::string& path) {
 	return istream->read_all();
 }
 
-static int _one(const struct dirent64 *d) { return 1; }
-
 strings_t fs_t::list_dirs(const std::string& path) {
-	struct dirent64 **eps;
-	strings_t dirs;
-	if(int n = scandir64(canocial(path).c_str(),&eps,_one,alphasort64)) {
-		if(-1 == n) c_error("list_dirs("<<path<<" -> "<<canocial(path)<<")");
-		for(int i=0; i<n; i++) {
-			if((eps[i]->d_name[0] != '.') && is_dir(join(path,eps[i]->d_name)))
-				dirs.push_back(eps[i]->d_name);
-			free(eps[i]);
-		}
-		free(eps);
-	}
-	return dirs;
+	return pimpl->list(canocial(path),_is_dir);
 }
 
 strings_t fs_t::list_files(const std::string& path) {
-	struct dirent64 **eps;
-	strings_t files;
-	if(int n = scandir64(canocial(path).c_str(),&eps,_one,alphasort64)) {
-		if(-1 == n) c_error("list_files("<<path<<" -> "<<canocial(path)<<")");
-		for(int i=0; i<n; i++) {
-			if((eps[i]->d_name[0] != '.') && is_file(join(path,eps[i]->d_name)))
-				files.push_back(eps[i]->d_name);
-			free(eps[i]);
-		}
-		free(eps);
-	}
-	return files;
+	return pimpl->list(canocial(path),_is_file);
 }
 
-fs_t::fs_t(const std::string& data_directory): pimpl(new pimpl_t(data_directory)) {}
+fs_t::fs_t(const std::string& data_directory): pimpl(new pimpl_t(*this,data_directory)) {}
 
 fs_t::~fs_t() { delete pimpl; }
 
