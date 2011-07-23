@@ -69,7 +69,8 @@ ${TRG_GLEST_NG}: ${OBJ_GLEST_NG_CPP} ${OBJ_GLEST_NG_C}
 	${LD} ${CPPFLAGS} -o $@ $^ ${LDFLAGS}
 	
 zip:
-	zip "glestng-`date \"+%y%m%d-%H%M%S\"`.zip" ${TRG_GLEST_NG} font.bmp
+	zip -r "glestng-`date \"+%y%m%d-%H%M%S\"`.zip" ${TRG_GLEST_NG} data
+	@echo "(if on windows, add SDL.dll to it)"
 
 # compile c files
 	
