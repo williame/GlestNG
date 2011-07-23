@@ -72,7 +72,7 @@ private:
 };
 
 struct world_t::pimpl_t {
-	pimpl_t(): idx(bounds_t(vec_t(-1,-1,-1),vec_t(1,1,1))), has_frustum(false) {}
+	pimpl_t(): idx(bounds_t(vec_t(-1,-1,-1),vec_t(1,1,1))), has_frustum(false), size(0) {}
 	void add_visible(object_t* obj);
 	void adjust_visible(object_t* obj);
 	void remove_visible(object_t* obj);
@@ -83,6 +83,7 @@ struct world_t::pimpl_t {
 	frustum_t frustum;
 	hits_t visible;
 	int visible_dirty; // index of first unsorted entry; consider tombstones and unsorted part
+	size_t size;
 };
 
 spatial_index_t::spatial_index_t(const bounds_t& bounds):
@@ -441,6 +442,7 @@ world_t::world_t(): pimpl(new pimpl_t()) {}
 void world_t::add(object_t* obj) {
 	if(obj->spatial_index) panic(*obj<<" is already in world");
 	pimpl->idx.add(obj);
+	pimpl->size++;
 	if(obj->spatial_index->is_visible(*obj))
 		pimpl->add_visible(obj);
 }
@@ -451,6 +453,12 @@ void world_t::remove(object_t* obj) {
 		if(obj->visible)
 			pimpl->remove_visible(obj);
 	} else if(obj->visible) panic(*obj<<" is visible but not in spatial index");
+	assert(pimpl->size);
+	pimpl->size--;
+}
+
+size_t world_t::size() const {
+	return pimpl->size;
 }
 
 static bool cmp_hits_distance(const world_t::hit_t& a,const world_t::hit_t& b) {

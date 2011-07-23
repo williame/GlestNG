@@ -61,6 +61,7 @@ public:
 	static world_t* get_world();
 	void add(object_t* obj);
 	void remove(object_t* obj);
+	size_t size() const;
 	struct hit_t {
 		hit_t(float d_,type_t t,object_t* o): d(d_),type(t),obj(o) {}
 		float d; // distance from the origin (of ray or frustum)

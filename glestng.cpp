@@ -167,7 +167,7 @@ void ui() {
 		glPopMatrix();
 	}
 	static char fps[128];
-	snprintf(fps,sizeof(fps),"%u fps, %d visible objects (of %u)",(unsigned)framerate.per_second(now()),visible_objects,(unsigned)objs.size());
+	snprintf(fps,sizeof(fps),"%u fps, %d visible objects (of %u)",(unsigned)framerate.per_second(now()),visible_objects,(unsigned)world()->size());
 	static ui_label_t* label = new ui_label_t("this is a test");
 	//label->set_pos(vec2_t(10,10));
 	label->set_text(fps);
@@ -273,8 +273,8 @@ void camera() {
 	glTranslatef(0,0,-3);
 	glGetFloatv(GL_PROJECTION_MATRIX,projection.f);
 	glGetFloatv(GL_MODELVIEW_MATRIX,modelview.f);
-//	projection = projection.transpose();
-//	modelview = modelview.transpose();
+	projection = projection.transpose();
+	modelview = modelview.transpose();
 	world()->set_frustum(projection,modelview);
 }
 
@@ -463,8 +463,8 @@ int main(int argc,char** args) {
 		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 		glColorMaterial(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE);
 		glEnable(GL_COLOR_MATERIAL);
-		//glEnable(GL_NORMALIZE);
-		//glFrontFace(GL_CW);
+		glEnable(GL_NORMALIZE);
+		glFrontFace(GL_CW);
 		camera();
 		bool quit = false;
 		SDL_Event event;
